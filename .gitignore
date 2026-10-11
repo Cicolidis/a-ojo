@@ -5,4 +5,6 @@ apps-script/.clasp.json
 
 # Dependencias y sistema
 node_modules/
+procesamiento/.venv/
+__pycache__/
 .DS_Store

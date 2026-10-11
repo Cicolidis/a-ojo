@@ -6,11 +6,11 @@
  *
  * Petición: `action` y `t` van en la query o en el cuerpo. El cuerpo puede ser
  * JSON enviado como text/plain (evita el preflight de CORS) o form-urlencoded.
- * Respuesta: { ok, data } o { ok: false, error, mensaje, status }.
+ * Respuesta: { ok, data } o { ok: false, error, mensaje, detalles?, status }.
  * Con `formato=texto` responde solo el mensaje en texto plano (para avisos de Android).
  */
 
-const VERSION_API = '0.1.0';
+const VERSION_API = '0.2.0';
 
 function doGet(e) {
   return manejar_(e, 'GET');
@@ -27,6 +27,7 @@ function rutas_() {
     'todo': { metodos: ['GET'], fn: accionTodo_ },
     'bandeja.pendientes': { metodos: ['GET'], fn: accionBandejaPendientes_ },
     'bandeja.actualizar': { metodos: ['POST'], fn: accionBandejaActualizar_ },
+    'receta.upsert': { metodos: ['POST'], fn: accionRecetaUpsert_ },
   };
 }
 
@@ -48,6 +49,7 @@ function manejar_(e, metodo) {
       ok: false,
       error: err.codigo || 'error_interno',
       mensaje: err.status ? err.message : 'Algo falló en la API: ' + err.message,
+      detalles: err.detalles,
       status: status,
     });
   }

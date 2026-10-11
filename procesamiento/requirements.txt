@@ -1,0 +1,4 @@
+# Dependencias del procesamiento (las instala ./setup.sh en procesamiento/.venv).
+# yt-dlp[default] trae yt-dlp-ejs, que YouTube necesita junto con un runtime de JavaScript.
+yt-dlp[default]
+faster-whisper

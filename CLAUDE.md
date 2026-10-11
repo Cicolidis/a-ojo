@@ -18,8 +18,19 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 - Acciones nuevas: una función en `Acciones.js`, registrada en `rutas_()` (`Api.js`), con su test en `tests/api.test.js`.
 - clasp siempre se corre con `npm run clasp -- …`, que usa la cuenta de `A_OJO_CLASP_USER` (Gmail personal; la sesión por defecto de clasp es otra cuenta).
 - Deploy: `npm run deploy` (push + redeploy sobre `A_OJO_DEPLOYMENT_ID`). **Nunca crear un deployment nuevo**: cambiaría la URL `/exec`.
+- Si un cambio usa un servicio de Google nuevo (Drive, Gmail…), después del push hay que correr `setup()` en el editor y aceptar el permiso **antes** del deploy. Si no, el web app deja de responder y se corta la captura.
+
+## Procesamiento (`procesamiento/`, comando `/recetas`)
+
+- Los scripts se corren con `procesamiento/aojo <fetch|transcribe|frames|api> …`, que usa el Python de `procesamiento/.venv` (lo crea `./setup.sh`). Solo biblioteca estándar más yt-dlp y faster-whisper.
+- Cada script imprime **una línea de JSON** (`{"ok": false, "error", "motivo"}` si falla) y escribe en `~/.a-ojo/trabajo/<bandeja_id>/` y `~/.a-ojo/log/`. Ninguna ruta fija al usuario: todo sale de `Path.home()` o del `.env`.
+- Los errores de yt-dlp se clasifican en `comun.py` (`login`, `privado`, `no_disponible`, `limite`, `red`, `cookies`) con un motivo en rioplatense que llega tal cual a la app.
+- El audio se decodifica con ffmpeg, no con PyAV: las versiones nuevas de PyAV rompen la de faster-whisper.
+- macOS no deja que Claude Code lea la carpeta de Chrome. Las cookies de Instagram se exportan desde la Terminal (`procesamiento/aojo fetch cookies`) a `~/.a-ojo/cookies-instagram.txt`, y `comun.args_cookies()` prefiere ese archivo.
+- Las reglas para armar cada receta viven en `.claude/commands/recetas.md`; la validación definitiva la hace `receta.upsert` en la API.
 
 ## Tests
 
-- `npm test`: tests de Node, sin dependencias. `tests/fakes/apps-script.js` simula SpreadsheetApp y los demás servicios, incluida la conversión de fechas ISO que hace Sheets cuando una celda no tiene formato de texto.
+- `npm test`: tests de Node, sin dependencias. `tests/fakes/apps-script.js` simula SpreadsheetApp, DriveApp y los demás servicios, incluida la conversión de fechas ISO que hace Sheets cuando una celda no tiene formato de texto.
+- `npm run test:py`: tests de `procesamiento/` (unittest, sin red: yt-dlp y el reloj se simulan).
 - `npm run smoke`: prueba contra la API desplegada (necesita el `.env`).

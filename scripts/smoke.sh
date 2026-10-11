@@ -41,6 +41,7 @@ revisar "ping sin token → 401" "$(echo "$R" | campo status)" "401"
 R=$(api_get "action=ping&t=$A_OJO_TOKEN")
 revisar "ping con token" "$(echo "$R" | campo ok)" "true"
 revisar "no faltan hojas" "$(echo "$R" | campo data.hojas_faltantes)" "[]"
+revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.2.0"
 
 R=$(api_post "{\"action\":\"capturar\",\"t\":\"$A_OJO_TOKEN\",\"url\":\"$URL_PRUEBA?utm_source=prueba\",\"quien\":\"camilo\"}")
 ID=$(echo "$R" | campo data.id)
@@ -72,6 +73,15 @@ R=$(curl -sSL --max-time 60 --data-urlencode "url=Mirá esto $URL_PRUEBA" --data
 revisar "form-urlencoded + formato=texto" "$R" "Ya estaba guardada"
 
 api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"descartada\"}" > /dev/null
+
+# receta.upsert con validar: true no escribe nada en la Sheet.
+RECETA="{\"titulo\":\"Prueba\",\"tipo\":\"dulce\",\"confianza\":\"alta\",\"origen_datos\":\"descripcion\",\
+\"idioma_original\":\"es\",\"fuente_url\":\"$URL_PRUEBA\",\"ingredientes\":[{\"cantidad\":100,\"unidad\":\"g\",\
+\"nombre\":\"harina 0000\",\"gondola\":\"almacén\"}],\"pasos\":[{\"texto\":\"Mezclá.\"}]}"
+R=$(api_post "{\"action\":\"receta.upsert\",\"t\":\"$A_OJO_TOKEN\",\"validar\":true,\"bandeja_id\":\"$ID\",\"receta\":$RECETA}")
+revisar "receta.upsert valida sin escribir" "$(echo "$R" | campo data.validar)" "true"
+R=$(api_post "{\"action\":\"receta.upsert\",\"t\":\"$A_OJO_TOKEN\",\"validar\":true,\"receta\":{\"titulo\":\"\"}}")
+revisar "receta.upsert rechaza una receta inválida" "$(echo "$R" | campo error)" "receta_invalida"
 
 echo
 if [ "$FALLAS" -eq 0 ]; then echo "Todo bien."; else echo "$FALLAS verificaciones fallaron."; exit 1; fi

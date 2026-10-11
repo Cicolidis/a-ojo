@@ -15,6 +15,8 @@ const ENUMS = {
   confianza: ['alta', 'media', 'baja'],
   unidad: ['g', 'kg', 'ml', 'l', 'u', 'cda', 'cdita', 'taza', 'pizca', 'a ojo', 'lata', 'paquete', 'diente', 'ramo'],
   gondola: ['verdulería', 'almacén', 'lácteos y huevos', 'carnicería', 'panadería', 'congelados', 'otros'],
+  // Capas de §6.1 que pueden aparecer en Recetas.origen_datos.
+  capa: ['descripcion', 'subtitulos', 'web', 'audio', 'frames', 'capturas'],
 };
 
 const ESQUEMA = {
@@ -54,6 +56,8 @@ const ESQUEMA = {
       col_('idioma_original'),
       col_('creado', 'fecha'),
       col_('actualizado', 'fecha'),
+      // Nota interna del procesamiento (§6.2): correcciones de transcripción y supuestos.
+      col_('notas_proceso'),
     ],
   },
   Ingredientes: {

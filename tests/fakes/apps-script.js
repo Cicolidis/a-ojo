@@ -49,6 +49,18 @@ class HojaFalsa {
   }
   insertRowsAfter(_f, n) { this.maxFilas += n; }
   insertColumnsAfter(_c, n) { this.maxCols += n; }
+  deleteRows(desde, n) {
+    if (desde <= this.filasFijas || desde + n - 1 > this.maxFilas) throw new Error('deleteRows fuera de rango');
+    if (this.maxFilas - n <= this.filasFijas) throw new Error('No se pueden borrar todas las filas no fijas');
+    const nuevas = new Map();
+    for (const [k, v] of this.celdas) {
+      const [f, c] = k.split(',').map(Number);
+      if (f < desde) nuevas.set(k, v);
+      else if (f >= desde + n) nuevas.set(f - n + ',' + c, v);
+    }
+    this.celdas = nuevas;
+    this.maxFilas -= n;
+  }
   deleteColumns(desde, n) {
     for (const k of [...this.celdas.keys()]) if (Number(k.split(',')[1]) >= desde) this.celdas.delete(k);
     this.maxCols -= n;
@@ -119,9 +131,68 @@ function constructorValidacion() {
   return b;
 }
 
+function iterador(lista) {
+  let i = 0;
+  return { hasNext: () => i < lista.length, next: () => lista[i++] };
+}
+
+/** Drive en memoria: carpetas, archivos, papelera y permisos de link. */
+class DriveFalso {
+  constructor() {
+    this.porId = new Map();
+    this.siguiente = 1;
+    this.raiz = this.carpeta('Mi unidad');
+  }
+  nuevoId(prefijo) { return prefijo + this.siguiente++; }
+  carpeta(nombre) {
+    const drive = this;
+    const c = {
+      id: this.nuevoId('carpeta'), nombre, carpetas: [], archivos: [], papelera: false,
+      getId: () => c.id,
+      getName: () => c.nombre,
+      isTrashed: () => c.papelera,
+      setTrashed: x => { c.papelera = x; return c; },
+      getFoldersByName: n => iterador(c.carpetas.filter(x => x.nombre === n && !x.papelera)),
+      createFolder: n => { const nueva = drive.carpeta(n); c.carpetas.push(nueva); return nueva; },
+      getFilesByName: n => iterador(c.archivos.filter(x => x.nombre === n && !x.papelera)),
+      createFile: blob => { const a = drive.archivo(blob); c.archivos.push(a); return a; },
+    };
+    this.porId.set(c.id, c);
+    return c;
+  }
+  archivo(blob) {
+    const a = {
+      id: this.nuevoId('archivo'), nombre: blob.getName(), mime: blob.getContentType(), bytes: blob.getBytes(),
+      papelera: false, acceso: null, permiso: null,
+      getId: () => a.id,
+      getName: () => a.nombre,
+      isTrashed: () => a.papelera,
+      setTrashed: x => { a.papelera = x; return a; },
+      setSharing: (acceso, permiso) => { a.acceso = acceso; a.permiso = permiso; return a; },
+    };
+    this.porId.set(a.id, a);
+    return a;
+  }
+  /** Archivos que no están en la papelera, de cualquier carpeta. */
+  archivosVivos() { return [...this.porId.values()].filter(x => x.bytes && !x.papelera); }
+  servicio() {
+    return {
+      getRootFolder: () => this.raiz,
+      getFolderById: id => {
+        const c = this.porId.get(id);
+        if (!c || !c.carpetas) throw new Error('No item with the given ID could be found');
+        return c;
+      },
+      Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' },
+      Permission: { VIEW: 'VIEW' },
+    };
+  }
+}
+
 /** Carga los archivos de apps-script/src en un contexto aislado con los servicios falsos. */
 function cargarProyecto() {
   const planilla = new PlanillaFalsa();
+  const drive = new DriveFalso();
   const propiedades = new Map();
   const registro = [];
   const contexto = {
@@ -145,7 +216,19 @@ function cargarProyecto() {
         setMimeType(m) { this.mime = m; return this; },
       }),
     },
-    Utilities: { getUuid: () => crypto.randomUUID() },
+    DriveApp: drive.servicio(),
+    Utilities: {
+      getUuid: () => crypto.randomUUID(),
+      base64Decode: s => {
+        if (s.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) throw new Error('Could not decode string.');
+        return [...Buffer.from(s, 'base64')];
+      },
+      newBlob: (bytes, mime, nombre) => ({
+        getBytes: () => bytes,
+        getContentType: () => mime,
+        getName: () => nombre,
+      }),
+    },
     console: { log: (...a) => registro.push(a.join(' ')), error: (...a) => registro.push('ERROR ' + a.join(' ')) },
   };
   vm.createContext(contexto);
@@ -155,7 +238,7 @@ function cargarProyecto() {
     vm.runInContext(fs.readFileSync(path.join(dir, archivo), 'utf8'), contexto, { filename: archivo });
   }
   const evaluar = codigo => vm.runInContext(codigo, contexto);
-  return { ctx: contexto, evaluar, planilla, propiedades, registro };
+  return { ctx: contexto, evaluar, planilla, drive, propiedades, registro };
 }
 
 module.exports = { cargarProyecto };

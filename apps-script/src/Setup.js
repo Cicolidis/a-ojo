@@ -28,8 +28,11 @@ function setup() {
   });
   ss.setActiveSheet(ss.getSheetByName('Bandeja'));
 
+  // La primera vez, esto pide el permiso de Drive (el web app lo necesita para las fotos).
+  const fotos = carpetaFotos_();
   const token = asegurarToken_();
   console.log('Listo: hojas creadas o actualizadas (' + nombres.join(', ') + ').');
+  console.log('Carpeta de fotos: A ojo/' + fotos.getName() + ' (' + fotos.getId() + ').');
   console.log('Token de la API: ' + token);
 }
 
