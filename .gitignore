@@ -1,0 +1,8 @@
+# Secretos y configuración local
+.env
+apps-script/.clasp.json
+.clasprc.json
+
+# Dependencias y sistema
+node_modules/
+.DS_Store

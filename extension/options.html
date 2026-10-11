@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A ojo · Configuración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Work+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/48.png" alt="" width="48" height="48">
+      <div>
+        <h1>A ojo</h1>
+        <p class="secundario">Configuración de la extensión</p>
+      </div>
+    </header>
+
+    <form id="form" novalidate>
+      <label for="apiUrl">URL del web app</label>
+      <input id="apiUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false" required>
+
+      <label for="token">Token</label>
+      <input id="token" type="password" autocomplete="off" spellcheck="false" required>
+
+      <label for="quien">¿Quién sos?</label>
+      <select id="quien">
+        <option value="camilo">Camilo</option>
+        <option value="pareja">Pareja</option>
+      </select>
+
+      <div class="botones">
+        <button type="submit" class="principal">Guardar</button>
+        <button type="button" id="probar">Probar conexión</button>
+      </div>
+      <p id="estado" role="status" aria-live="polite"></p>
+    </form>
+
+    <section class="ayuda">
+      <h2>Cómo se usa</h2>
+      <ul>
+        <li>Tocá el botón de A ojo en la barra para guardar la pestaña actual.</li>
+        <li>Clic derecho sobre un link → <strong>Guardar en A ojo</strong>.</li>
+        <li>Atajo: <kbd>⌥</kbd><kbd>⇧</kbd><kbd>R</kbd>. Se cambia en <code>chrome://extensions/shortcuts</code>.</li>
+      </ul>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

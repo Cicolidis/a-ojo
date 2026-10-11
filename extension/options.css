@@ -1,0 +1,135 @@
+:root {
+  color-scheme: light;
+  --fondo: #F5EEE3;
+  --superficie: #FFFBF5;
+  --superficie-2: #EFE2CF;
+  --borde: #D8C8B2;
+  --tinta: #2A211B;
+  --tinta-2: #6B5D52;
+  --acento: #A6461F;
+  --acento-hover: #7E3313;
+  --ok: #4F6B2E;
+  --alerta: #8A3A1A;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font: 400 15px/1.5 'Work Sans', system-ui, -apple-system, sans-serif;
+}
+
+main {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 0 20px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+header img { border-radius: 12px; }
+
+h1 {
+  margin: 0;
+  font: 700 32px/1.1 'Fraunces', Georgia, serif;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+
+.secundario {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--tinta-2);
+}
+
+form, .ayuda {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+label {
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: 500;
+}
+
+label:first-child { margin-top: 0; }
+
+input, select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--tinta);
+  font: inherit;
+}
+
+input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.botones {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+button {
+  min-height: 52px;
+  padding: 0 20px;
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  background: var(--superficie-2);
+  color: var(--tinta);
+  font: 600 15px 'Work Sans', system-ui, sans-serif;
+  cursor: pointer;
+}
+
+button.principal {
+  flex: 1;
+  border-color: var(--acento);
+  background: var(--acento);
+  color: var(--superficie);
+}
+
+button.principal:hover { background: var(--acento-hover); }
+button:disabled { opacity: 0.6; cursor: progress; }
+
+#estado {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+#estado.ok { color: var(--ok); }
+#estado.error { color: var(--alerta); }
+
+.ayuda { margin-top: 16px; }
+.ayuda ul { margin: 0; padding-left: 18px; color: var(--tinta-2); }
+.ayuda li + li { margin-top: 4px; }
+
+kbd, code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--superficie-2);
+  font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
