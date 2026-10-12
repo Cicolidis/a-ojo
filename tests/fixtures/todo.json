@@ -21,7 +21,8 @@
       "fuente_url": "https://www.youtube.com/shorts/prueba00001",
       "plataforma": "youtube",
       "creado": "2026-10-11T20:13:07.835Z",
-      "actualizado": "2026-10-11T20:16:20.491Z"
+      "actualizado": "2026-10-11T20:16:20.491Z",
+      "porciones_vistas": ""
     },
     {
       "estado": "favorita",
@@ -42,7 +43,8 @@
       "fuente_url": "https://www.youtube.com/shorts/prueba00002",
       "plataforma": "youtube",
       "creado": "2026-10-11T19:40:00.000Z",
-      "actualizado": "2026-10-11T19:45:00.000Z"
+      "actualizado": "2026-10-11T19:45:00.000Z",
+      "porciones_vistas": ""
     },
     {
       "estado": "para_probar",
@@ -63,7 +65,8 @@
       "fuente_url": "https://www.instagram.com/reel/PRUEBA00003/",
       "plataforma": "instagram",
       "creado": "2026-10-11T18:00:00.000Z",
-      "actualizado": "2026-10-11T18:05:00.000Z"
+      "actualizado": "2026-10-11T18:05:00.000Z",
+      "porciones_vistas": "40"
     },
     {
       "estado": "para_probar",
@@ -84,7 +87,8 @@
       "fuente_url": "https://www.youtube.com/shorts/prueba00004",
       "plataforma": "youtube",
       "creado": "2026-10-10T15:00:00.000Z",
-      "actualizado": "2026-10-10T15:00:00.000Z"
+      "actualizado": "2026-10-10T15:00:00.000Z",
+      "porciones_vistas": ""
     },
     {
       "estado": "para_probar",
@@ -105,7 +109,8 @@
       "fuente_url": "https://www.instagram.com/reel/PRUEBA00005/",
       "plataforma": "instagram",
       "creado": "2026-10-09T12:00:00.000Z",
-      "actualizado": "2026-10-09T12:00:00.000Z"
+      "actualizado": "2026-10-09T12:00:00.000Z",
+      "porciones_vistas": ""
     },
     {
       "estado": "probada",
@@ -126,7 +131,8 @@
       "fuente_url": "https://www.youtube.com/watch?v=prueba00006",
       "plataforma": "youtube",
       "creado": "2026-10-08T12:00:00.000Z",
-      "actualizado": "2026-10-08T12:00:00.000Z"
+      "actualizado": "2026-10-08T12:00:00.000Z",
+      "porciones_vistas": ""
     },
     {
       "estado": "descartada",
@@ -147,7 +153,8 @@
       "fuente_url": "https://www.youtube.com/shorts/prueba00007",
       "plataforma": "youtube",
       "creado": "2026-10-07T12:00:00.000Z",
-      "actualizado": "2026-10-07T12:00:00.000Z"
+      "actualizado": "2026-10-07T12:00:00.000Z",
+      "porciones_vistas": ""
     }
   ],
   "ingredientes": [
@@ -159,7 +166,11 @@
       "unidad": "g",
       "nombre": "chocolate semiamargo",
       "nota": "picado",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00002",
@@ -169,7 +180,11 @@
       "unidad": "g",
       "nombre": "manteca",
       "nota": "más un poco para el molde",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00003",
@@ -179,7 +194,11 @@
       "unidad": "g",
       "nombre": "azúcar",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00004",
@@ -189,7 +208,11 @@
       "unidad": "u",
       "nombre": "huevos",
       "nota": "",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00005",
@@ -199,7 +222,11 @@
       "unidad": "g",
       "nombre": "harina 0000",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00006",
@@ -209,7 +236,11 @@
       "unidad": "cdita",
       "nombre": "esencia de vainilla",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00007",
@@ -219,7 +250,11 @@
       "unidad": "a ojo",
       "nombre": "sal",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00008",
@@ -229,7 +264,11 @@
       "unidad": "a ojo",
       "nombre": "pimienta",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00009",
@@ -239,7 +278,11 @@
       "unidad": "g",
       "nombre": "nueces",
       "nota": "picadas gruesas",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "opcional",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00017",
@@ -249,7 +292,11 @@
       "unidad": "g",
       "nombre": "queso crema",
       "nota": "a temperatura ambiente",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00018",
@@ -259,7 +306,11 @@
       "unidad": "g",
       "nombre": "azúcar",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00019",
@@ -269,7 +320,11 @@
       "unidad": "u",
       "nombre": "huevos",
       "nota": "",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00020",
@@ -279,7 +334,11 @@
       "unidad": "ml",
       "nombre": "crema de leche",
       "nota": "",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00021",
@@ -289,7 +348,25 @@
       "unidad": "cda",
       "nombre": "harina 0000",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00037",
+      "receta_id": "r_vasca",
+      "orden": 6,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "papel manteca",
+      "nota": "para forrar el molde",
+      "gondola": "otros",
+      "seccion": "",
+      "rol": "utensilio",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00028",
@@ -299,7 +376,11 @@
       "unidad": "lata",
       "nombre": "garbanzos cocidos",
       "nota": "escurridos",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00029",
@@ -309,7 +390,11 @@
       "unidad": "g",
       "nombre": "harina de garbanzos",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00030",
@@ -319,7 +404,11 @@
       "unidad": "cda",
       "nombre": "aceite de oliva",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00031",
@@ -329,7 +418,11 @@
       "unidad": "cdita",
       "nombre": "comino",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00032",
@@ -339,7 +432,11 @@
       "unidad": "a ojo",
       "nombre": "sal",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00038",
@@ -389,7 +486,11 @@
       "unidad": "u",
       "nombre": "muslos de pollo",
       "nota": "con piel",
-      "gondola": "carnicería"
+      "gondola": "carnicería",
+      "seccion": "Guiso",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00046",
@@ -399,7 +500,11 @@
       "unidad": "u",
       "nombre": "cebollas",
       "nota": "en pluma",
-      "gondola": "verdulería"
+      "gondola": "verdulería",
+      "seccion": "Guiso",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00047",
@@ -409,7 +514,11 @@
       "unidad": "diente",
       "nombre": "ajo",
       "nota": "",
-      "gondola": "verdulería"
+      "gondola": "verdulería",
+      "seccion": "Guiso",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00048",
@@ -419,7 +528,11 @@
       "unidad": "cda",
       "nombre": "comino",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "Guiso",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00049",
@@ -429,7 +542,11 @@
       "unidad": "a ojo",
       "nombre": "jugo de limón",
       "nota": "",
-      "gondola": "verdulería"
+      "gondola": "verdulería",
+      "seccion": "Para terminar",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00050",
@@ -439,7 +556,11 @@
       "unidad": "a ojo",
       "nombre": "aceitunas verdes",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "Para terminar",
+      "rol": "opcional",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00051",
@@ -449,7 +570,11 @@
       "unidad": "a ojo",
       "nombre": "caldo de verduras",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "Guiso",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00056",
@@ -459,7 +584,11 @@
       "unidad": "kg",
       "nombre": "zapallo",
       "nota": "en cubos",
-      "gondola": "verdulería"
+      "gondola": "verdulería",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00057",
@@ -469,7 +598,11 @@
       "unidad": "u",
       "nombre": "cebolla",
       "nota": "",
-      "gondola": "verdulería"
+      "gondola": "verdulería",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00058",
@@ -479,7 +612,11 @@
       "unidad": "l",
       "nombre": "caldo de verduras",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00059",
@@ -489,7 +626,11 @@
       "unidad": "ml",
       "nombre": "crema de leche",
       "nota": "opcional",
-      "gondola": "lácteos y huevos"
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "opcional",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00060",
@@ -499,7 +640,11 @@
       "unidad": "a ojo",
       "nombre": "nuez moscada",
       "nota": "",
-      "gondola": "almacén"
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     },
     {
       "id": "i_00064",
@@ -752,14 +897,16 @@
       "receta_id": "r_vasca",
       "fecha": "2026-09-12T21:00:00.000Z",
       "quien": "pareja",
-      "texto": "Quedó perfecta a los 33 minutos. La próxima, un poco menos de azúcar."
+      "texto": "Quedó perfecta a los 33 minutos. La próxima, un poco menos de azúcar.",
+      "creado": "2026-09-12T21:00:00.000Z"
     },
     {
       "id": "n_00002",
       "receta_id": "r_sopa",
       "fecha": "2026-10-05T21:00:00.000Z",
       "quien": "camilo",
-      "texto": "Con jengibre rallado queda buenísima."
+      "texto": "Con jengibre rallado queda buenísima.",
+      "creado": "2026-10-05T21:00:00.000Z"
     }
   ],
   "compras": [],

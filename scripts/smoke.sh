@@ -41,7 +41,7 @@ revisar "ping sin token → 401" "$(echo "$R" | campo status)" "401"
 R=$(api_get "action=ping&t=$A_OJO_TOKEN")
 revisar "ping con token" "$(echo "$R" | campo ok)" "true"
 revisar "no faltan hojas" "$(echo "$R" | campo data.hojas_faltantes)" "[]"
-revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.2.0"
+revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.3.0"
 
 R=$(api_post "{\"action\":\"capturar\",\"t\":\"$A_OJO_TOKEN\",\"url\":\"$URL_PRUEBA?utm_source=prueba\",\"quien\":\"camilo\"}")
 ID=$(echo "$R" | campo data.id)
@@ -77,11 +77,21 @@ api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID
 # receta.upsert con validar: true no escribe nada en la Sheet.
 RECETA="{\"titulo\":\"Prueba\",\"tipo\":\"dulce\",\"confianza\":\"alta\",\"origen_datos\":\"descripcion\",\
 \"idioma_original\":\"es\",\"fuente_url\":\"$URL_PRUEBA\",\"ingredientes\":[{\"cantidad\":100,\"unidad\":\"g\",\
-\"nombre\":\"harina 0000\",\"gondola\":\"almacén\"}],\"pasos\":[{\"texto\":\"Mezclá.\"}]}"
+\"nombre\":\"harina 0000\",\"gondola\":\"almacén\",\"rol\":\"principal\"}],\"pasos\":[{\"texto\":\"Mezclá.\"}]}"
 R=$(api_post "{\"action\":\"receta.upsert\",\"t\":\"$A_OJO_TOKEN\",\"validar\":true,\"bandeja_id\":\"$ID\",\"receta\":$RECETA}")
 revisar "receta.upsert valida sin escribir" "$(echo "$R" | campo data.validar)" "true"
 R=$(api_post "{\"action\":\"receta.upsert\",\"t\":\"$A_OJO_TOKEN\",\"validar\":true,\"receta\":{\"titulo\":\"\"}}")
 revisar "receta.upsert rechaza una receta inválida" "$(echo "$R" | campo error)" "receta_invalida"
+
+# Las acciones de la app existen y validan, sin escribir nada: la receta no existe.
+for CUERPO in '"action":"receta.estado","estado":"probada"' '"action":"receta.porciones","porciones":4' \
+  '"action":"receta.ingredientes","ingredientes":[{"id":"i_nada0","rol":"principal"}]' \
+  '"action":"receta.clasificar","ingredientes":[{"id":"i_nada0","rol":"principal"}]'; do
+  R=$(api_post "{$CUERPO,\"t\":\"$A_OJO_TOKEN\",\"id\":\"r_nada0\"}")
+  revisar "$(echo "$CUERPO" | cut -d'"' -f4) responde no_encontrada" "$(echo "$R" | campo error)" "no_encontrada"
+done
+R=$(api_post "{\"action\":\"nota.agregar\",\"t\":\"$A_OJO_TOKEN\",\"receta_id\":\"r_nada0\",\"quien\":\"camilo\",\"texto\":\"x\"}")
+revisar "nota.agregar responde no_encontrada" "$(echo "$R" | campo error)" "no_encontrada"
 
 echo
 if [ "$FALLAS" -eq 0 ]; then echo "Todo bien."; else echo "$FALLAS verificaciones fallaron."; exit 1; fi

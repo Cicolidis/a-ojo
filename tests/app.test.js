@@ -59,6 +59,8 @@ test('trajoCambios y necesitaCompleta', async () => {
   assert.equal(necesitaCompleta(null), true);
   assert.equal(necesitaCompleta(datos, Date.parse('2026-10-13T00:00:00.000Z')), false);
   assert.equal(necesitaCompleta(datos, Date.parse('2026-10-19T00:00:00.000Z')), true, 'más de 7 días');
+  assert.equal(necesitaCompleta(Object.assign({}, datos, { version: undefined }), Date.parse('2026-10-13T00:00:00.000Z')), true,
+    'un snapshot de una versión anterior de la app se pide entero');
 });
 
 test('indexar ordena ingredientes, pasos y notas, y la lista va de la más nueva a la más vieja', async () => {
@@ -87,6 +89,7 @@ test('buscar: sin tildes, todas las palabras, combinado con los filtros y sin de
   assert.deepEqual(ids({ filtro: 'etiqueta:rápida' }), ['r_galle', 'r_torti']);
   assert.deepEqual(ids({ texto: 'para invitados' }), ['r_brown', 'r_pollo', 'r_vasca'], 'busca en etiquetas');
   assert.deepEqual(ids({ texto: 'licuado' }), []);
+  assert.deepEqual(ids({ filtro: 'descartada' }), ['r_desc'], 'las descartadas, solo en su filtro');
 });
 
 test('etiquetasFrecuentes y resumenBandeja', async () => {
@@ -168,6 +171,160 @@ test('ingredientesDelPaso: busca los ingredientes nombrados en el paso', async (
   assert.deepEqual(de3('Untá con el dulce de leche.'), ['dulce de leche']);
 });
 
+test('agrupar: por sección en orden de aparición y, dentro, por rol; los utensilios al final', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const { agrupar, enUnaLinea, rolDe, seccionDe } = await cargar('ingredientes.js');
+  const { porId } = indexar(aplicarDelta(null, fixture()));
+  const nombres = lista => lista.map(i => i.nombre);
+
+  const pollo = agrupar(porId.get('r_pollo').ingredientes);
+  assert.deepEqual(pollo.secciones.map(s => s.nombre), ['Guiso', 'Para terminar']);
+  assert.deepEqual(nombres(pollo.secciones[0].principales), ['muslos de pollo', 'cebollas', 'ajo', 'caldo de verduras'],
+    'el caldo es de la primera sección aunque se use al final');
+  assert.deepEqual(nombres(pollo.secciones[0].condimentos), ['comino']);
+  assert.deepEqual(nombres(pollo.secciones[1].condimentos), ['jugo de limón']);
+  assert.deepEqual(nombres(pollo.secciones[1].opcionales), ['aceitunas verdes']);
+
+  const brownie = agrupar(porId.get('r_brown').ingredientes);
+  assert.deepEqual(brownie.secciones.map(s => s.nombre), [''], 'una sola parte: sin título');
+  assert.equal(enUnaLinea(brownie.secciones[0].condimentos), 'Esencia de vainilla (1 cdita), sal y pimienta');
+  assert.equal(enUnaLinea(brownie.secciones[0].condimentos, 2), 'Esencia de vainilla (2 cditas), sal y pimienta');
+
+  const vasca = agrupar(porId.get('r_vasca').ingredientes);
+  assert.deepEqual(nombres(vasca.utensilios), ['papel manteca']);
+  assert.equal(enUnaLinea(vasca.utensilios), 'Papel manteca (para forrar el molde)');
+
+  const tortilla = agrupar(porId.get('r_torti').ingredientes);
+  assert.equal(tortilla.secciones[0].principales.length, 4, 'las recetas viejas, sin rol, son todas principales');
+
+  // Las ediciones de los usuarios ganan; «-» es «sin sección».
+  const ing = { nombre: 'sal', rol: 'condimento', seccion: 'Masa', rol_usuario: 'opcional', seccion_usuario: '-' };
+  assert.deepEqual([rolDe(ing), seccionDe(ing)], ['opcional', '']);
+  assert.equal(rolDe({ rol: 'cualquiera' }), 'principal');
+  const mixta = agrupar([
+    { nombre: 'harina', seccion: 'Masa' },
+    { nombre: 'sal', rol: 'condimento' },
+    { nombre: 'dulce de leche', seccion: 'Relleno' },
+  ]);
+  assert.deepEqual(mixta.secciones.map(s => s.nombre), ['', 'Masa', 'Relleno'], 'lo que no tiene sección va primero');
+});
+
+test('escalar: redondea con sentido y no toca lo «a ojo»', async () => {
+  const { escalar } = await cargar('ingredientes.js');
+  assert.equal(escalar(200, 'g', 1.5), 300);
+  assert.equal(escalar(150, 'g', 4 / 6), 100);
+  assert.equal(escalar(15, 'g', 1 / 3), 5);
+  assert.equal(escalar(250, 'ml', 1 / 3), 83);
+  assert.equal(escalar(1, 'kg', 1 / 3), 0.33);
+  assert.equal(escalar(3, 'u', 0.5), 1.5);
+  assert.equal(escalar(4, 'u', 1 / 3), 4 / 3, 'al tercio más cercano');
+  assert.equal(escalar(3, 'u', 0.7), 2, '2,1 huevos son 2');
+  assert.equal(escalar(3, 'u', 0.75), 2.25, 'al cuarto más cercano');
+  assert.equal(escalar(1, 'cda', 1 / 3), 1 / 3);
+  assert.equal(escalar(1, 'u', 0.1), 0.25, 'nunca menos de ¼');
+  assert.equal(escalar(null, 'a ojo', 2), null);
+  assert.equal(escalar(200, 'g', 1), 200);
+});
+
+test('vistas de porciones: la última usada primero y solo se guarda lo que hace falta', async () => {
+  const ing = await cargar('ingredientes.js');
+  const r = { porciones: 6, porciones_vistas: '12,3' };
+  assert.deepEqual(ing.vistasDe(r), [12, 3]);
+  assert.equal(ing.porcionesIniciales(r), 12);
+  assert.equal(ing.porcionesIniciales({ porciones: 6 }), 6);
+  assert.equal(ing.porcionesIniciales({ porciones: null }), null);
+  assert.deepEqual(ing.chipsPorciones(r), [{ n: 3, original: false }, { n: 6, original: true }, { n: 12, original: false }]);
+  assert.equal(ing.nuevasVistas('12,3', 3), '3,12');
+  assert.equal(ing.nuevasVistas('12,3', 12, true), '3');
+  assert.equal(ing.nuevasVistas('', 8), '8');
+  assert.equal(ing.nuevasVistas('1,2,3,4,5,6', 7), '7,1,2,3,4,5', 'hasta 6, como la API');
+
+  assert.equal(ing.hayQueGuardarVista(r, 12), false, 'ya es la última usada');
+  assert.equal(ing.hayQueGuardarVista(r, 3), true);
+  assert.equal(ing.hayQueGuardarVista(r, 6), true, 'volver a la original también se recuerda');
+  assert.equal(ing.hayQueGuardarVista({ porciones: 6 }, 6), false, 'la original sin otras vistas: nada que recordar');
+  assert.equal(ing.hayQueGuardarVista({ porciones: 6 }, 9), true);
+  assert.equal(ing.hayQueGuardarVista({ porciones: null }, 9), false);
+});
+
+test('aplicarEdicion: las cinco acciones, como las aplicaría la API, e idempotentes', async () => {
+  const { aplicarDelta } = await cargar('datos.js');
+  const { aplicarEdicion, aplicarCola, nuevaEdicion, nuevaNota } = await cargar('ediciones.js');
+  const datos = aplicarDelta(null, fixture());
+  const receta = (d, id) => d.recetas.find(r => r.id === id);
+
+  let d = aplicarEdicion(datos, nuevaEdicion('receta.estado', { id: 'r_brown', estado: 'probada', valoracion: 4 }));
+  assert.deepEqual([receta(d, 'r_brown').estado, receta(d, 'r_brown').valoracion], ['probada', 4]);
+  assert.equal(receta(datos, 'r_brown').estado, 'para_probar', 'no cambia los datos originales');
+  d = aplicarEdicion(d, nuevaEdicion('receta.estado', { id: 'r_brown', estado: 'favorita' }));
+  assert.equal(receta(d, 'r_brown').valoracion, 4, 'sin valoracion, no la toca');
+
+  d = aplicarEdicion(d, nuevaEdicion('receta.porciones', { id: 'r_brown', porciones: 12 }));
+  assert.equal(receta(d, 'r_brown').porciones_vistas, '12');
+
+  const sal = datos.ingredientes.find(i => i.receta_id === 'r_brown' && i.nombre === 'sal');
+  const edicion = nuevaEdicion('receta.ingredientes', { id: 'r_brown', ingredientes: [{ id: sal.id, rol: 'opcional', seccion: 'Para servir' }] });
+  d = aplicarEdicion(aplicarEdicion(d, edicion), edicion);
+  const sal2 = d.ingredientes.find(i => i.id === sal.id);
+  assert.deepEqual([sal2.rol, sal2.rol_usuario, sal2.seccion_usuario], ['condimento', 'opcional', 'Para servir']);
+
+  const nota = nuevaNota('r_brown', 'camilo', '  Con menos azúcar.  ', new Date('2026-10-12T20:00:00.000Z'));
+  assert.match(nota.datos.id, /^n_[0-9a-z]{8}$/);
+  d = aplicarCola(d, [nota, nota]);
+  const notas = d.notas.filter(n => n.receta_id === 'r_brown');
+  assert.equal(notas.length, 1, 'aplicarla dos veces no la duplica');
+  assert.deepEqual([notas[0].texto, notas[0].quien, notas[0].fecha], ['Con menos azúcar.', 'camilo', '2026-10-12T20:00:00.000Z']);
+});
+
+test('después de un delta, las ediciones que siguen en la cola se vuelven a aplicar', async () => {
+  const { aplicarDelta } = await cargar('datos.js');
+  const { aplicarCola, nuevaEdicion } = await cargar('ediciones.js');
+  const todo = fixture();
+  const datos = aplicarDelta(null, todo);
+  const cola = [nuevaEdicion('receta.estado', { id: 'r_vasca', estado: 'probada' })];
+  // El otro celular le cambió el título: el delta trae la receta con el estado viejo.
+  const delta = Object.assign({}, todo, {
+    ahora: '2026-10-12T10:00:00.000Z', completo: false,
+    recetas: [Object.assign({}, todo.recetas.find(r => r.id === 'r_vasca'), { titulo: 'Torta vasca cremosa' })],
+    ingredientes: todo.ingredientes.filter(i => i.receta_id === 'r_vasca'),
+    pasos: todo.pasos.filter(p => p.receta_id === 'r_vasca'),
+    notas: [], bandeja: [],
+  });
+  const vasca = aplicarCola(aplicarDelta(datos, delta), cola).recetas.find(r => r.id === 'r_vasca');
+  assert.deepEqual([vasca.titulo, vasca.estado], ['Torta vasca cremosa', 'probada']);
+});
+
+test('procesarCola: manda en orden, corta sin conexión y descarta lo que la API rechaza', async () => {
+  const { procesarCola, esReintentable, nuevaEdicion } = await cargar('ediciones.js');
+  const { ErrorApi } = await cargar('api.js');
+  const e = n => nuevaEdicion('receta.estado', { id: 'r_' + n, estado: 'probada' });
+
+  const cola = [e(1), e(2), e(3)];
+  const enviadas = [];
+  let guardadas = 0;
+  let r = await procesarCola(cola, async x => {
+    enviadas.push(x.datos.id);
+    if (x.datos.id === 'r_1') cola.push(e(4)); // una edición nueva mientras se manda
+    if (x.datos.id === 'r_3') throw new ErrorApi('red', 'Sin conexión.');
+  }, () => { guardadas++; });
+  assert.deepEqual(enviadas, ['r_1', 'r_2', 'r_3']);
+  assert.deepEqual(cola.map(x => x.datos.id), ['r_3', 'r_4'], 'sin conexión, queda para reintentar en orden');
+  assert.equal(r.error.codigo, 'red');
+  assert.equal(guardadas, 2);
+
+  r = await procesarCola(cola, async x => {
+    if (x.datos.id === 'r_3') throw new ErrorApi('estado_invalido', '«estado» no es válido.', 400);
+  });
+  assert.deepEqual(cola, []);
+  assert.deepEqual([r.enviadas, r.descartadas.length, r.descartadas[0].mensaje, r.error], [1, 1, '«estado» no es válido.', null]);
+
+  assert.equal(esReintentable(new ErrorApi('ocupado', 'Ocupada', 503)), true);
+  assert.equal(esReintentable(new ErrorApi('falta_columna', 'Corré setup()', 500)), true);
+  assert.equal(esReintentable(new ErrorApi('accion_desconocida', 'No conozco', 404)), true, 'la API todavía no se actualizó');
+  assert.equal(esReintentable(new ErrorApi('token_invalido', 'Token', 401)), true);
+  assert.equal(esReintentable(new ErrorApi('ingredientes_cambiaron', 'Cambió', 409)), false);
+});
+
 test('leerLinkConfig: valida la API, el token y quién es', async () => {
   const { leerLinkConfig } = await cargar('config.js');
   const api = 'https://script.google.com/macros/s/AKfyPRUEBA_123-abc/exec';
@@ -190,6 +347,7 @@ test('leerRuta', async () => {
   assert.deepEqual(leerRuta('#/'), { nombre: 'biblioteca' });
   assert.deepEqual(leerRuta('#/receta/r_7f3k2'), { nombre: 'receta', id: 'r_7f3k2' });
   assert.deepEqual(leerRuta('#/cocina/r_7f3k2/'), { nombre: 'cocina', id: 'r_7f3k2' });
+  assert.deepEqual(leerRuta('#/ingredientes/r_7f3k2'), { nombre: 'ingredientes', id: 'r_7f3k2' });
   assert.deepEqual(leerRuta('#/config?api=x&t=y'), { nombre: 'config' });
   assert.deepEqual(leerRuta('#/cualquiera'), { nombre: 'biblioteca' });
 });

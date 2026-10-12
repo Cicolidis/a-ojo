@@ -25,13 +25,17 @@ const ARCHIVOS = [
   'js/datos.js',
   'js/db.js',
   'js/dom.js',
+  'js/ediciones.js',
   'js/formato.js',
+  'js/ingredientes.js',
   'js/rutas.js',
   'js/sync.js',
   'js/vistas/biblioteca.js',
   'js/vistas/bienvenida.js',
   'js/vistas/cocina.js',
+  'js/vistas/controles.js',
   'js/vistas/ficha.js',
+  'js/vistas/ingredientes.js',
 ];
 
 const base = new URL('./', self.location).href;

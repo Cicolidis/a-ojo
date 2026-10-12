@@ -104,24 +104,28 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | origen_datos | texto | capas usadas: `descripcion,subtitulos,audio,web,frames,capturas` |
 | idioma_original | `es` · `en` · … | si no es `es`, la receta se tradujo |
 | creado · actualizado | fecha-hora ISO | |
+| porciones_vistas | texto | vistas de porciones: con cuántas la cocinaron (`12,3,6`), la última primero; hasta 6 |
 
 ### `Ingredientes`
-| id | receta_id | orden | cantidad (número o vacío) | unidad | nombre | nota | gondola |
-|---|---|---|---|---|---|---|---|
+| id | receta_id | orden | cantidad (número o vacío) | unidad | nombre | nota | gondola | seccion | rol | seccion_usuario | rol_usuario |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 
 - `cantidad` vacía más `unidad = "a ojo"` para "a gusto", "una pizca", "un chorrito".
 - Unidades normalizadas: `g`, `kg`, `ml`, `l`, `u`, `cda`, `cdita`, `taza`, `pizca`, `a ojo`, `lata`, `paquete`, `diente`, `ramo`.
 - `gondola`: `verdulería` · `almacén` · `lácteos y huevos` · `carnicería` · `panadería` · `congelados` · `otros`. La asigna el pipeline.
+- `seccion`: parte de la receta ("Masa", "Relleno", "Para servir"); vacía si tiene una sola parte. La asigna el pipeline.
+- `rol`: `principal` (lo infaltable) · `condimento` · `opcional` · `utensilio` (lo que no se come). Lo asigna el pipeline; vacío en las recetas viejas, que cuentan como `principal`.
+- `seccion_usuario` y `rol_usuario`: lo que cambiaron ellos en la app. Se guarda aparte para que reprocesar no lo pise: al reprocesar, la API lo pasa al ingrediente con la misma sección y el mismo nombre. Vacío = lo del pipeline; `seccion_usuario = "-"` = sin sección.
 
 ### `Pasos`
 | id | receta_id | orden | texto | timer_min (opcional) | tip (opcional) |
 |---|---|---|---|---|---|
 
 ### `Notas`
-| id | receta_id | fecha | quien | texto |
-|---|---|---|---|---|
+| id | receta_id | fecha | quien | texto | creado |
+|---|---|---|---|---|---|
 
-Cada vez que cocinan algo, suman una nota: es el **historial de cocción**.
+Cada vez que cocinan algo, suman una nota: es el **historial de cocción**. `fecha` es la del celular (puede haberla escrito sin conexión) y `creado`, cuándo llegó a la Sheet: con eso se arma el delta de `todo`.
 
 ### `Compras`
 | id | receta_id (o vacío si se agregó a mano) | nombre | cantidad | unidad | gondola | hecho (bool) | creado |
@@ -140,8 +144,11 @@ Cada vez que cocinan algo, suman una nota: es el **historial de cocción**.
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
 | GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras y bandeja (solo lo cambiado desde `since`) |
 | POST | `receta.upsert` | receta completa (con ingredientes y pasos) | `{id}` |
-| POST | `receta.estado` | `{id, estado, valoracion?}` | `{ok}` |
-| POST | `nota.agregar` | `{receta_id, quien, texto}` | `{id}` |
+| POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
+| POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
+| POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
+| POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (`/recetas --clasificar`: todos los ingredientes) |
+| POST | `nota.agregar` | `{id?, receta_id, quien, texto, fecha?}` | `{id}` (con el id de la app, un reintento no la duplica) |
 | POST | `compras.agregar` | `{receta_id, porciones?}` o `{nombre, cantidad, unidad}` | `{ids}` |
 | POST | `compras.marcar` | `{id, hecho}` | `{ok}` |
 | POST | `compras.limpiar` | — | borra los marcados |
@@ -149,7 +156,9 @@ Cada vez que cocinan algo, suman una nota: es el **historial de cocción**.
 | POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?}` | `{ok}` |
 | POST | `capturas.subir` | `{bandeja_id, imagenes: [base64]}` | guarda en Drive y deja la fila en `pendiente` con marca `capturas` |
 
-**Nota técnica:** HTTP Shortcuts y la extensión mandan `POST` con `Content-Type: text/plain` para evitar el preflight de CORS, que Apps Script no maneja. El cuerpo es JSON como texto.
+**Nota técnica:** HTTP Shortcuts, la extensión y la app mandan `POST` con `Content-Type: text/plain` para evitar el preflight de CORS, que Apps Script no maneja. El cuerpo es JSON como texto.
+
+Las acciones que usa la app son **idempotentes**: la cola offline puede mandar dos veces la misma edición sin que se duplique nada. Las que editan una receta actualizan su `actualizado`, así el delta la lleva al otro celular.
 
 ---
 
@@ -197,6 +206,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - Si una cantidad no aparece: `cantidad` vacía y `unidad = "a ojo"`. **Nunca inventar cantidades.**
 - Pasos: frases cortas, un verbo principal por paso; temperatura y tiempo explícitos; `timer_min` cuando corresponda.
 - Asignar `tipo`, `etiquetas`, `gondola` y `tiempo_min` (estimado).
+- Asignar a cada ingrediente su `seccion` y su `rol` (§3). Los ingredientes van agrupados por sección y, dentro de cada una, en orden de uso.
 
 ### 6.3 Confianza
 - **Alta:** ingredientes con cantidades y pasos completos a partir de texto o subtítulos, o de audio claro.
@@ -246,8 +256,11 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado; ingredientes con porciones ajustables (−/+); pasos; notas con fecha ("Nuestra nota"); advertencia si la confianza es baja; botones "Agregar a compras" y "Empezar a cocinar".
-3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso, el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": valoración más nota y el estado pasa a `probada`.
+2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con fecha ("Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); botones "Agregar a compras" y "Empezar a cocinar".
+   - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
+   - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
+   - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
+3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (con las cantidades de la vista de porciones), el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
 4. **Lista de compras:** agrupada por góndola, cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes, "Mandar por WhatsApp" y limpiar los marcados.
 5. **Bandeja:** tarjetas por link con estado ("Esperando a la Mac…", "Necesita ayuda" con los botones Subir capturas / Descartar, "Recién llegadas" con la marca de confianza) y la hora del último procesamiento.
 
@@ -312,9 +325,14 @@ Cada fase termina con una demo funcionando y un commit.
 - Configuración con un link.
 - **Listo cuando:** ella la instala en Android, la abre sin conexión y cocina una receta de punta a punta.
 
-### Fase 4: interacción y compras
-- Estados, valoración, notas y porciones.
-- Lista de compras y exportación a WhatsApp.
+### Fase 4a: ficha
+- Secciones y roles de los ingredientes: los asigna `/recetas`; las recetas ya guardadas se completan con `/recetas --clasificar`.
+- Editor de ingredientes (rol y sección), estados, valoración, notas, vistas de porciones y "¿Cómo salió?".
+- Cola offline de las ediciones.
+- **Listo cuando:** las recetas muestran los ingredientes por sección y rol; sin conexión, en un celular se cambia un rol, se cocina una receta para otra cantidad de porciones y se guarda "¿Cómo salió?"; al volver la conexión, el otro celular ve el estado, la valoración, la nota, la vista y el rol nuevos.
+
+### Fase 4b: compras y bandeja
+- Lista de compras por lugar y exportación a WhatsApp.
 - Pantalla Bandeja con la subida de capturas.
 - **Listo cuando:** arman la compra de 3 recetas y la mandan por WhatsApp.
 

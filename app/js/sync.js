@@ -3,16 +3,33 @@
 import { llamarApi } from './api.js';
 import { guardar } from './db.js';
 import { aplicarDelta, necesitaCompleta, trajoCambios } from './datos.js';
+import { aplicarCola, procesarCola } from './ediciones.js';
 
 export const CACHE_FOTOS = 'a-ojo-fotos';
 
-/** Pide a `todo` lo cambiado (o todo) y guarda el snapshot nuevo. Devuelve { datos, cambios }. */
-export async function sincronizar(config, datos) {
-  const completa = necesitaCompleta(datos);
+/**
+ * Primero manda las ediciones de la cola; después pide a `todo` lo cambiado (o
+ * todo), le vuelve a aplicar lo que haya quedado sin mandar y guarda el snapshot.
+ * Sin conexión, falla con el error `red` sin pedir nada más.
+ * Devuelve { datos, cambios, descartadas, pendiente } (`pendiente`: por qué quedaron ediciones sin mandar).
+ */
+export async function sincronizar(config, datos, cola) {
+  const envio = await procesarCola(cola,
+    e => llamarApi(config, e.accion, e.datos, { metodo: 'POST' }),
+    () => guardar('cola', cola));
+  if (envio.error && envio.error.codigo === 'red') throw envio.error;
+
+  // Si la API rechazó alguna edición, los datos locales la tienen aplicada: se piden todos de nuevo.
+  const completa = necesitaCompleta(datos) || envio.descartadas.length > 0;
   const resp = await llamarApi(config, 'todo', completa ? {} : { since: datos.since });
-  const nuevos = aplicarDelta(completa ? null : datos, resp);
+  const nuevos = aplicarCola(aplicarDelta(completa ? null : datos, resp), cola);
   await guardar('datos', nuevos);
-  return { datos: nuevos, cambios: trajoCambios(completa ? null : datos, resp) };
+  return {
+    datos: nuevos,
+    cambios: envio.enviadas > 0 || envio.descartadas.length > 0 || trajoCambios(completa ? null : datos, resp),
+    descartadas: envio.descartadas,
+    pendiente: envio.error,
+  };
 }
 
 /**

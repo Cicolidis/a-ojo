@@ -1,7 +1,7 @@
 // Biblioteca (#/): buscador, filtros, aviso de la bandeja y grilla de recetas.
 
 import { h, icono, foto } from '../dom.js';
-import { FILTROS, buscar, etiquetasFrecuentes, filtroEtiqueta, resumenBandeja } from '../datos.js';
+import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, resumenBandeja } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
 
 export function montar(contenedor, { app }) {
@@ -35,7 +35,8 @@ export function montar(contenedor, { app }) {
   ));
 
   function pintarChips() {
-    const filtros = FILTROS.concat(etiquetasFrecuentes(app.indice.lista).map(filtroEtiqueta));
+    const filtros = FILTROS.concat(etiquetasFrecuentes(app.indice.lista).map(filtroEtiqueta),
+      app.indice.lista.some(r => r.estado === 'descartada') ? [FILTRO_DESCARTADAS] : []);
     if (!filtros.some(f => f.id === estado.filtro)) estado.filtro = 'todas';
     chips.replaceChildren(...filtros.map(f => h('button', {
       type: 'button',
@@ -80,7 +81,11 @@ export function montar(contenedor, { app }) {
   function actualizar() {
     const n = app.indice.lista.filter(r => r.estado !== 'descartada').length;
     cuenta.textContent = app.datos ? (n === 1 ? '1 receta' : n + ' recetas') : '';
-    sync.textContent = app.sync.estado === 'sin_conexion' || app.sync.estado === 'error' ? app.sync.mensaje : '';
+    const pendientes = app.cola.length;
+    sync.textContent = [
+      app.sync.estado === 'sin_conexion' || app.sync.estado === 'error' ? app.sync.mensaje : '',
+      pendientes === 1 ? '1 cambio sin mandar' : pendientes ? pendientes + ' cambios sin mandar' : '',
+    ].filter(Boolean).join(' · ');
     sync.classList.toggle('error', app.sync.estado === 'error');
     pintarChips();
     pintarAviso();

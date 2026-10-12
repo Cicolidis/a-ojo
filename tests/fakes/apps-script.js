@@ -2,8 +2,9 @@
  * Versión mínima, en memoria, de los servicios de Apps Script que usa el código
  * de apps-script/src. Alcanza para probar la API en Node sin desplegar.
  *
- * Imita a propósito una trampa real de Sheets: si una celda no tiene formato
- * de texto (@), las fechas ISO y los números escritos como texto se convierten.
+ * Imita a propósito dos trampas reales de Sheets: si una celda no tiene formato
+ * de texto (@), las fechas ISO y los números escritos como texto se convierten;
+ * y las columnas insertadas copian la validación de la de al lado.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -48,7 +49,19 @@ class HojaFalsa {
     return this.getRange(1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1));
   }
   insertRowsAfter(_f, n) { this.maxFilas += n; }
-  insertColumnsAfter(_c, n) { this.maxCols += n; }
+  /** Como Sheets: corre las columnas de la derecha y las nuevas copian la validación de la columna `c`. */
+  insertColumnsAfter(c, n) {
+    const nuevas = new Map();
+    for (const [k, v] of this.celdas) {
+      const [f, col] = k.split(',').map(Number);
+      nuevas.set(f + ',' + (col > c ? col + n : col), v);
+      if (col === c && v.validacion) {
+        for (let i = 1; i <= n; i++) nuevas.set(f + ',' + (c + i), { valor: '', formato: v.formato, validacion: v.validacion });
+      }
+    }
+    this.celdas = nuevas;
+    this.maxCols += n;
+  }
   deleteRows(desde, n) {
     if (desde <= this.filasFijas || desde + n - 1 > this.maxFilas) throw new Error('deleteRows fuera de rango');
     if (this.maxFilas - n <= this.filasFijas) throw new Error('No se pueden borrar todas las filas no fijas');
@@ -86,6 +99,12 @@ class RangoFalso {
     if (valores.length !== this.nf || valores[0].length !== this.nc) throw new Error('setValues: dimensiones incorrectas');
     this.cada((celda, i, j) => {
       let v = valores[i][j];
+      const regla = celda.validacion;
+      if (regla && !regla.permiteInvalidos && v !== '' && v !== null &&
+          ((regla.lista && !regla.lista.includes(v)) || (regla.rango && !(v >= regla.rango[0] && v <= regla.rango[1])))) {
+        throw new Error('Los datos que ingresaste en la celda ' + String.fromCharCode(64 + this.c + j) + (this.f + i) +
+          ' infringen las reglas de validación de datos establecidas.');
+      }
       if (typeof v === 'string' && celda.formato !== '@') {
         if (ISO.test(v)) v = new Date(v);
         else if (/^-?\d+(\.\d+)?$/.test(v)) v = Number(v);
@@ -100,6 +119,7 @@ class RangoFalso {
   setBackground() { return this; }
   setFontColor() { return this; }
   setDataValidation(regla) { this.cada(celda => { celda.validacion = regla; }); return this; }
+  clearDataValidations() { return this.setDataValidation(null); }
 }
 
 class PlanillaFalsa {

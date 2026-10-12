@@ -2,6 +2,10 @@
 // Todo es puro (sin DOM ni IndexedDB) para poder testearlo en Node.
 
 const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+// Subirla cuando la app empiece a usar columnas nuevas: los snapshots guardados con
+// otra versión se piden enteros de nuevo, así no les faltan esas columnas.
+// 2: secciones y roles de ingredientes, vistas de porciones (Fase 4a).
+export const VERSION_DATOS = 2;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.
@@ -12,6 +16,7 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 export function aplicarDelta(datos, resp) {
   if (resp.completo || !datos) {
     return {
+      version: VERSION_DATOS,
       since: resp.ahora,
       ultimaCompleta: resp.ahora,
       recetas: resp.recetas,
@@ -25,6 +30,7 @@ export function aplicarDelta(datos, resp) {
   const cambiadas = new Set(resp.recetas.map(r => r.id));
   const deOtras = lista => lista.filter(x => !cambiadas.has(x.receta_id));
   return {
+    version: datos.version,
     since: resp.ahora,
     ultimaCompleta: datos.ultimaCompleta,
     recetas: porId(datos.recetas, resp.recetas),
@@ -43,9 +49,12 @@ function porId(viejos, nuevos) {
   return [...mapa.values()];
 }
 
-/** ¿Hace falta pedir todo de nuevo? Sin `since`, o si la última vez completa fue hace más de 7 días. */
+/**
+ * ¿Hace falta pedir todo de nuevo? Sin `since`, con un snapshot de otra versión
+ * de la app o si la última vez completa fue hace más de 7 días.
+ */
 export function necesitaCompleta(datos, ahoraMs = Date.now()) {
-  if (!datos || !datos.since || !datos.ultimaCompleta) return true;
+  if (!datos || !datos.since || !datos.ultimaCompleta || datos.version !== VERSION_DATOS) return true;
   const ultima = Date.parse(datos.ultimaCompleta);
   return isNaN(ultima) || ahoraMs - ultima > SIETE_DIAS_MS;
 }
@@ -110,6 +119,9 @@ export const FILTROS = [
   { id: 'tipo:salado', nombre: 'Salado' },
 ];
 
+/** Aparece al final de los filtros solo si hay alguna descartada: es la forma de recuperarlas. */
+export const FILTRO_DESCARTADAS = { id: 'descartada', nombre: 'Descartadas' };
+
 export function filtroEtiqueta(etiqueta) {
   const nombre = (etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1)).replace(/\btacc\b/gi, 'TACC');
   return { id: 'etiqueta:' + etiqueta, nombre };
@@ -117,19 +129,20 @@ export function filtroEtiqueta(etiqueta) {
 
 function cumpleFiltro(r, filtro) {
   if (!filtro || filtro === 'todas') return true;
-  if (filtro === 'para_probar' || filtro === 'favorita') return r.estado === filtro;
+  if (filtro === 'para_probar' || filtro === 'favorita' || filtro === 'descartada') return r.estado === filtro;
   if (filtro.startsWith('tipo:')) return r.tipo === filtro.slice(5);
   if (filtro.startsWith('etiqueta:')) return r.etiquetasLista.includes(filtro.slice(9));
   return true;
 }
 
 /**
- * Recetas visibles en la Biblioteca: sin las descartadas, con el filtro elegido
- * y con todas las palabras buscadas en el título, los ingredientes o las etiquetas.
+ * Recetas visibles en la Biblioteca: sin las descartadas (salvo en su filtro), con
+ * el filtro elegido y con todas las palabras buscadas en el título, los
+ * ingredientes o las etiquetas.
  */
 export function buscar(lista, { texto = '', filtro = 'todas' } = {}) {
   const palabras = normalizar(texto).split(/\s+/).filter(Boolean);
-  return lista.filter(r => r.estado !== 'descartada' && cumpleFiltro(r, filtro) &&
+  return lista.filter(r => (r.estado !== 'descartada' || filtro === 'descartada') && cumpleFiltro(r, filtro) &&
     palabras.every(p => r.busqueda.includes(p)));
 }
 

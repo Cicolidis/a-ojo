@@ -2,7 +2,7 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 3 (app de lectura y cocina).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas y cocinarlas, también sin conexión.
+**Estado: Fase 4a (ficha).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas y anotarlas, también sin conexión: estados, valoración, notas, vistas de porciones e ingredientes por sección y rol, editables.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
@@ -100,6 +100,8 @@ Deja una fila de prueba de `example.com` en estado `descartada`; se puede borrar
 
 **Si una versión nueva usa un servicio de Google que antes no usaba** (como Drive en la Fase 2), antes del deploy hay que correr `setup()` en el editor y aceptar el permiso nuevo. Si no, el web app deja de responder hasta que alguien lo acepte.
 
+**Si una versión nueva suma columnas** (como la Fase 4a), también: `npm run push`, `setup()` en el editor y recién ahí `npm run deploy`. Hasta que se corra, las acciones que escriben esas columnas responden «Corré setup()».
+
 ### 6. Extensión de Chrome
 
 1. Abrí `chrome://extensions` y activá el **Modo de desarrollador**.
@@ -171,13 +173,14 @@ Abrí Claude Code en la carpeta del repo y corré:
 | `/recetas b_e3cgj` | procesa (o reprocesa) esa fila de la bandeja |
 | `/recetas --dry-run` | hace todo menos escribir en la Sheet: la receta solo se valida |
 | `/recetas <id> --dry-run --sin-cookies` | prueba un Reel sin la cuenta secundaria |
+| `/recetas --clasificar` | completa la sección y el rol de los ingredientes de las recetas ya guardadas, sin reprocesarlas |
 
 Por cada link va sumando capas solo mientras falten datos: metadatos y caption, subtítulos (YouTube), la receta de la web que nombre la descripción, el audio con Whisper y, por último, mosaicos de fotogramas para leer el texto sobreimpreso. La receta queda en `lista`, con su foto copiada a Drive (carpeta "A ojo/fotos"). Si no se puede, la fila pasa a `ayuda` con un motivo.
 
 - Archivos de trabajo: `~/.a-ojo/trabajo/<id de la bandeja>/`. Se pueden borrar cuando quieras.
 - Log: `~/.a-ojo/log/AAAA-MM-DD.log`.
 - Entre pedidos a YouTube o Instagram hay una pausa de 2 a 5 segundos. Ante un HTTP 429 reintenta después de 30, 60 y 120 segundos; si sigue, corta la corrida.
-- Reprocesar un link actualiza la misma receta: conserva su estado, la valoración y las notas.
+- Reprocesar un link actualiza la misma receta: conserva su estado, la valoración, las notas, las vistas de porciones y los roles y secciones que hayan cambiado en la app.
 
 Los scripts también se pueden correr a mano, por ejemplo `procesamiento/aojo fetch meta b_e3cgj https://www.youtube.com/shorts/a2qRJHVeJwk` o `procesamiento/aojo api pendientes`.
 
@@ -193,8 +196,13 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 | GET | `bandeja.pendientes` | — | `{ filas }`, de la más vieja a la más nueva. Incluye las `procesando` sin cambios hace más de 30 minutos (una corrida que se cortó) |
 | POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento |
 | POST | `receta.upsert` | `{ receta, bandeja_id?, foto?, validar? }` | `{ id, nueva, foto_url, ingredientes, pasos }`. Ver abajo |
+| POST | `receta.estado` | `{ id, estado?, valoracion? }` | `{ id, estado, valoracion }` |
+| POST | `receta.porciones` | `{ id, porciones, quitar? }` | `{ id, porciones_vistas }`: la vista pasa al frente (o se saca) |
+| POST | `receta.ingredientes` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Lo que cambian ellos: va a `rol_usuario` y `seccion_usuario` |
+| POST | `receta.clasificar` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Para `/recetas --clasificar`: tienen que venir todos |
+| POST | `nota.agregar` | `{ id?, receta_id, quien, texto, fecha? }` | `{ id, fecha }`. Con un `id` que ya existe responde `repetida: true` sin duplicarla |
 
-**`receta.upsert`:** `receta` trae los campos de la hoja Recetas más `ingredientes: [{ cantidad, unidad, nombre, nota, gondola }]` y `pasos: [{ texto, timer_min, tip }]` (el formato completo está en [`.claude/commands/recetas.md`](.claude/commands/recetas.md)). Busca la receta por `id`, después por el `receta_id` de la fila de la bandeja y por último por `fuente_url`, así que reprocesar no duplica: actualiza los campos, conserva `estado`, `valoracion`, `creado` y las notas, y **reemplaza todos** los ingredientes y pasos. Con `bandeja_id`, esa fila pasa a `lista`. `foto: { base64, mime }` (jpeg, png o webp, hasta 5 MB) se guarda en Drive, pública con link. Con `validar: true` solo valida. Si hay errores, responde `receta_invalida` con la lista en `detalles`.
+**`receta.upsert`:** `receta` trae los campos de la hoja Recetas más `ingredientes: [{ cantidad, unidad, nombre, nota, gondola, seccion, rol }]` y `pasos: [{ texto, timer_min, tip }]` (el formato completo está en [`.claude/commands/recetas.md`](.claude/commands/recetas.md)). Busca la receta por `id`, después por el `receta_id` de la fila de la bandeja y por último por `fuente_url`, así que reprocesar no duplica: actualiza los campos, conserva `estado`, `valoracion`, `porciones_vistas`, `creado` y las notas, y **reemplaza todos** los ingredientes y pasos (las ediciones de rol y sección pasan al ingrediente con la misma sección y el mismo nombre). Con `bandeja_id`, esa fila pasa a `lista`. `foto: { base64, mime }` (jpeg, png o webp, hasta 5 MB) se guarda en Drive, pública con link. Con `validar: true` solo valida. Si hay errores, responde `receta_invalida` con la lista en `detalles`.
 
 **Deltas de `todo`:** en `todo?since=…`, si una receta cambió vienen **todos** sus ingredientes y pasos; la app reemplaza con ellos los que tenía guardados de esa receta.
 

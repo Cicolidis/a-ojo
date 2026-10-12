@@ -60,10 +60,10 @@ function receta(cambios = {}) {
     idioma_original: 'es',
     notas_proceso: '«harina 4» → harina 0000',
     ingredientes: [
-      { cantidad: 200, unidad: 'g', nombre: 'chocolate semiamargo', gondola: 'almacén' },
-      { cantidad: 150, unidad: 'g', nombre: 'manteca', nota: 'pomada', gondola: 'lácteos y huevos' },
-      { cantidad: 3, unidad: 'u', nombre: 'huevos', gondola: 'lácteos y huevos' },
-      { cantidad: null, unidad: 'a ojo', nombre: 'sal', gondola: 'almacén' },
+      { cantidad: 200, unidad: 'g', nombre: 'chocolate semiamargo', gondola: 'almacén', rol: 'principal' },
+      { cantidad: 150, unidad: 'g', nombre: 'manteca', nota: 'pomada', gondola: 'lácteos y huevos', rol: 'principal' },
+      { cantidad: 3, unidad: 'u', nombre: 'huevos', gondola: 'lácteos y huevos', rol: 'principal' },
+      { cantidad: null, unidad: 'a ojo', nombre: 'sal', gondola: 'almacén', rol: 'condimento' },
     ],
     pasos: [
       { texto: 'Derretí el chocolate con la manteca.' },
@@ -82,7 +82,9 @@ test('setup crea las 6 hojas en orden, con encabezados, y borra la hoja por defe
     ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras']);
   const enc = p.planilla.getSheetByName('Bandeja').getRange(1, 1, 1, 10).getValues()[0];
   assert.deepEqual(enc, ['id', 'creado', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'actualizado']);
-  assert.equal(p.planilla.getSheetByName('Recetas').getLastColumn(), 19);
+  assert.equal(p.planilla.getSheetByName('Recetas').getLastColumn(), 20);
+  const ings = p.planilla.getSheetByName('Ingredientes');
+  assert.deepEqual(ings.getRange(1, 9, 1, 4).getValues()[0], ['seccion', 'rol', 'seccion_usuario', 'rol_usuario']);
   assert.match(p.token, /^[0-9a-f]{32}$/);
   assert.ok(p.registro.some(l => l.includes(p.token)), 'el token aparece en el registro');
 });
@@ -116,6 +118,15 @@ test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   assert.equal(bandeja.getLastColumn(), 11);
   assert.equal(bandeja.getRange(1, 11).getValues()[0][0], 'capturas');
   assert.equal(p.filas('Bandeja').length, 1);
+});
+
+test('setup: una columna nueva no hereda la validación de la de al lado (Sheets la copia al insertarla)', () => {
+  const p = proyecto();
+  p.evaluar("ESQUEMA.Ingredientes.columnas.push({ nombre: 'apodo', tipo: 'texto' })");
+  p.ctx.setup();
+  assert.doesNotThrow(() => p.ctx.agregarFila_('Ingredientes', { id: 'i_1', receta_id: 'r_1', apodo: 'Masa' }));
+  assert.throws(() => p.ctx.agregarFila_('Ingredientes', { id: 'i_2', receta_id: 'r_1', rol_usuario: 'cualquiera' }),
+    /validación/, 'las validaciones propias siguen');
 });
 
 test('token: sin token o con uno incorrecto responde 401', () => {
@@ -316,7 +327,7 @@ test('receta.upsert al reprocesar: misma receta, conserva lo del usuario y reemp
 
   const r = p.upsert(receta({
     titulo: 'Brownie súper húmedo',
-    ingredientes: [{ cantidad: 1, unidad: 'taza', nombre: 'azúcar', gondola: 'almacén' }],
+    ingredientes: [{ cantidad: 1, unidad: 'taza', nombre: 'azúcar', gondola: 'almacén', rol: 'principal' }],
     pasos: ['Mezclá todo.', 'Horneá.'],
   }), { bandeja_id: bandejaId });
   assert.equal(r.data.id, id);
@@ -382,9 +393,9 @@ test('receta.upsert junta todos los errores de validación', () => {
     fuente_url: 'sin link',
     porciones: 'muchas',
     ingredientes: [
-      { cantidad: 2, unidad: 'cups', nombre: 'harina', gondola: 'almacén' },
-      { cantidad: null, unidad: 'g', nombre: 'azúcar', gondola: 'almacén' },
-      { cantidad: 1, unidad: 'a ojo', nombre: '', gondola: 'kiosco' },
+      { cantidad: 2, unidad: 'cups', nombre: 'harina', gondola: 'almacén', rol: 'principal', seccion: 'Masa' },
+      { cantidad: null, unidad: 'g', nombre: 'azúcar', gondola: 'almacén', rol: 'principal' },
+      { cantidad: 1, unidad: 'a ojo', nombre: '', gondola: 'kiosco', rol: 'infaltable' },
       { cantidad: -3, unidad: 'u', nombre: 'huevos', gondola: 'lácteos y huevos' },
     ],
     pasos: [{ texto: '' }, { texto: 'Horneá.', timer_min: 'un rato' }],
@@ -397,10 +408,11 @@ test('receta.upsert junta todos los errores de validación', () => {
     'fuente_url', 'ingrediente 1: unidad «cups»', 'ingrediente 2: sin cantidad', 'ingrediente 3: falta el nombre',
     'ingrediente 3: góndola «kiosco»', 'ingrediente 3: con unidad «a ojo»', 'ingrediente 4: cantidad',
     'paso 1: falta el texto', 'paso 2: timer_min', 'porciones',
+    'ingrediente 3: rol «infaltable»', 'ingrediente 4: falta el rol', 'si la receta tiene secciones',
   ];
   for (const e of esperados) assert.ok(r.detalles.some(d => d.includes(e)), 'falta el error: ' + e);
   assert.equal(r.detalles.length, esperados.length);
-  assert.match(r.mensaje, /^La receta tiene 15 errores: /);
+  assert.match(r.mensaje, /^La receta tiene 18 errores: /);
 
   assert.equal(p.upsert(receta({ ingredientes: [], pasos: [] })).detalles.length, 2);
   assert.equal(p.postJson({ action: 'receta.upsert', t: p.token }).error, 'sin_receta');
@@ -434,6 +446,183 @@ test('receta.upsert guarda la foto en Drive, pública, y al reprocesar reemplaza
   for (const foto of [{ base64: FOTO.base64, mime: 'image/gif' }, { base64: '%%%', mime: 'image/jpeg' }, { base64: '', mime: 'image/jpeg' }]) {
     assert.equal(p.upsert(receta(), { foto }).error, 'foto_invalida');
   }
+});
+
+test('receta.upsert al reprocesar pasa las ediciones de los usuarios al mismo ingrediente', () => {
+  const p = proyecto();
+  const id = p.upsert(receta({
+    ingredientes: [
+      { cantidad: 100, unidad: 'g', nombre: 'azúcar', gondola: 'almacén', rol: 'principal', seccion: 'Masa' },
+      { cantidad: 2, unidad: 'u', nombre: 'huevos', gondola: 'lácteos y huevos', rol: 'principal', seccion: 'Masa' },
+      { cantidad: 50, unidad: 'g', nombre: 'Azúcar', gondola: 'almacén', rol: 'principal', seccion: 'Almíbar' },
+      { cantidad: null, unidad: 'a ojo', nombre: 'canela', gondola: 'almacén', rol: 'condimento', seccion: 'Almíbar' },
+    ],
+  })).data.id;
+  const deLaReceta = () => p.filas('Ingredientes').filter(i => i.receta_id === id);
+  const [, huevos, azucarAlmibar, canela] = deLaReceta().map(i => i.id);
+  const r = p.postJson({ action: 'receta.ingredientes', t: p.token, id, ingredientes: [
+    { id: azucarAlmibar, rol: 'opcional', seccion: 'Almíbar' },
+    { id: canela, rol: 'opcional', seccion: 'Para servir' },
+    { id: huevos, rol: 'condimento', seccion: 'Masa' },
+  ] });
+  assert.equal(r.ok, true, r.mensaje);
+
+  // Reprocesada: cambia el orden, la canela ya viene como opcional y los huevos no están más.
+  p.upsert(receta({
+    ingredientes: [
+      { cantidad: 60, unidad: 'g', nombre: 'azucar', gondola: 'almacén', rol: 'principal', seccion: 'almíbar' },
+      { cantidad: 120, unidad: 'g', nombre: 'azúcar', gondola: 'almacén', rol: 'principal', seccion: 'Masa' },
+      { cantidad: null, unidad: 'a ojo', nombre: 'canela', gondola: 'almacén', rol: 'opcional', seccion: 'Almíbar' },
+      { cantidad: 200, unidad: 'g', nombre: 'harina', gondola: 'almacén', rol: 'principal', seccion: 'Masa' },
+    ],
+  }));
+  assert.deepEqual(deLaReceta().map(i => [i.nombre, i.rol_usuario, i.seccion_usuario]), [
+    ['azucar', 'opcional', ''], // misma sección y nombre, sin importar tildes ni mayúsculas
+    ['azúcar', '', ''], // el de la masa no tenía ediciones (y hay dos «azúcar»: no alcanza el nombre)
+    ['canela', '', 'Para servir'], // el rol nuevo ya coincide; la sección elegida queda
+    ['harina', '', ''],
+  ]);
+});
+
+test('receta.estado cambia estado y valoración, y la receta llega en el próximo delta', async () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+  const estado = cuerpo => p.postJson(Object.assign({ action: 'receta.estado', t: p.token, id }, cuerpo));
+
+  const r = estado({ estado: 'probada', valoracion: 4 });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.deepEqual([r.data.estado, r.data.valoracion], ['probada', 4]);
+  assert.deepEqual(estado({ estado: 'probada', valoracion: 4 }).data, r.data, 'mandarlo dos veces deja lo mismo');
+  assert.equal(estado({ estado: 'favorita' }).data.valoracion, 4, 'sin valoracion, no la toca');
+  const [rec] = p.filas('Recetas');
+  assert.deepEqual([rec.estado, rec.valoracion], ['favorita', 4]);
+
+  const delta = p.get({ action: 'todo', t: p.token, since: desde }).data;
+  assert.deepEqual(delta.recetas.map(x => x.id), [id]);
+  assert.equal(delta.ingredientes.length, 4);
+
+  assert.equal(estado({ valoracion: 0 }).data.valoracion, 0, 'se puede borrar la valoración');
+  assert.equal(estado({ estado: 'rica' }).error, 'estado_invalido');
+  assert.equal(estado({ valoracion: 6 }).error, 'valoracion_invalida');
+  assert.equal(estado({ valoracion: 2.5 }).error, 'valoracion_invalida');
+  assert.equal(estado({}).error, 'sin_cambios');
+  assert.equal(estado({ id: 'r_nada0', estado: 'probada' }).status, 404);
+  assert.equal(p.get({ action: 'receta.estado', t: p.token, id, estado: 'probada' }).status, 405);
+});
+
+test('receta.porciones guarda las vistas, la última usada primero, y reprocesar las conserva', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const porciones = cuerpo => p.postJson(Object.assign({ action: 'receta.porciones', t: p.token, id }, cuerpo));
+  assert.equal(porciones({ porciones: 24 }).data.porciones_vistas, '24');
+  assert.equal(porciones({ porciones: 12 }).data.porciones_vistas, '12,24');
+  assert.equal(porciones({ porciones: '24' }).data.porciones_vistas, '24,12', 'una que ya estaba pasa al frente');
+  assert.equal(porciones({ porciones: 24 }).data.porciones_vistas, '24,12', 'mandarlo dos veces deja lo mismo');
+  assert.equal(porciones({ porciones: 12, quitar: true }).data.porciones_vistas, '24');
+  assert.equal(porciones({ porciones: 12, quitar: true }).data.porciones_vistas, '24');
+  for (const n of [1, 2, 3, 4, 5, 7, 8]) porciones({ porciones: n });
+  assert.equal(p.filas('Recetas')[0].porciones_vistas, '8,7,5,4,3,2', 'hasta 6 vistas');
+
+  p.upsert(receta({ titulo: 'Brownie reprocesado' }));
+  assert.equal(p.filas('Recetas')[0].porciones_vistas, '8,7,5,4,3,2');
+
+  for (const n of [0, -2, 1.5, 'muchas', null]) assert.equal(porciones({ porciones: n }).error, 'porciones_invalidas');
+  assert.equal(porciones({ id: 'r_nada0', porciones: 4 }).status, 404);
+});
+
+test('receta.ingredientes guarda las ediciones aparte; receta.clasificar completa y limpia las que coinciden', async () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const [choco, manteca, huevos, sal] = p.filas('Ingredientes').map(i => i.id);
+  const porId = () => Object.fromEntries(p.filas('Ingredientes').map(i => [i.id, i]));
+  const editar = (action, ingredientes, extra = {}) =>
+    p.postJson(Object.assign({ action, t: p.token, id, ingredientes }, extra));
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+
+  // La sal pasa a opcional y la manteca, a una sección «Base».
+  let r = editar('receta.ingredientes', [
+    { id: sal, rol: 'opcional', seccion: '' },
+    { id: manteca, rol: 'principal', seccion: 'Base' },
+  ]);
+  assert.equal(r.ok, true, r.mensaje);
+  let x = porId();
+  assert.deepEqual([x[sal].rol, x[sal].rol_usuario, x[sal].seccion_usuario], ['condimento', 'opcional', '']);
+  assert.deepEqual([x[manteca].rol_usuario, x[manteca].seccion_usuario], ['', 'Base'], 'lo igual a /recetas queda vacío');
+  assert.equal(p.get({ action: 'todo', t: p.token, since: desde }).data.ingredientes.length, 4, 'el delta lleva los ingredientes');
+
+  // Volver a lo de /recetas borra la edición.
+  editar('receta.ingredientes', [{ id: sal, rol: 'condimento', seccion: '' }]);
+  assert.equal(porId()[sal].rol_usuario, '');
+
+  // /recetas --clasificar: tienen que venir todos; pone las secciones y limpia lo que ahora coincide.
+  assert.equal(editar('receta.clasificar', [{ id: choco, rol: 'principal', seccion: 'Base' }]).error, 'faltan_ingredientes');
+  r = editar('receta.clasificar', [choco, manteca, huevos, sal].map(i => ({ id: i, rol: i === sal ? 'condimento' : 'principal', seccion: 'Base' })));
+  assert.equal(r.ok, true, r.mensaje);
+  x = porId();
+  assert.deepEqual([x[manteca].seccion, x[manteca].seccion_usuario], ['Base', ''], 'ya coincide con /recetas');
+
+  // Sacar un ingrediente de su sección queda como «-».
+  editar('receta.ingredientes', [{ id: sal, rol: 'condimento', seccion: '' }]);
+  assert.equal(porId()[sal].seccion_usuario, '-');
+
+  assert.equal(editar('receta.ingredientes', [{ id: sal, rol: 'infaltable' }]).error, 'ingredientes_invalidos');
+  assert.equal(editar('receta.ingredientes', [{ id: sal, rol: 'opcional', seccion: '-' }]).error, 'ingredientes_invalidos');
+  assert.equal(editar('receta.ingredientes', [{ id: sal, rol: 'opcional' }, { id: sal, rol: 'principal' }]).error, 'ingredientes_invalidos');
+  assert.equal(editar('receta.ingredientes', []).error, 'sin_ingredientes');
+  const otra = p.upsert(receta({ fuente_url: 'https://youtu.be/cyTOswdJ4TY' })).data.id;
+  const deOtra = p.filas('Ingredientes').find(i => i.receta_id === otra).id;
+  const ajeno = editar('receta.ingredientes', [{ id: deOtra, rol: 'opcional' }]);
+  assert.deepEqual([ajeno.status, ajeno.error], [409, 'ingredientes_cambiaron']);
+  assert.equal(editar('receta.ingredientes', [{ id: sal, rol: 'opcional' }], { id: 'r_nada0' }).status, 404);
+});
+
+test('nota.agregar: con el id de la app no se duplica, y llega en el delta aunque la fecha sea vieja', async () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+  const nota = cuerpo => p.postJson(Object.assign({ action: 'nota.agregar', t: p.token, receta_id: id, quien: 'pareja' }, cuerpo));
+
+  const ayer = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const r = nota({ id: 'n_abc12345', texto: '  Quedó genial con menos azúcar.  ', fecha: ayer });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.deepEqual(r.data, { id: 'n_abc12345', fecha: ayer });
+  assert.equal(nota({ id: 'n_abc12345', texto: 'Quedó genial con menos azúcar.', fecha: ayer }).data.repetida, true);
+  const notas = p.filas('Notas');
+  assert.equal(notas.length, 1, 'un reintento no la duplica');
+  assert.deepEqual([notas[0].texto, notas[0].quien], ['Quedó genial con menos azúcar.', 'pareja']);
+  assert.ok(notas[0].creado > ayer);
+
+  const delta = p.get({ action: 'todo', t: p.token, since: desde }).data;
+  assert.deepEqual(delta.notas.map(n => n.id), ['n_abc12345'], 'cuenta cuándo llegó, no la fecha del celular');
+
+  // Sin id, la API le pone uno; una fecha en el futuro queda en «ahora».
+  const sinId = nota({ texto: 'Otra', fecha: '2099-01-01T00:00:00.000Z' });
+  assert.match(sinId.data.id, /^n_[0-9a-z]{5}$/);
+  assert.ok(sinId.data.fecha < '2099');
+
+  assert.equal(nota({ texto: ' ' }).error, 'sin_texto');
+  assert.equal(nota({ texto: 'x', quien: 'otra' }).error, 'quien_invalido');
+  assert.equal(nota({ texto: 'x', id: 'abc' }).error, 'id_invalido');
+  assert.equal(nota({ texto: 'x', fecha: 'ayer' }).error, 'fecha_invalida');
+  assert.equal(nota({ texto: 'x', receta_id: 'r_nada0' }).status, 404);
+  const otra = p.upsert(receta({ fuente_url: 'https://youtu.be/cyTOswdJ4TY' })).data.id;
+  assert.equal(nota({ texto: 'x', id: 'n_abc12345', receta_id: otra }).status, 409);
+});
+
+test('las acciones nuevas piden correr setup() si a la Sheet le falta una columna', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  // Una Sheet de antes de la Fase 4a: sin la columna de las vistas.
+  const hoja = p.planilla.getSheetByName('Recetas');
+  const enc = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
+  hoja.getRange(1, enc.indexOf('porciones_vistas') + 1).setValues([['']]);
+  const r = p.postJson({ action: 'receta.porciones', t: p.token, id, porciones: 4 });
+  assert.deepEqual([r.status, r.error], [500, 'falta_columna']);
+  assert.match(r.mensaje, /setup\(\)/);
 });
 
 test('borrarFilas_ borra filas salteadas sin tocar las demás', () => {

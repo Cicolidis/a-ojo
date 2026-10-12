@@ -1,6 +1,9 @@
 /**
  * Acciones de la API (§4). Cada una recibe la petición ya validada y devuelve `data`.
- * Las de las fases siguientes (receta.estado, nota.*, compras.*, capturas.*) se suman acá.
+ * Las de las fases siguientes (compras.*, capturas.*) se suman acá.
+ *
+ * Las que usa la app se reintentan desde su cola offline: tienen que ser
+ * idempotentes (mandar dos veces lo mismo deja todo igual).
  */
 
 /** Una fila que quedó en `procesando` más que esto es de una corrida de /recetas que se cortó. */
@@ -96,7 +99,8 @@ function accionTodo_(req) {
       const ids = recetas.map(r => r.id);
       ingredientes = ingredientes.filter(i => ids.indexOf(i.receta_id) !== -1);
       pasos = pasos.filter(p => ids.indexOf(p.receta_id) !== -1);
-      notas = notas.filter(n => cambio(n.fecha));
+      // Una nota escrita sin conexión llega con una `fecha` vieja: cuenta cuándo llegó.
+      notas = notas.filter(n => cambio(n.creado || n.fecha));
       bandeja = bandeja.filter(b => cambio(b.actualizado));
     }
 
@@ -200,7 +204,7 @@ function accionRecetaUpsert_(req) {
     if (existente) escribirFila_('Recetas', existente.fila, datos);
     else agregarFila_('Recetas', datos);
 
-    reemplazarDeReceta_('Ingredientes', id, v.ingredientes);
+    reemplazarDeReceta_('Ingredientes', id, v.ingredientes, conservarEdiciones_);
     reemplazarDeReceta_('Pasos', id, v.pasos);
 
     if (bandeja) {
@@ -211,16 +215,71 @@ function accionRecetaUpsert_(req) {
   });
 }
 
-/** Reemplaza todas las filas de una receta en `hoja` (Ingredientes o Pasos), con `orden` 1…n. */
-function reemplazarDeReceta_(hoja, recetaId, items) {
+/**
+ * Reemplaza todas las filas de una receta en `hoja` (Ingredientes o Pasos), con `orden` 1…n.
+ * `ajustar(items, viejas)`, si viene, completa los items nuevos con datos de las filas viejas.
+ */
+function reemplazarDeReceta_(hoja, recetaId, items, ajustar) {
   const filas = leerFilas_(hoja);
-  borrarFilas_(hoja, filas.filter(f => f.datos.receta_id === recetaId).map(f => f.fila));
+  const viejas = filas.filter(f => f.datos.receta_id === recetaId);
+  if (ajustar) items = ajustar(items, viejas.map(f => f.datos));
+  borrarFilas_(hoja, viejas.map(f => f.fila));
   const usados = filas.map(f => f.datos.id);
   agregarFilas_(hoja, items.map((item, i) => {
     const id = nuevoId_(ESQUEMA[hoja].prefijo, usados);
     usados.push(id);
     return Object.assign({}, item, { id: id, receta_id: recetaId, orden: i + 1 });
   }));
+}
+
+/**
+ * Al reprocesar, las ediciones de los usuarios (rol_usuario, seccion_usuario) pasan
+ * al ingrediente nuevo que es «el mismo»: igual sección original e igual nombre o,
+ * si no hay, igual nombre cuando había uno solo con ese nombre. Si lo nuevo de
+ * /recetas ya coincide con lo que eligieron, la edición se borra.
+ */
+function conservarEdiciones_(nuevos, viejos) {
+  const editados = viejos.filter(i => i.rol_usuario || i.seccion_usuario);
+  if (!editados.length) return nuevos;
+  const cuantos = {};
+  viejos.forEach(i => {
+    const k = claveTexto_(i.nombre);
+    cuantos[k] = (cuantos[k] || 0) + 1;
+  });
+  const usados = [];
+  const libre = i => usados.indexOf(i) === -1;
+  return nuevos.map(ing => {
+    const nombre = claveTexto_(ing.nombre);
+    const viejo =
+      editados.filter(i => libre(i) && claveTexto_(i.nombre) === nombre && claveTexto_(i.seccion) === claveTexto_(ing.seccion))[0] ||
+      (cuantos[nombre] === 1 ? editados.filter(i => libre(i) && claveTexto_(i.nombre) === nombre)[0] : null);
+    if (!viejo) return ing;
+    usados.push(viejo);
+    return Object.assign({}, ing, {
+      rol_usuario: viejo.rol_usuario ? rolUsuario_(viejo.rol_usuario, ing.rol) : '',
+      seccion_usuario: viejo.seccion_usuario ? seccionUsuario_(seccionElegida_(viejo.seccion_usuario), ing.seccion) : '',
+    });
+  });
+}
+
+/** Lo que se guarda en rol_usuario: vacío si coincide con el rol de /recetas. */
+function rolUsuario_(elegido, original) {
+  return elegido === (original || 'principal') ? '' : elegido;
+}
+
+/** Lo que se guarda en seccion_usuario: vacío si coincide con la de /recetas, SIN_SECCION si la sacaron. */
+function seccionUsuario_(elegida, original) {
+  return elegida === (original || '') ? '' : elegida || SIN_SECCION;
+}
+
+/** La sección que eligieron los usuarios, a partir de seccion_usuario (no vacía). */
+function seccionElegida_(seccionUsuario) {
+  return seccionUsuario === SIN_SECCION ? '' : seccionUsuario;
+}
+
+/** Para comparar nombres: sin tildes, en minúsculas y sin espacios de más. */
+function claveTexto_(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -273,11 +332,21 @@ function validarReceta_(r) {
     enLista(unidad, 'unidad', donde + ': unidad');
     const gondola = texto(ing.gondola);
     enLista(gondola, 'gondola', donde + ': góndola');
+    const rol = texto(ing.rol);
+    if (!rol) errores.push(donde + ': falta el rol (' + ENUMS.rol.join(', ') + ')');
+    else enLista(rol, 'rol', donde + ': rol');
+    const seccion = texto(ing.seccion);
+    if (seccion.length > 40) errores.push(donde + ': la sección tiene que ser corta');
     const cantidad = numero(ing.cantidad, donde + ': cantidad');
     if (unidad === 'a ojo' && cantidad !== null) errores.push(donde + ': con unidad «a ojo» la cantidad va vacía');
     if (unidad !== 'a ojo' && vacio(ing.cantidad)) errores.push(donde + ': sin cantidad, la unidad tiene que ser «a ojo»');
-    return { cantidad: cantidad, unidad: unidad, nombre: nombre, nota: texto(ing.nota), gondola: gondola };
+    return { cantidad: cantidad, unidad: unidad, nombre: nombre, nota: texto(ing.nota), gondola: gondola, seccion: seccion, rol: rol };
   });
+  const comestibles = ings.filter(i => i.rol !== 'utensilio');
+  const conSeccion = comestibles.filter(i => i.seccion).length;
+  if (conSeccion && conSeccion < comestibles.length) {
+    errores.push('si la receta tiene secciones, cada ingrediente (salvo los utensilios) lleva la suya');
+  }
 
   const pasos = Array.isArray(r.pasos) ? r.pasos : [];
   if (!pasos.length) errores.push('falta al menos un paso');
@@ -313,4 +382,198 @@ function validarReceta_(r) {
     throw err;
   }
   return { id: texto(r.id), clave: norm.clave, campos: campos, ingredientes: ings, pasos: ps };
+}
+
+// Ediciones desde la app (§7.2) y desde /recetas --clasificar.
+
+/** Fila de la receta `id`, o un error claro. Se llama dentro del lock. */
+function filaReceta_(id) {
+  const buscado = String(id || '').trim();
+  if (!buscado) throw errorApi_('sin_id', 400, 'Falta el «id» de la receta.');
+  const encontrada = leerFilas_('Recetas').filter(f => f.datos.id === buscado)[0];
+  if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré la receta «' + buscado + '».');
+  return encontrada;
+}
+
+function vacio_(v) {
+  return v === undefined || v === null || String(v).trim() === '';
+}
+
+/** POST receta.estado { id, estado?, valoracion? } */
+function accionRecetaEstado_(req) {
+  const cambios = {};
+  if (!vacio_(req.estado)) {
+    const estado = String(req.estado).trim();
+    if (ENUMS.estadoReceta.indexOf(estado) === -1) {
+      throw errorApi_('estado_invalido', 400, '«estado» tiene que ser uno de: ' + ENUMS.estadoReceta.join(', ') + '.');
+    }
+    cambios.estado = estado;
+  }
+  if (!vacio_(req.valoracion)) {
+    const valoracion = Number(req.valoracion);
+    if (!Number.isInteger(valoracion) || valoracion < 0 || valoracion > 5) {
+      throw errorApi_('valoracion_invalida', 400, '«valoracion» tiene que ser un entero de 0 a 5.');
+    }
+    cambios.valoracion = valoracion;
+  }
+  if (!Object.keys(cambios).length) throw errorApi_('sin_cambios', 400, 'Mandá «estado», «valoracion» o los dos.');
+
+  return conLock_(() => {
+    const receta = filaReceta_(req.id);
+    Object.assign(receta.datos, cambios, { actualizado: ahoraIso_() });
+    escribirFila_('Recetas', receta.fila, receta.datos);
+    return { id: receta.datos.id, estado: receta.datos.estado, valoracion: receta.datos.valoracion };
+  });
+}
+
+/** Cuántas vistas de porciones se guardan por receta, como máximo. */
+const MAX_VISTAS_ = 6;
+
+/**
+ * POST receta.porciones { id, porciones, quitar? }
+ * Pone `porciones` al frente de las vistas de la receta (la última usada va primero) o, con `quitar`, la saca.
+ */
+function accionRecetaPorciones_(req) {
+  const porciones = Number(req.porciones);
+  if (!Number.isInteger(porciones) || porciones < 1 || porciones > 999) {
+    throw errorApi_('porciones_invalidas', 400, '«porciones» tiene que ser un número entero desde 1.');
+  }
+  const quitar = req.quitar === true || req.quitar === 'true';
+
+  return conLock_(() => {
+    exigirColumnas_('Recetas', ['porciones_vistas']);
+    const receta = filaReceta_(req.id);
+    const vistas = listaPorciones_(receta.datos.porciones_vistas).filter(n => n !== porciones);
+    if (!quitar) vistas.unshift(porciones);
+    receta.datos.porciones_vistas = vistas.slice(0, MAX_VISTAS_).join(',');
+    receta.datos.actualizado = ahoraIso_();
+    escribirFila_('Recetas', receta.fila, receta.datos);
+    return { id: receta.datos.id, porciones_vistas: receta.datos.porciones_vistas };
+  });
+}
+
+/** «12, 3,6» → [12, 3, 6], sin repetidos ni basura. */
+function listaPorciones_(texto) {
+  return String(texto || '').split(',')
+    .map(s => Number(s.trim()))
+    .filter((n, i, lista) => Number.isInteger(n) && n > 0 && lista.indexOf(n) === i);
+}
+
+/**
+ * POST receta.ingredientes { id, ingredientes: [{ id, seccion, rol }] }
+ * Los usuarios cambian el rol o la sección de algunos ingredientes. Se guarda
+ * aparte (rol_usuario, seccion_usuario), así reprocesar la receta no lo pisa.
+ */
+function accionRecetaIngredientes_(req) {
+  return editarIngredientes_(req, false);
+}
+
+/**
+ * POST receta.clasificar { id, ingredientes: [{ id, seccion, rol }] }
+ * /recetas --clasificar completa la sección y el rol de una receta ya guardada,
+ * sin reprocesarla. Tienen que venir todos sus ingredientes.
+ */
+function accionRecetaClasificar_(req) {
+  return editarIngredientes_(req, true);
+}
+
+function editarIngredientes_(req, deProceso) {
+  const lista = Array.isArray(req.ingredientes) ? req.ingredientes : [];
+  if (!lista.length) throw errorApi_('sin_ingredientes', 400, 'Falta «ingredientes».');
+  const errores = [];
+  const cambios = {};
+  lista.forEach((ing, i) => {
+    const donde = 'ingrediente ' + (i + 1);
+    ing = ing || {};
+    const id = String(ing.id || '').trim();
+    const rol = String(ing.rol || '').trim();
+    const seccion = vacio_(ing.seccion) ? '' : String(ing.seccion).trim();
+    if (!id) errores.push(donde + ': falta el id');
+    else if (cambios[id]) errores.push(donde + ': «' + id + '» está repetido');
+    if (ENUMS.rol.indexOf(rol) === -1) errores.push(donde + ': rol «' + rol + '» no es válido (' + ENUMS.rol.join(', ') + ')');
+    if (seccion.length > 40) errores.push(donde + ': la sección tiene que ser corta');
+    if (seccion === SIN_SECCION) errores.push(donde + ': «' + SIN_SECCION + '» no es una sección');
+    if (id) cambios[id] = { rol: rol, seccion: seccion };
+  });
+  if (errores.length) {
+    const err = errorApi_('ingredientes_invalidos', 400, 'Revisá los ingredientes: ' + errores.join('; ') + '.');
+    err.detalles = errores;
+    throw err;
+  }
+
+  return conLock_(() => {
+    exigirColumnas_('Ingredientes', ['seccion', 'rol', 'seccion_usuario', 'rol_usuario']);
+    const receta = filaReceta_(req.id);
+    const filas = leerFilas_('Ingredientes').filter(f => f.datos.receta_id === receta.datos.id);
+    const ids = filas.map(f => f.datos.id);
+    const ajenos = Object.keys(cambios).filter(id => ids.indexOf(id) === -1);
+    if (ajenos.length) {
+      throw errorApi_('ingredientes_cambiaron', 409,
+        'La receta cambió mientras tanto (no tiene ' + ajenos.join(', ') + '). Volvé a editar los ingredientes.');
+    }
+    const faltan = deProceso ? ids.filter(id => !cambios[id]) : [];
+    if (faltan.length) throw errorApi_('faltan_ingredientes', 400, 'Faltan ingredientes de la receta: ' + faltan.join(', ') + '.');
+
+    filas.filter(f => cambios[f.datos.id]).forEach(f => {
+      const c = cambios[f.datos.id];
+      const d = f.datos;
+      if (deProceso) {
+        d.rol = c.rol;
+        d.seccion = c.seccion;
+        if (d.rol_usuario) d.rol_usuario = rolUsuario_(d.rol_usuario, d.rol);
+        if (d.seccion_usuario) d.seccion_usuario = seccionUsuario_(seccionElegida_(d.seccion_usuario), d.seccion);
+      } else {
+        d.rol_usuario = rolUsuario_(c.rol, d.rol);
+        d.seccion_usuario = seccionUsuario_(c.seccion, d.seccion);
+      }
+      escribirFila_('Ingredientes', f.fila, d);
+    });
+    // Así el próximo delta de `todo` lleva los ingredientes al otro celular.
+    receta.datos.actualizado = ahoraIso_();
+    escribirFila_('Recetas', receta.fila, receta.datos);
+    return { id: receta.datos.id, ingredientes: Object.keys(cambios).length };
+  });
+}
+
+/**
+ * POST nota.agregar { id?, receta_id, quien, texto, fecha? }
+ * La app manda su propio id: si la nota ya llegó (un reintento), responde lo mismo sin duplicarla.
+ */
+function accionNotaAgregar_(req) {
+  const recetaId = String(req.receta_id || '').trim();
+  if (!recetaId) throw errorApi_('sin_receta', 400, 'Falta «receta_id».');
+  const quien = String(req.quien || '').trim().toLowerCase();
+  if (ENUMS.quien.indexOf(quien) === -1) {
+    throw errorApi_('quien_invalido', 400, '«quien» tiene que ser ' + ENUMS.quien.join(' o ') + '.');
+  }
+  const texto = String(req.texto || '').trim();
+  if (!texto) throw errorApi_('sin_texto', 400, 'La nota está vacía.');
+  if (texto.length > 2000) throw errorApi_('texto_largo', 400, 'La nota es muy larga (máximo 2000 caracteres).');
+  const idPedido = String(req.id || '').trim();
+  if (idPedido && !/^n_[0-9a-z]{5,12}$/.test(idPedido)) throw errorApi_('id_invalido', 400, '«' + idPedido + '» no es un id de nota.');
+  const fechaMs = vacio_(req.fecha) ? NaN : Date.parse(req.fecha);
+  if (!vacio_(req.fecha) && isNaN(fechaMs)) throw errorApi_('fecha_invalida', 400, '«fecha» tiene que ser una fecha ISO.');
+
+  return conLock_(() => {
+    exigirColumnas_('Notas', ['creado']);
+    filaReceta_(recetaId);
+    const notas = leerDatos_('Notas');
+    const existente = idPedido ? notas.filter(n => n.id === idPedido)[0] : null;
+    if (existente) {
+      if (existente.receta_id !== recetaId) throw errorApi_('id_usado', 409, 'El id «' + idPedido + '» ya es de otra nota.');
+      return { id: existente.id, fecha: existente.fecha, repetida: true };
+    }
+    const ahora = ahoraIso_();
+    const nota = {
+      id: idPedido || nuevoId_(ESQUEMA.Notas.prefijo, notas.map(n => n.id)),
+      receta_id: recetaId,
+      // Un reloj adelantado no puede dejar una nota en el futuro.
+      fecha: !isNaN(fechaMs) && fechaMs <= Date.parse(ahora) ? new Date(fechaMs).toISOString() : ahora,
+      quien: quien,
+      texto: texto,
+      creado: ahora,
+    };
+    agregarFila_('Notas', nota);
+    return { id: nota.id, fecha: nota.fecha };
+  });
 }

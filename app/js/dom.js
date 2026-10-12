@@ -18,6 +18,13 @@ export function h(etiqueta, atributos, ...hijos) {
   return el;
 }
 
+/** Reemplaza el contenido de `el`, con los mismos hijos que acepta h() (listas, null…). */
+export function rellenar(el, ...hijos) {
+  el.replaceChildren();
+  agregar(el, hijos);
+  return el;
+}
+
 function agregar(el, hijos) {
   hijos.forEach(hijo => {
     if (hijo === null || hijo === undefined || hijo === false) return;
@@ -39,6 +46,9 @@ const TRAZOS = {
   estrella: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
   aviso: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/>',
   cocinar: '<path d="M4 11h16v2a7 7 0 01-7 7h-2a7 7 0 01-7-7z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
+  menos: '<path d="M5 12h14"/>',
+  lapiz: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
 };
 
 export function icono(nombre, tamano = 20) {

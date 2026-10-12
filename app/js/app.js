@@ -1,16 +1,20 @@
-// Arranque de A ojo: configuración, datos locales, rutas y sincronización en segundo plano.
+// Arranque de A ojo: configuración, datos locales, rutas, ediciones y sincronización en segundo plano.
 
 import { leerRuta } from './rutas.js';
 import { leerConfig, guardarConfig, leerLinkConfig } from './config.js';
-import { leer, borrar } from './db.js';
+import { leer, guardar, borrar } from './db.js';
 import { indexar } from './datos.js';
+import { aplicarCola, aplicarEdicion } from './ediciones.js';
 import { sincronizar, precargarFotos } from './sync.js';
+import { h } from './dom.js';
 import * as biblioteca from './vistas/biblioteca.js';
 import * as ficha from './vistas/ficha.js';
 import * as cocina from './vistas/cocina.js';
+import * as ingredientes from './vistas/ingredientes.js';
 import * as bienvenida from './vistas/bienvenida.js';
 
 const CINCO_MIN_MS = 5 * 60 * 1000;
+const REINTENTO_MS = 60 * 1000;
 const contenedor = document.getElementById('app');
 
 const app = {
@@ -20,12 +24,18 @@ const app = {
   // estado: inactivo · sincronizando · ok · sin_conexion · error
   sync: { estado: 'inactivo', mensaje: '' },
   ultimaSync: 0,
+  // Ediciones que todavía no llegaron a la API (ver ediciones.js).
+  cola: [],
   biblioteca: { texto: '', filtro: 'todas', scroll: 0 },
+  // Porciones elegidas en cada ficha, mientras la app está abierta: id → número.
+  porciones: new Map(),
 };
 
 let vista = null;
 let recargarAlSalir = false;
 let sincronizando = null;
+let otraVez = false;
+let reintento = null;
 
 const mismaRuta = (a, b) => {
   const x = leerRuta(a);
@@ -44,6 +54,15 @@ function volver(destino) {
   else location.replace(destino);
 }
 
+/**
+ * Va a `destino` en lugar de la pantalla actual, como si se hubiera llegado
+ * desde `desde`: así su «volver» vuelve atrás en el historial hasta ahí.
+ */
+function reemplazar(destino, desde) {
+  history.replaceState({ desde }, '', destino);
+  mostrar({ enfocar: true });
+}
+
 function mostrar({ enfocar = false } = {}) {
   const ruta = leerRuta(location.hash);
   if (ruta.nombre === 'config') return configurar();
@@ -53,10 +72,11 @@ function mostrar({ enfocar = false } = {}) {
   contenedor.replaceChildren();
   if (ruta.nombre !== 'biblioteca') window.scrollTo(0, 0);
 
-  const ctx = { app, volver };
+  const ctx = { app, volver, reemplazar, editar, avisar };
   if (!app.config) vista = bienvenida.montar(contenedor, ctx);
   else if (ruta.nombre === 'receta') vista = ficha.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'cocina') vista = cocina.montar(contenedor, ctx, ruta.id);
+  else if (ruta.nombre === 'ingredientes') vista = ingredientes.montar(contenedor, ctx, ruta.id);
   else vista = biblioteca.montar(contenedor, ctx);
 
   if (enfocar) {
@@ -72,6 +92,32 @@ function refrescar() {
   const y = window.scrollY;
   mostrar();
   window.scrollTo(0, y);
+}
+
+/**
+ * Aplica una edición al instante (datos, índice y pantalla), la deja en la cola
+ * y la manda cuando se pueda. Las vistas la arman con ediciones.js.
+ */
+function editar(edicion) {
+  if (!app.datos) return;
+  app.cola.push(edicion);
+  app.datos = aplicarEdicion(app.datos, edicion);
+  app.indice = indexar(app.datos);
+  guardar('cola', app.cola).catch(err => console.warn('No se pudo guardar la cola:', err));
+  guardar('datos', app.datos).catch(err => console.warn('No se pudieron guardar los datos:', err));
+  sincronizarAhora();
+}
+
+// Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
+const zonaAviso = h('div', { class: 'aviso', role: 'status', hidden: true });
+document.body.append(zonaAviso);
+let ocultarAviso = null;
+
+function avisar(texto) {
+  zonaAviso.textContent = texto;
+  zonaAviso.hidden = false;
+  clearTimeout(ocultarAviso);
+  ocultarAviso = setTimeout(() => { zonaAviso.hidden = true; }, 6000);
 }
 
 /** Link de configuración: guarda, borra el token de la barra de direcciones y sincroniza. */
@@ -91,24 +137,36 @@ async function configurar() {
     app.datos = null;
     app.indice = indexar(null);
     app.ultimaSync = 0;
+    app.cola = [];
     await borrar('datos').catch(() => {});
+    await borrar('cola').catch(() => {});
   }
   mostrar();
   sincronizarAhora();
 }
 
 function sincronizarAhora() {
-  if (!app.config || sincronizando) return sincronizando;
+  if (!app.config) return null;
+  // Una edición durante la sincronización: se vuelve a sincronizar al terminar.
+  if (sincronizando) {
+    otraVez = true;
+    return sincronizando;
+  }
+  clearTimeout(reintento);
   const antes = app.sync.estado;
   app.sync = { estado: 'sincronizando', mensaje: '' };
   if (!app.datos) refrescar();
-  sincronizando = sincronizar(app.config, app.datos)
-    .then(({ datos, cambios }) => {
-      app.datos = datos;
+  sincronizando = sincronizar(app.config, app.datos, app.cola)
+    .then(({ datos, cambios, descartadas, pendiente }) => {
+      // Las ediciones que se hicieron mientras bajaba `todo` también se ven.
+      app.datos = aplicarCola(datos, app.cola);
       app.ultimaSync = Date.now();
-      app.sync = { estado: 'ok', mensaje: '' };
-      if (cambios) app.indice = indexar(datos);
-      if (cambios || antes === 'sin_conexion' || antes === 'error') refrescar();
+      app.sync = pendiente
+        ? { estado: 'error', mensaje: 'No se pudieron mandar los cambios: ' + pendiente.message }
+        : { estado: 'ok', mensaje: '' };
+      if (cambios) app.indice = indexar(app.datos);
+      descartadas.forEach(d => avisar('No se pudo guardar un cambio: ' + d.mensaje));
+      if (cambios || pendiente || antes === 'sin_conexion' || antes === 'error') refrescar();
       precargarFotos(datos.recetas.map(r => r.foto_url)).catch(() => {});
     })
     .catch(err => {
@@ -121,7 +179,15 @@ function sincronizarAhora() {
       }
       refrescar();
     })
-    .finally(() => { sincronizando = null; });
+    .finally(() => {
+      sincronizando = null;
+      if (otraVez) {
+        otraVez = false;
+        sincronizarAhora();
+      } else if (app.cola.length) {
+        reintento = setTimeout(sincronizarAhora, REINTENTO_MS);
+      }
+    });
   return sincronizando;
 }
 
@@ -151,13 +217,16 @@ async function arrancar() {
   });
   window.addEventListener('online', () => sincronizarAhora());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && Date.now() - app.ultimaSync > CINCO_MIN_MS) sincronizarAhora();
+    if (document.visibilityState !== 'visible') return;
+    if (app.cola.length || Date.now() - app.ultimaSync > CINCO_MIN_MS) sincronizarAhora();
   });
 
   if (leerRuta(location.hash).nombre === 'config') return configurar();
   if (app.config) {
     try {
-      app.datos = (await leer('datos')) || null;
+      app.cola = (await leer('cola')) || [];
+      // Lo que quedó sin mandar se ve igual, aunque la app se haya cerrado antes de guardar los datos.
+      app.datos = aplicarCola((await leer('datos')) || null, app.cola);
     } catch (err) {
       console.warn('No se pudieron leer los datos guardados:', err);
     }

@@ -1,6 +1,6 @@
 ---
 description: Procesa la Bandeja de A ojo — baja cada link pendiente, arma la receta en rioplatense y la guarda en la Sheet
-argument-hint: "[cantidad | id de bandeja] [--dry-run] [--sin-cookies]"
+argument-hint: "[cantidad | id de bandeja] [--dry-run] [--sin-cookies] [--clasificar]"
 allowed-tools: Bash(procesamiento/aojo:*), Read, Write, WebFetch
 ---
 
@@ -14,6 +14,7 @@ Argumentos: `$ARGUMENTS`
 - Un id de la bandeja (ej.: `b_e3cgj`): procesá solo esa fila, esté en el estado que esté (sirve para reprocesar).
 - `--dry-run`: no escribe nada en la Sheet. Pasá `--dry-run` a todos los `api actualizar` y `api upsert` (este último solo valida la receta contra la API).
 - `--sin-cookies`: pasáselo a `fetch meta` (para probar Instagram sin la cuenta secundaria).
+- `--clasificar`: no procesa la bandeja. Completa la sección y el rol de los ingredientes de las recetas ya guardadas que no los tienen. Seguí §5 y no hagas nada más.
 
 Todos los comandos se corren **desde la raíz del repo** con `procesamiento/aojo <script> …`. Cada uno imprime una línea de JSON: si trae `"ok": false`, mirá `error` y `motivo`. Nunca leas `info.json` entero (pesa megas) ni imprimas el `.env`.
 
@@ -84,10 +85,11 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
   "idioma_original": "es",
   "notas_proceso": "Subtítulos: «harina 4» → harina 0000. Porciones estimadas por el molde.",
   "ingredientes": [
-    { "cantidad": 3, "unidad": "u", "nombre": "huevos", "nota": "", "gondola": "lácteos y huevos" },
-    { "cantidad": 200, "unidad": "g", "nombre": "azúcar", "nota": "", "gondola": "almacén" },
-    { "cantidad": 1, "unidad": "u", "nombre": "limón", "nota": "ralladura y jugo", "gondola": "verdulería" },
-    { "cantidad": null, "unidad": "a ojo", "nombre": "sal", "nota": "una pizca", "gondola": "almacén" }
+    { "seccion": "", "rol": "principal", "cantidad": 3, "unidad": "u", "nombre": "huevos", "nota": "", "gondola": "lácteos y huevos" },
+    { "seccion": "", "rol": "principal", "cantidad": 200, "unidad": "g", "nombre": "azúcar", "nota": "", "gondola": "almacén" },
+    { "seccion": "", "rol": "principal", "cantidad": 1, "unidad": "u", "nombre": "limón", "nota": "ralladura y jugo", "gondola": "verdulería" },
+    { "seccion": "", "rol": "condimento", "cantidad": null, "unidad": "a ojo", "nombre": "sal", "nota": "una pizca", "gondola": "almacén" },
+    { "seccion": "", "rol": "utensilio", "cantidad": null, "unidad": "a ojo", "nombre": "papel manteca", "nota": "para forrar la budinera", "gondola": "otros" }
   ],
   "pasos": [
     { "texto": "Precalentá el horno a 180 °C.", "timer_min": null, "tip": "" },
@@ -104,7 +106,9 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
 - `unidad`: `g` · `kg` · `ml` · `l` · `u` · `cda` · `cdita` · `taza` · `pizca` · `a ojo` · `lata` · `paquete` · `diente` · `ramo`.
 - `cantidad` es un número (`0.5`, no «1/2») y va `null` **si y solo si** la unidad es `a ojo`.
 - `gondola`: `verdulería` · `almacén` · `lácteos y huevos` · `carnicería` · `panadería` · `congelados` · `otros`.
-- `porciones` y `tiempo_min` pueden ser `null`. `molde` y `nota` pueden quedar vacíos.
+- `rol`: `principal` · `condimento` · `opcional` · `utensilio` (obligatorio; ver «Secciones y roles» en §3).
+- `seccion`: texto corto, o `""` si la receta tiene una sola parte.
+- `porciones` y `tiempo_min` pueden ser `null`. `molde`, `nota` y `seccion` pueden quedar vacíos.
 
 ## 3. Reglas de estructuración (§6.2 y §6.3)
 
@@ -125,8 +129,18 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
 
 **Ingredientes**
 - `nombre` corto y genérico («manteca», «chocolate semiamargo»). El estado o la preparación van en `nota` («pomada», «picado», «a temperatura ambiente»).
-- En el orden en que se usan.
+- En el orden en que se usan, agrupados por sección (todos los de la masa, después todos los del relleno).
 - Si el video ofrece variantes («o 2 cucharadas de mayonesa»), la principal va como ingrediente y la variante, en la `nota` o en un `tip`.
+- Si algo se usa en dos partes (azúcar en la masa y en el almíbar), va dos veces, una en cada sección.
+
+**Secciones y roles** (la ficha agrupa por sección y, dentro de cada una, por rol; ellos verifican de un vistazo que tienen lo infaltable)
+- `seccion`: la parte de la receta a la que pertenece el ingrediente, en pocas palabras y con mayúscula inicial: «Masa», «Relleno», «Cobertura», «Almíbar», «Marinada», «Para servir». Usá los nombres de la fuente si los tiene. Si la receta tiene **una sola parte**, todas van vacías. Si tiene secciones, **todos** los ingredientes llevan la suya (salvo los utensilios, que dan igual).
+- `rol`:
+  - `principal`: lo infaltable, sin eso el plato no sale (la harina y los huevos de una torta, el pollo y la cebolla de un guiso, el aceite de oliva de un hummus).
+  - `condimento`: lo que da sabor en poca cantidad y suele estar en la alacena: sal, pimienta, especias, hierbas secas, esencias, ralladuras, y el aceite o la manteca para cocinar o engrasar.
+  - `opcional`: lo que la fuente marca como opcional o «si querés», la decoración y lo que es solo para acompañar o servir.
+  - `utensilio`: lo que no se come: papel manteca, papel aluminio, film, palitos, bolsa de horno, manga. El molde no: va en `molde`.
+- Ante la duda entre `principal` y `condimento`, preguntate si sin eso igual la harías: si sí, es condimento.
 
 **Pasos**
 - Frases cortas, un verbo principal por paso, nombrando los ingredientes que se usan (el modo cocina los muestra por paso).
@@ -171,3 +185,15 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
 ## 4. Al terminar
 
 Mostrá una tabla con: fila, plato (o el link si no salió), resultado (`lista` / `ayuda` / `pendiente`), confianza, capas usadas y, si corresponde, el motivo. Después, en una línea: cuántas siguen pendientes en la bandeja y que el detalle está en `~/.a-ojo/log/<fecha de hoy>.log`. Si fue `--dry-run`, aclaralo: no se escribió nada en la Sheet.
+
+## 5. `--clasificar`: recetas ya guardadas
+
+Completa `seccion` y `rol` de recetas guardadas antes de que existieran, **sin reprocesarlas**: no cambia nada más de la receta (nombres, cantidades, pasos, foto), y las ediciones que hayan hecho ellos en la app se conservan.
+
+1. `procesamiento/aojo api sin-clasificar`. Si no hay recetas, decilo en una línea y terminá.
+2. Por cada receta, de a una:
+   1. `procesamiento/aojo api ingredientes <receta_id>`: trae los ingredientes con su `id`, los pasos, `notas_proceso` y el `archivo` donde va la clasificación.
+   2. Decidí sección y rol de cada ingrediente con las reglas de §3. Los pasos ayudan a ver las partes («Para el relleno…», «Mientras tanto, el almíbar»). Si no sabés si algo era opcional para el autor, mirá la descripción con `procesamiento/aojo fetch meta <bandeja_id> <fuente_url>` (solo metadatos; no bajes audio ni video).
+   3. Escribí el `archivo` con Write: `{"ingredientes": [{"id": "i_…", "seccion": "", "rol": "principal"}, …]}`, con **todos** los ingredientes de la receta.
+   4. `procesamiento/aojo api clasificar <receta_id>` (con `--dry-run` si la corrida es de prueba).
+3. Al terminar, mostrá una tabla por receta: secciones (o «una sola parte») y, por rol, los ingredientes que no son `principal`. Así se revisa rápido.

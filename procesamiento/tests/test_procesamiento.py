@@ -11,11 +11,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 # Antes de importar comun: que el log y la carpeta de trabajo no toquen ~/.a-ojo.
 os.environ['A_OJO_DIR'] = tempfile.mkdtemp(prefix='a-ojo-tests-')
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import api  # noqa: E402
 import comun  # noqa: E402
 import fetch  # noqa: E402
 import frames  # noqa: E402
@@ -290,6 +292,78 @@ class TestCookies(unittest.TestCase):
         finally:
             os.environ.clear()
             os.environ.update(viejo)
+
+
+def correr_api(*argv):
+    """Corre `api <argv>` y devuelve (JSON impreso, código de salida)."""
+    codigo = 0
+    with contextlib.redirect_stdout(io.StringIO()) as out:
+        try:
+            api.main(list(argv))
+        except SystemExit as e:
+            codigo = e.code
+    return json.loads(out.getvalue()), codigo
+
+
+TODO_CLASIFICAR = {
+    'recetas': [
+        {'id': 'r_nueva', 'titulo': 'Torta', 'creado': '2026-10-02T00:00:00.000Z'},
+        {'id': 'r_vieja', 'titulo': 'Brownie', 'creado': '2026-10-01T00:00:00.000Z', 'porciones': 6,
+         'fuente_url': 'https://youtu.be/x', 'notas_proceso': 'nada'},
+        {'id': 'r_lista', 'titulo': 'Sopa', 'creado': '2026-10-03T00:00:00.000Z'},
+    ],
+    'ingredientes': [
+        {'id': 'i_2', 'receta_id': 'r_vieja', 'orden': 2, 'nombre': 'sal', 'unidad': 'a ojo', 'rol': ''},
+        {'id': 'i_1', 'receta_id': 'r_vieja', 'orden': 1, 'nombre': 'chocolate', 'unidad': 'g', 'cantidad': 200},
+        {'id': 'i_3', 'receta_id': 'r_nueva', 'orden': 1, 'nombre': 'harina', 'rol': None},
+        {'id': 'i_4', 'receta_id': 'r_lista', 'orden': 1, 'nombre': 'zapallo', 'rol': 'principal', 'seccion': ''},
+    ],
+    'pasos': [{'receta_id': 'r_vieja', 'orden': 1, 'texto': 'Derretí el chocolate.'}],
+    'bandeja': [{'id': 'b_1', 'receta_id': 'r_vieja'}],
+}
+
+
+class TestClasificar(unittest.TestCase):
+    def test_sin_clasificar_de_la_mas_vieja_a_la_mas_nueva(self):
+        with mock.patch.object(api, 'llamar', return_value=TODO_CLASIFICAR):
+            r, codigo = correr_api('sin-clasificar')
+        self.assertEqual(codigo, 0)
+        self.assertEqual([x['id'] for x in r['recetas']], ['r_vieja', 'r_nueva'])
+
+    def test_ingredientes_en_orden_con_bandeja_y_archivo(self):
+        with mock.patch.object(api, 'llamar', return_value=TODO_CLASIFICAR):
+            r, _ = correr_api('ingredientes', 'r_vieja')
+        self.assertEqual([i['id'] for i in r['ingredientes']], ['i_1', 'i_2'])
+        self.assertEqual(r['pasos'], ['Derretí el chocolate.'])
+        self.assertEqual(r['bandeja_id'], 'b_1')
+        self.assertTrue(r['archivo'].endswith('r_vieja/clasificacion.json'))
+        with mock.patch.object(api, 'llamar', return_value=TODO_CLASIFICAR):
+            r, codigo = correr_api('ingredientes', 'r_nada0')
+        self.assertEqual((r['error'], codigo), ('no_encontrada', 1))
+
+    def test_clasificar_manda_el_archivo_y_valida_antes(self):
+        archivo = comun.dir_trabajo('r_vieja') / 'clasificacion.json'
+        comun.escribir_json(archivo, {'ingredientes': [
+            {'id': 'i_1', 'seccion': 'Masa', 'rol': 'principal'},
+            {'id': 'i_2', 'rol': 'condimento'},
+        ]})
+        with mock.patch.object(api, 'llamar', return_value={'id': 'r_vieja', 'ingredientes': 2}) as llamar:
+            r, _ = correr_api('clasificar', 'r_vieja', '--dry-run')
+            self.assertTrue(r['dry_run'])
+            llamar.assert_not_called()
+            r, _ = correr_api('clasificar', 'r_vieja')
+        llamar.assert_called_once_with('POST', 'receta.clasificar', {'id': 'r_vieja', 'ingredientes': [
+            {'id': 'i_1', 'seccion': 'Masa', 'rol': 'principal'},
+            {'id': 'i_2', 'seccion': '', 'rol': 'condimento'},
+        ]})
+        self.assertEqual(r['ingredientes'], 2)
+
+        comun.escribir_json(archivo, [{'id': 'i_1', 'rol': 'infaltable'}])
+        with mock.patch.object(api, 'llamar') as llamar:
+            r, codigo = correr_api('clasificar', 'r_vieja')
+        llamar.assert_not_called()
+        self.assertEqual((r['error'], codigo), ('clasificacion_invalida', 1))
+        self.assertIn('infaltable', r['motivo'])
 
 
 class TestVarios(unittest.TestCase):

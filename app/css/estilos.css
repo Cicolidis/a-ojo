@@ -71,6 +71,9 @@ h1:focus, .paso-texto:focus { outline: none; }
 
 .icono { display: inline-flex; flex: none; }
 
+/* `hidden` gana aunque el elemento tenga display propio (flex, grid…). */
+[hidden] { display: none !important; }
+
 .solo-lector {
   position: absolute;
   width: 1px;
@@ -120,6 +123,24 @@ h1:focus, .paso-texto:focus { outline: none; }
 
 .boton-secundario:disabled { opacity: 0.45; cursor: default; }
 
+.boton-chico { min-height: 44px; padding: 0 16px; border-radius: 14px; font-size: 15px; }
+
+/* Acción secundaria con forma de link (Editar ingredientes, Renombrar, Ahora no). */
+.boton-texto {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--acento);
+  font: 600 15px var(--sans);
+}
+
+.boton-texto.alerta-texto { color: var(--alerta); }
+
 .boton-redondo {
   display: inline-flex;
   align-items: center;
@@ -130,6 +151,90 @@ h1:focus, .paso-texto:focus { outline: none; }
   border-radius: 22px;
   background: var(--superficie);
   color: var(--tinta);
+}
+
+.boton-redondo.chico { border: 1px solid var(--borde-control); }
+.boton-redondo:disabled { opacity: 0.45; cursor: default; }
+
+/* Campos de texto */
+
+textarea, input[type="text"], select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde-control);
+  border-radius: 12px;
+  background: var(--superficie);
+  color: var(--tinta);
+  font: 400 16px/1.4 var(--sans);
+}
+
+textarea { resize: vertical; }
+textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-color: var(--acento); }
+
+/* Controles: selector segmentado y estrellas */
+
+.segmentado {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--superficie-2);
+}
+
+.segmentado button {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--tinta-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.segmentado button[aria-pressed="true"] {
+  background: var(--superficie);
+  color: var(--tinta);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(42, 33, 27, 0.12);
+}
+
+.segmentado.chico button { min-height: 38px; padding: 0 4px; font-size: 13px; }
+
+.estrellas { display: flex; gap: 2px; }
+
+.estrellas button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--tinta-2);
+}
+
+.estrellas button.llena { color: var(--acento); }
+.estrellas button.llena svg { fill: currentColor; }
+
+/* Avisos breves abajo de la pantalla */
+
+.aviso {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 10;
+  width: calc(100% - 2 * var(--margen));
+  max-width: 520px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--tinta);
+  color: var(--superficie);
+  font-size: 14px;
+  transform: translateX(-50%);
 }
 
 /* Biblioteca */
@@ -357,6 +462,78 @@ h1:focus, .paso-texto:focus { outline: none; }
 }
 
 .seccion { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+.ficha-estado { display: flex; flex-direction: column; gap: 10px; }
+
+.valorar { display: flex; align-items: center; justify-content: space-between; }
+
+.aviso-descartada {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--superficie-2);
+  color: var(--alerta);
+  font-size: 14px;
+}
+
+.aviso-descartada .boton-secundario { align-self: flex-start; min-height: 44px; }
+
+.porciones { display: flex; flex-direction: column; gap: 8px; }
+
+.porciones-control { display: flex; align-items: center; gap: 12px; }
+
+.porciones-n { min-width: 104px; font-weight: 600; text-align: center; }
+
+.grupo-ingredientes { display: flex; flex-direction: column; gap: 6px; }
+
+.grupo-ingredientes .etiqueta-seccion { margin: 6px 0 0 4px; }
+
+.lista-ingredientes li.condimentos { display: block; }
+
+.condimentos .rotulo, .utensilios .etiqueta-seccion { display: block; }
+
+.condimentos .rotulo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+
+.lista-ingredientes li.opcional { color: var(--tinta-2); }
+
+.marca-opcional {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--borde-control);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
+.utensilios {
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--superficie);
+  font-size: 14px;
+}
+
+.notas { display: flex; flex-direction: column; gap: 10px; }
+
+.notas:empty { display: none; }
+
+.seccion > .boton-secundario { align-self: flex-start; }
+
+.form-nota { display: flex; flex-direction: column; gap: 10px; }
+
+.form-botones { display: flex; justify-content: flex-end; gap: 10px; }
+
+.form-botones button { min-height: 44px; border-radius: 14px; font-size: 15px; }
+
+.ficha-cuerpo > .boton-texto { margin-top: 8px; }
 
 .seccion-cabeza {
   display: flex;
@@ -621,7 +798,56 @@ h1:focus, .paso-texto:focus { outline: none; }
 
 .cocina-fin h1 { font: 500 34px/1.15 var(--serif); }
 
+.cocina-fin h2 { margin-top: 8px; font: 500 22px var(--serif); }
+
 .cocina-fin .boton-principal, .cocina-fin .boton-secundario { min-height: 60px; }
+
+.cocina-fin-otros { display: flex; justify-content: space-between; }
+
+/* Editor de ingredientes */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top)) var(--margen) calc(104px + env(safe-area-inset-bottom));
+}
+
+.editor-ayuda { font-size: 14px; line-height: 1.45; color: var(--tinta-nota); }
+
+.editor-lista { display: flex; flex-direction: column; gap: 18px; }
+
+.editor-seccion { display: flex; flex-direction: column; gap: 8px; }
+
+.editor-cabeza { display: flex; align-items: center; justify-content: space-between; }
+
+.editor-ingredientes {
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--superficie);
+  list-style: none;
+}
+
+.editor-ingredientes li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--linea);
+}
+
+.editor-ingredientes li:last-child { border-bottom: none; }
+
+.editor-nombre { display: flex; flex-direction: column; }
+
+.editor-seccion-elegir { display: flex; align-items: center; gap: 10px; }
+
+.editor-seccion-elegir select { flex: 1; min-height: 40px; padding: 6px 10px; font-size: 15px; }
+
+.campo-seccion { display: flex; align-items: center; gap: 8px; }
+
+.campo-seccion input { flex: 1; }
 
 /* Bienvenida */
 

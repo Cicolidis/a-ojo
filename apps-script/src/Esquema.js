@@ -17,7 +17,12 @@ const ENUMS = {
   gondola: ['verdulería', 'almacén', 'lácteos y huevos', 'carnicería', 'panadería', 'congelados', 'otros'],
   // Capas de §6.1 que pueden aparecer en Recetas.origen_datos.
   capa: ['descripcion', 'subtitulos', 'web', 'audio', 'frames', 'capturas'],
+  // Rol de un ingrediente en la receta: lo infaltable, lo que da sabor, lo que se puede saltear y lo que no se come.
+  rol: ['principal', 'condimento', 'opcional', 'utensilio'],
 };
+
+// En Ingredientes.seccion_usuario: los usuarios sacaron el ingrediente de la sección que le puso /recetas.
+const SIN_SECCION = '-';
 
 const ESQUEMA = {
   Bandeja: {
@@ -58,6 +63,8 @@ const ESQUEMA = {
       col_('actualizado', 'fecha'),
       // Nota interna del procesamiento (§6.2): correcciones de transcripción y supuestos.
       col_('notas_proceso'),
+      // Porciones con las que la cocinaron («12,3,6»), la última primero: las vistas de la ficha.
+      col_('porciones_vistas'),
     ],
   },
   Ingredientes: {
@@ -71,6 +78,12 @@ const ESQUEMA = {
       col_('nombre'),
       col_('nota'),
       col_('gondola', 'texto', { enum: 'gondola' }),
+      // Los asigna /recetas. Vacíos en las recetas viejas: cuentan como principal y sin sección.
+      col_('seccion'),
+      col_('rol', 'texto', { enum: 'rol' }),
+      // Ediciones de los usuarios: reprocesar no las pisa (vacío = lo de /recetas).
+      col_('seccion_usuario'),
+      col_('rol_usuario', 'texto', { enum: 'rol' }),
     ],
   },
   Pasos: {
@@ -92,6 +105,8 @@ const ESQUEMA = {
       col_('fecha', 'fecha'),
       col_('quien', 'texto', { enum: 'quien' }),
       col_('texto'),
+      // Cuándo llegó a la Sheet. `fecha` es la del celular, que puede haberla escrito sin conexión.
+      col_('creado', 'fecha'),
     ],
   },
   Compras: {

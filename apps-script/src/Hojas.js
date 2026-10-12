@@ -18,6 +18,19 @@ function encabezados_(sh) {
   return n ? sh.getRange(1, 1, 1, n).getValues()[0].map(String) : [];
 }
 
+/**
+ * Falla si a la hoja le faltan columnas del esquema. Sin esto, una columna nueva
+ * a la que todavía no se le corrió setup() se perdería en silencio al escribir.
+ */
+function exigirColumnas_(nombre, columnas) {
+  const encabezados = encabezados_(hoja_(nombre));
+  const faltan = columnas.filter(c => encabezados.indexOf(c) === -1);
+  if (faltan.length) {
+    throw errorApi_('falta_columna', 500,
+      'A la hoja «' + nombre + '» le faltan columnas (' + faltan.join(', ') + '). Corré setup() en el editor de Apps Script.');
+  }
+}
+
 /** Lee una hoja entera. Devuelve [{ fila, datos }] y saltea las filas sin id. */
 function leerFilas_(nombre) {
   const valores = hoja_(nombre).getDataRange().getValues();

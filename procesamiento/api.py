@@ -7,9 +7,13 @@ Uso (por medio de procesamiento/aojo):
   api capturar <url> [--quien camilo]
   api actualizar <bandeja_id> <estado> [--motivo "…"] [--dry-run]
   api upsert <bandeja_id> [--dry-run]    manda trabajo/<id>/receta.json (y foto.jpg si existe)
+  api sin-clasificar                     recetas con ingredientes sin rol (para /recetas --clasificar)
+  api ingredientes <receta_id>           la receta guardada: ingredientes con id, pasos y notas
+  api clasificar <receta_id> [--dry-run] manda trabajo/<receta_id>/clasificacion.json
 
 Con --dry-run (o A_OJO_DRY_RUN=1) no escribe nada en la Sheet: «actualizar» no
-llama a la API y «upsert» solo valida la receta. El token nunca se imprime.
+llama a la API, «upsert» solo valida la receta y «clasificar» solo revisa el archivo.
+El token nunca se imprime.
 """
 import argparse
 import base64
@@ -77,6 +81,8 @@ def dry_run(args):
     return getattr(args, 'dry_run', False) or os.environ.get('A_OJO_DRY_RUN') == '1'
 
 
+ROLES = ('principal', 'condimento', 'opcional', 'utensilio')
+
 RESUMEN_FILA = ('id', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'creado', 'actualizado')
 
 
@@ -134,6 +140,66 @@ def cmd_upsert(args):
     salida({'ok': True, 'dry_run': dry_run(args), **r})
 
 
+def sin_clasificar(todo):
+    """Recetas con algún ingrediente sin rol, de la más vieja a la más nueva."""
+    sin_rol = {i.get('receta_id') for i in todo['ingredientes'] if not str(i.get('rol') or '').strip()}
+    recetas = sorted((r for r in todo['recetas'] if r.get('id') in sin_rol), key=lambda r: r.get('creado') or '')
+    return [{'id': r['id'], 'titulo': r.get('titulo')} for r in recetas]
+
+
+def detalle_receta(todo, receta_id):
+    """Lo que hace falta para clasificar los ingredientes de una receta ya guardada."""
+    receta = next((r for r in todo['recetas'] if r.get('id') == receta_id), None)
+    if not receta:
+        fallar('no_encontrada', f'No encontré la receta «{receta_id}».')
+    def en_orden(filas):
+        return sorted((f for f in filas if f.get('receta_id') == receta_id), key=lambda f: f.get('orden') or 0)
+    bandeja = next((b['id'] for b in todo['bandeja'] if b.get('receta_id') == receta_id), None)
+    return {
+        'receta': {k: receta.get(k) for k in ('id', 'titulo', 'porciones', 'fuente_url', 'notas_proceso')},
+        'bandeja_id': bandeja,
+        'ingredientes': [{k: i.get(k) for k in ('id', 'cantidad', 'unidad', 'nombre', 'nota', 'seccion', 'rol')}
+                         for i in en_orden(todo['ingredientes'])],
+        'pasos': [p.get('texto') for p in en_orden(todo['pasos'])],
+        'archivo': str(comun.dir_trabajo(receta_id) / 'clasificacion.json'),
+    }
+
+
+def cmd_sin_clasificar(_args):
+    recetas = sin_clasificar(llamar('GET', 'todo'))
+    salida({'ok': True, 'total': len(recetas), 'recetas': recetas})
+
+
+def cmd_ingredientes(args):
+    salida({'ok': True, **detalle_receta(llamar('GET', 'todo'), args.receta_id)})
+
+
+def cmd_clasificar(args):
+    d = comun.dir_trabajo(args.receta_id)
+    try:
+        datos = comun.leer_json(d / 'clasificacion.json')
+    except OSError:
+        fallar('sin_clasificacion', f'No encontré {d / "clasificacion.json"}.')
+    except ValueError as e:
+        fallar('clasificacion_no_json', f'clasificacion.json no es JSON válido: {e}')
+    lista = datos.get('ingredientes') if isinstance(datos, dict) else datos
+    if not isinstance(lista, list) or not lista:
+        fallar('clasificacion_invalida', 'clasificacion.json tiene que traer la lista «ingredientes».')
+    ingredientes = [{'id': i.get('id'), 'seccion': i.get('seccion') or '', 'rol': i.get('rol')}
+                    for i in lista if isinstance(i, dict)]
+    errores = [f'ingrediente {n}: rol «{i["rol"]}» no es válido' for n, i in enumerate(ingredientes, 1) if i['rol'] not in ROLES]
+    errores += [f'ingrediente {n}: falta el id' for n, i in enumerate(ingredientes, 1) if not i['id']]
+    if len(ingredientes) != len(lista) or errores:
+        fallar('clasificacion_invalida', 'Revisá clasificacion.json: ' + ('; '.join(errores) or 'hay ítems que no son objetos') + '.')
+    if dry_run(args):
+        log(args.receta_id, 'clasificar', f'(dry-run) {len(ingredientes)} ingredientes')
+        salida({'ok': True, 'dry_run': True, 'id': args.receta_id, 'ingredientes': len(ingredientes)})
+        return
+    r = llamar('POST', 'receta.clasificar', {'id': args.receta_id, 'ingredientes': ingredientes})
+    log(args.receta_id, 'clasificar', f'{r.get("ingredientes")} ingredientes')
+    salida({'ok': True, **r})
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog='api')
     sub = p.add_subparsers(dest='comando', required=True)
@@ -164,11 +230,23 @@ def main(argv=None):
     s.add_argument('--dry-run', action='store_true')
     s.set_defaults(fn=cmd_upsert)
 
+    sub.add_parser('sin-clasificar').set_defaults(fn=cmd_sin_clasificar)
+
+    s = sub.add_parser('ingredientes')
+    s.add_argument('receta_id')
+    s.set_defaults(fn=cmd_ingredientes)
+
+    s = sub.add_parser('clasificar')
+    s.add_argument('receta_id')
+    s.add_argument('--dry-run', action='store_true')
+    s.set_defaults(fn=cmd_clasificar)
+
     args = p.parse_args(argv)
     try:
         args.fn(args)
     except ErrorApi as e:
-        log(getattr(args, 'bandeja_id', None), args.comando, f'error de la API: {e.codigo}: {e.mensaje}')
+        log(getattr(args, 'bandeja_id', None) or getattr(args, 'receta_id', None), args.comando,
+            f'error de la API: {e.codigo}: {e.mensaje}')
         salida({'ok': False, 'error': e.codigo, 'motivo': e.mensaje, 'detalles': e.detalles, 'status': e.status})
         sys.exit(1)
 

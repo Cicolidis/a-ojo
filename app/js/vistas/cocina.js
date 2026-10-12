@@ -1,10 +1,15 @@
 // Modo cocina (#/cocina/:id): un paso por pantalla, con la pantalla siempre
 // encendida, los ingredientes del paso y timers que siguen corriendo entre pasos.
-// El paso actual y los timers se guardan por receta en localStorage.
+// El paso actual y los timers se guardan por receta en localStorage. Las
+// cantidades son las de la vista de porciones con la que se empezó (la última
+// usada). Al terminar pregunta «¿Cómo salió?».
 
 import { h, icono } from '../dom.js';
 import { ingredientesDelPaso } from '../cocina.js';
 import { capitalizar, formatearCantidad, formatearReloj, formatearTimer } from '../formato.js';
+import { escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
+import { nuevaEdicion, nuevaNota } from '../ediciones.js';
+import { estrellas } from './controles.js';
 
 const clave = id => 'a-ojo:cocina:' + id;
 const SONAR_MS = 2 * 60 * 1000; // Un timer vencido suena hasta 2 minutos; después queda marcado.
@@ -24,7 +29,7 @@ export function progresoGuardado(id, totalPasos) {
   return p && p.paso > 0 && p.paso < totalPasos ? p.paso : 0;
 }
 
-export function montar(contenedor, { app, volver }, id) {
+export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   const r = app.indice.porId.get(id);
   if (!r || !r.pasos.length) {
     contenedor.append(h('div', { class: 'bienvenida' },
@@ -34,6 +39,9 @@ export function montar(contenedor, { app, volver }, id) {
   }
 
   const pasos = r.pasos;
+  const base = porcionesBase(r);
+  const porciones = porcionesIniciales(r);
+  const factor = base ? porciones / base : 1;
   const guardado = leerProgreso(id) || { paso: 0, timers: {} };
   let actual = Math.min(Math.max(guardado.paso, 0), pasos.length - 1);
   const timers = guardado.timers; // { idDelPaso: fin en ms }
@@ -146,18 +154,43 @@ export function montar(contenedor, { app, volver }, id) {
     pintar(true);
   }
 
+  /** «¿Cómo salió?»: estrellas y una nota, las dos opcionales. Guardar la marca probada. */
   function terminar() {
     terminado = true;
     localStorage.removeItem(clave(id));
     Object.keys(timers).forEach(k => delete timers[k]);
+    const receta = app.indice.porId.get(id) || r;
+    const antes = Number(receta.valoracion) || 0;
+    let valoracion = antes;
+    const nota = h('textarea', { rows: '3', maxlength: '2000', 'aria-label': 'Nota',
+      placeholder: 'Qué cambiarían, cuánto tardó, qué le sumarían…' });
+    const guardarSalida = () => {
+      const cambios = {};
+      if (receta.estado !== 'probada' && receta.estado !== 'favorita') cambios.estado = 'probada';
+      if (valoracion !== antes) cambios.valoracion = valoracion;
+      if (Object.keys(cambios).length) editar(nuevaEdicion('receta.estado', Object.assign({ id }, cambios)));
+      if (nota.value.trim()) editar(nuevaNota(id, app.config.quien, nota.value));
+    };
     raiz.replaceChildren(
       h('div', { class: 'cocina-arriba' },
-        h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Salir del modo cocina', onclick: salir }, icono('cerrar'))),
+        h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Salir sin guardar', onclick: salir }, icono('cerrar'))),
       h('div', { class: 'cocina-fin' },
         h('h1', { tabindex: '-1' }, '¡Listo! Que lo disfruten.'),
         h('p', { class: 'secundario' }, r.titulo),
-        h('button', { type: 'button', class: 'boton-principal', onclick: salir }, 'Volver a la receta'),
-        h('button', { type: 'button', class: 'boton-secundario', onclick: () => irA(0) }, 'Cocinarla de nuevo')),
+        h('h2', null, '¿Cómo salió?'),
+        estrellas(valoracion, v => { valoracion = v; }, '¿Cómo salió? De 1 a 5 estrellas'),
+        nota,
+        h('button', { type: 'button', class: 'boton-principal', onclick: () => {
+          guardarSalida();
+          salir();
+        } }, 'Guardar'),
+        h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
+          guardarSalida();
+          reemplazar('#/ingredientes/' + id, '#/receta/' + id);
+        } }, icono('lapiz', 18), 'Guardar y editar ingredientes'),
+        h('div', { class: 'cocina-fin-otros' },
+          h('button', { type: 'button', class: 'boton-texto', onclick: salir }, 'Ahora no'),
+          h('button', { type: 'button', class: 'boton-texto', onclick: () => irA(0) }, 'Cocinarla de nuevo'))),
     );
     raiz.querySelector('h1').focus();
   }
@@ -186,7 +219,9 @@ export function montar(contenedor, { app, volver }, id) {
         h('p', { class: 'paso-n' }, 'PASO ' + (actual + 1) + ' DE ' + pasos.length),
         texto,
         ingredientes.length ? h('div', { class: 'chips-ingredientes', 'aria-label': 'Ingredientes de este paso' },
-          ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + formatearCantidad(i.cantidad, i.unidad)))) : null,
+          ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad)))) : null,
+        ingredientes.length && factor !== 1 ? h('p', { class: 'secundario' },
+          'Cantidades para ' + porciones + ' porciones. Los pasos dicen las de ' + base + '.') : null,
         Number(p.timer_min) > 0 && !timers[p.id] ? h('button', {
           type: 'button',
           class: 'boton-secundario boton-timer',

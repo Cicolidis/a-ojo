@@ -73,7 +73,9 @@ function prepararHoja_(ss, nombre, def) {
     let regla = null;
     if (c.enum) regla = SpreadsheetApp.newDataValidation().requireValueInList(ENUMS[c.enum], true);
     else if (c.rango) regla = SpreadsheetApp.newDataValidation().requireNumberBetween(c.rango[0], c.rango[1]);
+    // Sin regla, se borra la que haya: al insertar una columna, Sheets le copia la de la columna de al lado.
     if (regla) rango.setDataValidation(regla.setAllowInvalid(false).build());
+    else rango.clearDataValidations();
   });
 
   sh.autoResizeColumns(1, n);
