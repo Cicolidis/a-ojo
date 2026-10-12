@@ -29,6 +29,16 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 - macOS no deja que Claude Code lea la carpeta de Chrome. Las cookies de Instagram se exportan desde la Terminal (`procesamiento/aojo fetch cookies`) a `~/.a-ojo/cookies-instagram.txt`, y `comun.args_cookies()` prefiere ese archivo.
 - Las reglas para armar cada receta viven en `.claude/commands/recetas.md`; la validación definitiva la hace `receta.upsert` en la API.
 
+## App (`app/`)
+
+- PWA sin build: módulos ES servidos tal cual por GitHub Pages (`.github/workflows/pages.yml`). Nada de dependencias ni frameworks.
+- El texto de las recetas viene de terceros: el DOM se arma con `h()` de `js/dom.js`, que usa `textContent`. **Nunca `innerHTML` con datos**, y solo links `http(s)` (`urlSegura`).
+- La lógica pura va en `js/datos.js`, `js/formato.js`, `js/cocina.js`, `js/config.js` y `js/rutas.js`, con sus tests en `tests/app.test.js`. Las vistas (`js/vistas/`) solo arman DOM.
+- **Archivo nuevo en `app/` → sumarlo a `ARCHIVOS` en `sw.js`**: si no, no funciona sin conexión. El test de precache lo exige.
+- El service worker no intercepta la API. `__VERSION__` en `sw.js` lo reemplaza el workflow por el commit; con el literal (desarrollo) la interfaz va primero a la red.
+- Para probar: `npm run app` (API falsa con `tests/fixtures/todo.json`, token `prueba`). **No usar el token real en el navegador**: el link real lo genera Camilo con `npm run link-config`.
+- En esta fase la app solo lee. Las ediciones (estado, notas, compras) y su cola offline llegan en la Fase 4.
+
 ## Tests
 
 - `npm test`: tests de Node, sin dependencias. `tests/fakes/apps-script.js` simula SpreadsheetApp, DriveApp y los demás servicios, incluida la conversión de fechas ISO que hace Sheets cuando una celda no tiene formato de texto.

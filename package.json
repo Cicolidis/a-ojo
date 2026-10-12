@@ -1,15 +1,18 @@
 {
   "name": "a-ojo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "App personal de recetas: captura, bandeja en Google Sheets, API de Apps Script y procesamiento con /recetas.",
+  "description": "App personal de recetas: captura, bandeja en Google Sheets, API de Apps Script, procesamiento con /recetas y una PWA para leer y cocinar.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:py": "procesamiento/.venv/bin/python -m unittest discover -s procesamiento/tests",
     "clasp": "sh scripts/clasp.sh",
     "push": "sh scripts/clasp.sh push --force",
     "deploy": "sh scripts/deploy.sh",
-    "smoke": "sh scripts/smoke.sh"
+    "smoke": "sh scripts/smoke.sh",
+    "app": "node scripts/servir.js --falsa",
+    "iconos": "sh scripts/iconos.sh",
+    "link-config": "sh scripts/link-config.sh"
   },
   "engines": {
     "node": ">=20"

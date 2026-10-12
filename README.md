@@ -2,16 +2,17 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 2 (procesamiento).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas.
+**Estado: Fase 3 (app de lectura y cocina).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas y cocinarlas, también sin conexión.
 
 ```
+app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
 apps-script/src/            API (doGet/doPost), setup(), normalización de links y fotos en Drive
 extension/                  extensión de Chrome MV3 (botón, menú contextual, ⌥⇧R)
 procesamiento/              scripts de Python que usa /recetas (descargas, Whisper, fotogramas, API)
 .claude/commands/recetas.md el comando /recetas: flujo y reglas para armar cada receta
 docs/                       guías de HTTP Shortcuts (Android) y del perfil de Instagram
-scripts/                    deploy y prueba de humo
-tests/                      tests en Node (sin dependencias; Apps Script simulado en memoria)
+scripts/                    deploy, prueba de humo, servidor local de la app, íconos y link de configuración
+tests/                      tests en Node (sin dependencias; Apps Script simulado en memoria) y datos de prueba de la app
 ```
 
 ## Requisitos
@@ -111,6 +112,40 @@ Para guardar: el botón de la barra, clic derecho sobre un link → **Guardar en
 
 Seguí [`docs/android-http-shortcuts.md`](docs/android-http-shortcuts.md).
 
+## App (PWA)
+
+La app vive en `app/` y se publica sola en **<https://cicolidis.github.io/a-ojo/>** con cada push a `main` que la toque (`.github/workflows/pages.yml`). Es HTML, CSS y JS con módulos, sin paso de build.
+
+- **Biblioteca:** buscador (sin tildes, sobre título, ingredientes y etiquetas), filtros y el resumen de la bandeja.
+- **Ficha:** ingredientes, pasos con tips y timers, notas y advertencia si la confianza es baja.
+- **Modo cocina:** un paso por pantalla con los ingredientes que usa, pantalla siempre encendida y timers que siguen corriendo entre pasos. Si se cierra a mitad de camino, al volver sigue en el mismo paso.
+- **Sin conexión:** la interfaz y las fotos quedan en caché (service worker) y los datos en IndexedDB. Al abrir pide solo lo cambiado (`todo?since=…`) y, una vez por semana, todo.
+
+### Configurar un celular (una vez por persona)
+
+1. Completá `A_OJO_APP_URL` en el `.env` (la URL de arriba).
+2. Generá el link de esa persona y mandáselo por privado (incluye el token):
+
+```bash
+npm run link-config -- pareja
+```
+
+3. En Android, abrilo con Chrome: la app queda configurada y el link se borra de la barra de direcciones. Después, menú ⋮ → **Instalar app** (o "Agregar a la pantalla principal").
+
+Si se rota el token, hay que mandar un link nuevo. Con un link de otra API, la app borra los datos guardados y baja todo de nuevo.
+
+### Probar en la Mac
+
+```bash
+npm run app
+```
+
+Levanta la app en <http://localhost:4173> con una **API falsa** que responde con `tests/fixtures/todo.json` (token `prueba`): el comando imprime el link de configuración de prueba. Así se prueba todo sin el token real. Para probar sin conexión, cortá el servidor y recargá.
+
+En desarrollo el service worker va primero a la red, así los cambios se ven al recargar. En producción va primero a la caché; cada deploy cambia la versión (el commit) y la app se actualiza sola la próxima vez que se abre (si está en el modo cocina, espera a que se salga).
+
+Los íconos (`app/iconos/`) salen del logo 2B con `npm run iconos` (Chrome headless).
+
 ## Procesamiento: `/recetas`
 
 Corre a mano, en la Mac donde esté el repo (la Mac Mini o la computadora de ella). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
@@ -161,6 +196,6 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 
 **`receta.upsert`:** `receta` trae los campos de la hoja Recetas más `ingredientes: [{ cantidad, unidad, nombre, nota, gondola }]` y `pasos: [{ texto, timer_min, tip }]` (el formato completo está en [`.claude/commands/recetas.md`](.claude/commands/recetas.md)). Busca la receta por `id`, después por el `receta_id` de la fila de la bandeja y por último por `fuente_url`, así que reprocesar no duplica: actualiza los campos, conserva `estado`, `valoracion`, `creado` y las notas, y **reemplaza todos** los ingredientes y pasos. Con `bandeja_id`, esa fila pasa a `lista`. `foto: { base64, mime }` (jpeg, png o webp, hasta 5 MB) se guarda en Drive, pública con link. Con `validar: true` solo valida. Si hay errores, responde `receta_invalida` con la lista en `detalles`.
 
-**Para la PWA (Fase 3):** en un delta de `todo?since=…`, si una receta cambió vienen **todos** sus ingredientes y pasos; reemplazan a los que había guardados de esa receta.
+**Deltas de `todo`:** en `todo?since=…`, si una receta cambió vienen **todos** sus ingredientes y pasos; la app reemplaza con ellos los que tenía guardados de esa receta.
 
 **Deduplicación:** los links se normalizan (sin `?si=`, `igsh`, `utm_*`, etc.) y se comparan por ID de video o de post. Un Short, su `youtu.be` y su `watch?v=` son el mismo; también un `/reel/` y un `/p/` con el mismo código. Si se vuelve a guardar un link `descartado`, pasa otra vez a `pendiente`.

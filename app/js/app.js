@@ -1,0 +1,170 @@
+// Arranque de A ojo: configuración, datos locales, rutas y sincronización en segundo plano.
+
+import { leerRuta } from './rutas.js';
+import { leerConfig, guardarConfig, leerLinkConfig } from './config.js';
+import { leer, borrar } from './db.js';
+import { indexar } from './datos.js';
+import { sincronizar, precargarFotos } from './sync.js';
+import * as biblioteca from './vistas/biblioteca.js';
+import * as ficha from './vistas/ficha.js';
+import * as cocina from './vistas/cocina.js';
+import * as bienvenida from './vistas/bienvenida.js';
+
+const CINCO_MIN_MS = 5 * 60 * 1000;
+const contenedor = document.getElementById('app');
+
+const app = {
+  config: leerConfig(),
+  datos: null,
+  indice: indexar(null),
+  // estado: inactivo · sincronizando · ok · sin_conexion · error
+  sync: { estado: 'inactivo', mensaje: '' },
+  ultimaSync: 0,
+  biblioteca: { texto: '', filtro: 'todas', scroll: 0 },
+};
+
+let vista = null;
+let recargarAlSalir = false;
+let sincronizando = null;
+
+const mismaRuta = (a, b) => {
+  const x = leerRuta(a);
+  const y = leerRuta(b);
+  return x.nombre === y.nombre && x.id === y.id;
+};
+
+/**
+ * Vuelve a `destino`. Si se llegó desde ahí, con history.back() (así el botón
+ * Atrás de Android queda coherente y la Biblioteca conserva el scroll); si no
+ * (link directo o recarga), reemplazando la entrada actual.
+ */
+function volver(destino) {
+  const desde = history.state && history.state.desde;
+  if (desde !== undefined && mismaRuta(desde, destino)) history.back();
+  else location.replace(destino);
+}
+
+function mostrar({ enfocar = false } = {}) {
+  const ruta = leerRuta(location.hash);
+  if (ruta.nombre === 'config') return configurar();
+  if (recargarAlSalir && ruta.nombre !== 'cocina') return location.reload();
+
+  if (vista && vista.desmontar) vista.desmontar();
+  contenedor.replaceChildren();
+  if (ruta.nombre !== 'biblioteca') window.scrollTo(0, 0);
+
+  const ctx = { app, volver };
+  if (!app.config) vista = bienvenida.montar(contenedor, ctx);
+  else if (ruta.nombre === 'receta') vista = ficha.montar(contenedor, ctx, ruta.id);
+  else if (ruta.nombre === 'cocina') vista = cocina.montar(contenedor, ctx, ruta.id);
+  else vista = biblioteca.montar(contenedor, ctx);
+
+  if (enfocar) {
+    const titulo = contenedor.querySelector('h1, .paso-texto');
+    if (titulo) titulo.focus({ preventScroll: true });
+  }
+}
+
+/** Repinta lo que cambió por la sincronización, sin mover el scroll ni sacar a nadie del modo cocina. */
+function refrescar() {
+  if (vista && vista.actualizar) return vista.actualizar();
+  if (vista && vista.enCocina) return;
+  const y = window.scrollY;
+  mostrar();
+  window.scrollTo(0, y);
+}
+
+/** Link de configuración: guarda, borra el token de la barra de direcciones y sincroniza. */
+async function configurar() {
+  const { config, error } = leerLinkConfig(location.hash);
+  history.replaceState(null, '', location.pathname + location.search + '#/');
+  if (error) {
+    if (vista && vista.desmontar) vista.desmontar();
+    contenedor.replaceChildren();
+    vista = bienvenida.montar(contenedor, { app }, error);
+    return;
+  }
+  const otraApi = !app.config || app.config.api !== config.api;
+  guardarConfig(config);
+  app.config = config;
+  if (otraApi) {
+    app.datos = null;
+    app.indice = indexar(null);
+    app.ultimaSync = 0;
+    await borrar('datos').catch(() => {});
+  }
+  mostrar();
+  sincronizarAhora();
+}
+
+function sincronizarAhora() {
+  if (!app.config || sincronizando) return sincronizando;
+  const antes = app.sync.estado;
+  app.sync = { estado: 'sincronizando', mensaje: '' };
+  if (!app.datos) refrescar();
+  sincronizando = sincronizar(app.config, app.datos)
+    .then(({ datos, cambios }) => {
+      app.datos = datos;
+      app.ultimaSync = Date.now();
+      app.sync = { estado: 'ok', mensaje: '' };
+      if (cambios) app.indice = indexar(datos);
+      if (cambios || antes === 'sin_conexion' || antes === 'error') refrescar();
+      precargarFotos(datos.recetas.map(r => r.foto_url)).catch(() => {});
+    })
+    .catch(err => {
+      if (err.codigo === 'red') {
+        app.sync = { estado: 'sin_conexion', mensaje: app.datos ? 'Sin conexión · mostrando lo guardado' : 'Sin conexión. Cuando vuelva, bajamos las recetas.' };
+      } else if (err.codigo === 'token_invalido') {
+        app.sync = { estado: 'error', mensaje: 'El token no es válido. Pedí un link de configuración nuevo.' };
+      } else {
+        app.sync = { estado: 'error', mensaje: err.message || 'No se pudo sincronizar.' };
+      }
+      refrescar();
+    })
+    .finally(() => { sincronizando = null; });
+  return sincronizando;
+}
+
+function registrarServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  // Con una versión nueva de la app se recarga, salvo en el modo cocina: ahí espera a que se salga.
+  const habiaControlador = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!habiaControlador) return;
+    if (leerRuta(location.hash).nombre === 'cocina') recargarAlSalir = true;
+    else location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn('No se pudo registrar el service worker:', err));
+}
+
+async function arrancar() {
+  registrarServiceWorker();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  window.addEventListener('hashchange', evento => {
+    // Cada entrada del historial recuerda de qué pantalla se llegó (las que se
+    // revisitan con Atrás ya lo tienen).
+    if (!history.state || history.state.desde === undefined) {
+      history.replaceState({ desde: new URL(evento.oldURL).hash }, '');
+    }
+    mostrar({ enfocar: true });
+  });
+  window.addEventListener('online', () => sincronizarAhora());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - app.ultimaSync > CINCO_MIN_MS) sincronizarAhora();
+  });
+
+  if (leerRuta(location.hash).nombre === 'config') return configurar();
+  if (app.config) {
+    try {
+      app.datos = (await leer('datos')) || null;
+    } catch (err) {
+      console.warn('No se pudieron leer los datos guardados:', err);
+    }
+    app.indice = indexar(app.datos);
+  }
+  mostrar();
+  sincronizarAhora();
+}
+
+arrancar();

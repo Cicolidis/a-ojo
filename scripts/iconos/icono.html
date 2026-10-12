@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- Logo 2B (§8): fondo terracota, «a» itálica de Fraunces 700 y granos crema. Lo usa scripts/iconos.sh. -->
+<!-- ?tam=512&tipo=any|maskable|favicon -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,700&display=block">
+<style>html, body { margin: 0; background: transparent; } svg { display: block; }</style>
+</head>
+<body>
+<svg id="logo" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <rect id="fondo" width="220" height="220" rx="50" fill="#A6461F"/>
+  <g id="contenido">
+    <text id="letra" x="100" y="164" text-anchor="middle" font-family="Fraunces" font-style="italic" font-weight="700" font-size="170" fill="#FFFBF5">a</text>
+    <g id="granos" fill="#F5EEE3">
+      <circle cx="150" cy="62" r="8"/>
+      <circle cx="166" cy="46" r="5.5"/>
+      <circle cx="177" cy="32" r="3.5"/>
+    </g>
+  </g>
+</svg>
+<script>
+  const p = new URLSearchParams(location.search);
+  const tam = Number(p.get('tam')) || 512;
+  const tipo = p.get('tipo') || 'any';
+  const svg = document.getElementById('logo');
+  svg.setAttribute('width', tam);
+  svg.setAttribute('height', tam);
+  if (tipo === 'maskable') {
+    // A sangre: Android recorta la forma. El contenido entra en la zona segura (círculo del 80 %).
+    document.getElementById('fondo').setAttribute('rx', '0');
+    document.getElementById('contenido').setAttribute('transform', 'translate(110 110) scale(0.78) translate(-110 -110)');
+  }
+  if (tipo === 'favicon') {
+    // En 32 px los granos desaparecen y la «a» se centra.
+    document.getElementById('granos').remove();
+    const letra = document.getElementById('letra');
+    letra.setAttribute('x', '110');
+    letra.setAttribute('font-size', '180');
+  }
+</script>
+</body>
+</html>

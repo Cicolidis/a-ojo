@@ -1,0 +1,900 @@
+{
+  "ahora": "2026-10-11T22:00:00.000Z",
+  "completo": true,
+  "recetas": [
+    {
+      "estado": "para_probar",
+      "valoracion": 0,
+      "molde": "20×30 cm",
+      "foto_url": "/fotos-prueba/brownie.jpg",
+      "confianza": "alta",
+      "origen_datos": "subtitulos",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_brown",
+      "titulo": "Brownie húmedo con nueces",
+      "tipo": "dulce",
+      "etiquetas": "chocolate, para invitados",
+      "porciones": 6,
+      "tiempo_min": 45,
+      "autor": "@cocina.de.prueba",
+      "fuente_url": "https://www.youtube.com/shorts/prueba00001",
+      "plataforma": "youtube",
+      "creado": "2026-10-11T20:13:07.835Z",
+      "actualizado": "2026-10-11T20:16:20.491Z"
+    },
+    {
+      "estado": "favorita",
+      "valoracion": 5,
+      "molde": "18 cm",
+      "foto_url": "/fotos-prueba/torta-vasca.jpg",
+      "confianza": "alta",
+      "origen_datos": "subtitulos",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_vasca",
+      "titulo": "Torta vasca",
+      "tipo": "dulce",
+      "etiquetas": "para invitados, de un día para el otro",
+      "porciones": 8,
+      "tiempo_min": 70,
+      "autor": "@cocina.de.prueba",
+      "fuente_url": "https://www.youtube.com/shorts/prueba00002",
+      "plataforma": "youtube",
+      "creado": "2026-10-11T19:40:00.000Z",
+      "actualizado": "2026-10-11T19:45:00.000Z"
+    },
+    {
+      "estado": "para_probar",
+      "valoracion": 0,
+      "molde": "",
+      "foto_url": "/fotos-prueba/galletitas.jpg",
+      "confianza": "alta",
+      "origen_datos": "descripcion",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_galle",
+      "titulo": "Galletitas de garbanzos",
+      "tipo": "salado",
+      "etiquetas": "vegana, sin tacc, rápida",
+      "porciones": 20,
+      "tiempo_min": 30,
+      "autor": "@verde.prueba",
+      "fuente_url": "https://www.instagram.com/reel/PRUEBA00003/",
+      "plataforma": "instagram",
+      "creado": "2026-10-11T18:00:00.000Z",
+      "actualizado": "2026-10-11T18:05:00.000Z"
+    },
+    {
+      "estado": "para_probar",
+      "valoracion": 0,
+      "molde": "",
+      "foto_url": "/fotos-prueba/tortilla.jpg",
+      "confianza": "alta",
+      "origen_datos": "audio",
+      "idioma_original": "en",
+      "notas_proceso": "",
+      "id": "r_torti",
+      "titulo": "Tortilla de banana",
+      "tipo": "dulce",
+      "etiquetas": "desayuno, rápida, sin tacc",
+      "porciones": 1,
+      "tiempo_min": 10,
+      "autor": "@quick.test",
+      "fuente_url": "https://www.youtube.com/shorts/prueba00004",
+      "plataforma": "youtube",
+      "creado": "2026-10-10T15:00:00.000Z",
+      "actualizado": "2026-10-10T15:00:00.000Z"
+    },
+    {
+      "estado": "para_probar",
+      "valoracion": 0,
+      "molde": "",
+      "foto_url": "",
+      "confianza": "baja",
+      "origen_datos": "descripcion,audio",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_pollo",
+      "titulo": "Pollo marroquí",
+      "tipo": "salado",
+      "etiquetas": "para invitados",
+      "porciones": 4,
+      "tiempo_min": 60,
+      "autor": "@sabores.prueba",
+      "fuente_url": "https://www.instagram.com/reel/PRUEBA00005/",
+      "plataforma": "instagram",
+      "creado": "2026-10-09T12:00:00.000Z",
+      "actualizado": "2026-10-09T12:00:00.000Z"
+    },
+    {
+      "estado": "probada",
+      "valoracion": 4,
+      "molde": "",
+      "foto_url": "/fotos-prueba/sopa.jpg",
+      "confianza": "alta",
+      "origen_datos": "descripcion",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_sopa",
+      "titulo": "Sopa crema de zapallo",
+      "tipo": "sopa",
+      "etiquetas": "invierno, freezable, vegetariana",
+      "porciones": 4,
+      "tiempo_min": 40,
+      "autor": "Abuela de prueba",
+      "fuente_url": "https://www.youtube.com/watch?v=prueba00006",
+      "plataforma": "youtube",
+      "creado": "2026-10-08T12:00:00.000Z",
+      "actualizado": "2026-10-08T12:00:00.000Z"
+    },
+    {
+      "estado": "descartada",
+      "valoracion": 0,
+      "molde": "",
+      "foto_url": "",
+      "confianza": "alta",
+      "origen_datos": "descripcion",
+      "idioma_original": "es",
+      "notas_proceso": "",
+      "id": "r_desc",
+      "titulo": "Licuado descartado",
+      "tipo": "bebida",
+      "etiquetas": "",
+      "porciones": 1,
+      "tiempo_min": 5,
+      "autor": "@x",
+      "fuente_url": "https://www.youtube.com/shorts/prueba00007",
+      "plataforma": "youtube",
+      "creado": "2026-10-07T12:00:00.000Z",
+      "actualizado": "2026-10-07T12:00:00.000Z"
+    }
+  ],
+  "ingredientes": [
+    {
+      "id": "i_00001",
+      "receta_id": "r_brown",
+      "orden": 1,
+      "cantidad": 200,
+      "unidad": "g",
+      "nombre": "chocolate semiamargo",
+      "nota": "picado",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00002",
+      "receta_id": "r_brown",
+      "orden": 2,
+      "cantidad": 200,
+      "unidad": "g",
+      "nombre": "manteca",
+      "nota": "más un poco para el molde",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00003",
+      "receta_id": "r_brown",
+      "orden": 3,
+      "cantidad": 200,
+      "unidad": "g",
+      "nombre": "azúcar",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00004",
+      "receta_id": "r_brown",
+      "orden": 4,
+      "cantidad": 3,
+      "unidad": "u",
+      "nombre": "huevos",
+      "nota": "",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00005",
+      "receta_id": "r_brown",
+      "orden": 5,
+      "cantidad": 100,
+      "unidad": "g",
+      "nombre": "harina 0000",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00006",
+      "receta_id": "r_brown",
+      "orden": 6,
+      "cantidad": 1,
+      "unidad": "cdita",
+      "nombre": "esencia de vainilla",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00007",
+      "receta_id": "r_brown",
+      "orden": 7,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "sal",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00008",
+      "receta_id": "r_brown",
+      "orden": 8,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "pimienta",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00009",
+      "receta_id": "r_brown",
+      "orden": 9,
+      "cantidad": 100,
+      "unidad": "g",
+      "nombre": "nueces",
+      "nota": "picadas gruesas",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00017",
+      "receta_id": "r_vasca",
+      "orden": 1,
+      "cantidad": 500,
+      "unidad": "g",
+      "nombre": "queso crema",
+      "nota": "a temperatura ambiente",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00018",
+      "receta_id": "r_vasca",
+      "orden": 2,
+      "cantidad": 180,
+      "unidad": "g",
+      "nombre": "azúcar",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00019",
+      "receta_id": "r_vasca",
+      "orden": 3,
+      "cantidad": 4,
+      "unidad": "u",
+      "nombre": "huevos",
+      "nota": "",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00020",
+      "receta_id": "r_vasca",
+      "orden": 4,
+      "cantidad": 250,
+      "unidad": "ml",
+      "nombre": "crema de leche",
+      "nota": "",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00021",
+      "receta_id": "r_vasca",
+      "orden": 5,
+      "cantidad": 1,
+      "unidad": "cda",
+      "nombre": "harina 0000",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00028",
+      "receta_id": "r_galle",
+      "orden": 1,
+      "cantidad": 1,
+      "unidad": "lata",
+      "nombre": "garbanzos cocidos",
+      "nota": "escurridos",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00029",
+      "receta_id": "r_galle",
+      "orden": 2,
+      "cantidad": 120,
+      "unidad": "g",
+      "nombre": "harina de garbanzos",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00030",
+      "receta_id": "r_galle",
+      "orden": 3,
+      "cantidad": 3,
+      "unidad": "cda",
+      "nombre": "aceite de oliva",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00031",
+      "receta_id": "r_galle",
+      "orden": 4,
+      "cantidad": 1,
+      "unidad": "cdita",
+      "nombre": "comino",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00032",
+      "receta_id": "r_galle",
+      "orden": 5,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "sal",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00038",
+      "receta_id": "r_torti",
+      "orden": 1,
+      "cantidad": 1,
+      "unidad": "u",
+      "nombre": "banana",
+      "nota": "bien madura",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00039",
+      "receta_id": "r_torti",
+      "orden": 2,
+      "cantidad": 2,
+      "unidad": "u",
+      "nombre": "huevos",
+      "nota": "",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00040",
+      "receta_id": "r_torti",
+      "orden": 3,
+      "cantidad": 0.5,
+      "unidad": "cdita",
+      "nombre": "canela",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00041",
+      "receta_id": "r_torti",
+      "orden": 4,
+      "cantidad": 1,
+      "unidad": "cdita",
+      "nombre": "manteca",
+      "nota": "",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00045",
+      "receta_id": "r_pollo",
+      "orden": 1,
+      "cantidad": 8,
+      "unidad": "u",
+      "nombre": "muslos de pollo",
+      "nota": "con piel",
+      "gondola": "carnicería"
+    },
+    {
+      "id": "i_00046",
+      "receta_id": "r_pollo",
+      "orden": 2,
+      "cantidad": 2,
+      "unidad": "u",
+      "nombre": "cebollas",
+      "nota": "en pluma",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00047",
+      "receta_id": "r_pollo",
+      "orden": 3,
+      "cantidad": 3,
+      "unidad": "diente",
+      "nombre": "ajo",
+      "nota": "",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00048",
+      "receta_id": "r_pollo",
+      "orden": 4,
+      "cantidad": 1,
+      "unidad": "cda",
+      "nombre": "comino",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00049",
+      "receta_id": "r_pollo",
+      "orden": 5,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "jugo de limón",
+      "nota": "",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00050",
+      "receta_id": "r_pollo",
+      "orden": 6,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "aceitunas verdes",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00051",
+      "receta_id": "r_pollo",
+      "orden": 7,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "caldo de verduras",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00056",
+      "receta_id": "r_sopa",
+      "orden": 1,
+      "cantidad": 1,
+      "unidad": "kg",
+      "nombre": "zapallo",
+      "nota": "en cubos",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00057",
+      "receta_id": "r_sopa",
+      "orden": 2,
+      "cantidad": 1,
+      "unidad": "u",
+      "nombre": "cebolla",
+      "nota": "",
+      "gondola": "verdulería"
+    },
+    {
+      "id": "i_00058",
+      "receta_id": "r_sopa",
+      "orden": 3,
+      "cantidad": 1,
+      "unidad": "l",
+      "nombre": "caldo de verduras",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00059",
+      "receta_id": "r_sopa",
+      "orden": 4,
+      "cantidad": 100,
+      "unidad": "ml",
+      "nombre": "crema de leche",
+      "nota": "opcional",
+      "gondola": "lácteos y huevos"
+    },
+    {
+      "id": "i_00060",
+      "receta_id": "r_sopa",
+      "orden": 5,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "nuez moscada",
+      "nota": "",
+      "gondola": "almacén"
+    },
+    {
+      "id": "i_00064",
+      "receta_id": "r_desc",
+      "orden": 1,
+      "cantidad": 1,
+      "unidad": "u",
+      "nombre": "banana",
+      "nota": "",
+      "gondola": "verdulería"
+    }
+  ],
+  "pasos": [
+    {
+      "id": "p_00010",
+      "receta_id": "r_brown",
+      "orden": 1,
+      "texto": "Precalentá el horno a 170 °C.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00011",
+      "receta_id": "r_brown",
+      "orden": 2,
+      "texto": "Derretí el chocolate con la manteca a baño María, a fuego mínimo.",
+      "timer_min": 5,
+      "tip": ""
+    },
+    {
+      "id": "p_00012",
+      "receta_id": "r_brown",
+      "orden": 3,
+      "texto": "En otro bowl, batí el azúcar con los huevos hasta que se disuelvan los cristales.",
+      "timer_min": null,
+      "tip": "Es la clave para que el centro quede húmedo."
+    },
+    {
+      "id": "p_00013",
+      "receta_id": "r_brown",
+      "orden": 4,
+      "texto": "Sumá la vainilla, una pizca de sal y una de pimienta. Uní todo con el chocolate derretido.",
+      "timer_min": null,
+      "tip": "La pimienta realza el chocolate: no se siente picante."
+    },
+    {
+      "id": "p_00014",
+      "receta_id": "r_brown",
+      "orden": 5,
+      "texto": "Incorporá la harina tamizada y las nueces con movimientos envolventes.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00015",
+      "receta_id": "r_brown",
+      "orden": 6,
+      "texto": "Volcá la mezcla en el molde enmantecado y horneá 23 minutos.",
+      "timer_min": 23,
+      "tip": "Tiene que salir con el centro todavía blando."
+    },
+    {
+      "id": "p_00016",
+      "receta_id": "r_brown",
+      "orden": 7,
+      "texto": "Dejá enfriar en el molde antes de cortar.",
+      "timer_min": 30,
+      "tip": ""
+    },
+    {
+      "id": "p_00022",
+      "receta_id": "r_vasca",
+      "orden": 1,
+      "texto": "Precalentá el horno a 220 °C y forrá el molde con papel manteca arrugado.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00023",
+      "receta_id": "r_vasca",
+      "orden": 2,
+      "texto": "Batí el queso crema con el azúcar hasta que quede liso.",
+      "timer_min": 3,
+      "tip": ""
+    },
+    {
+      "id": "p_00024",
+      "receta_id": "r_vasca",
+      "orden": 3,
+      "texto": "Sumá los huevos de a uno, batiendo entre cada uno.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00025",
+      "receta_id": "r_vasca",
+      "orden": 4,
+      "texto": "Agregá la crema de leche y la harina, y mezclá apenas.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00026",
+      "receta_id": "r_vasca",
+      "orden": 5,
+      "texto": "Horneá 35 minutos: tiene que quedar bien dorada arriba y temblorosa en el centro.",
+      "timer_min": 35,
+      "tip": "El centro termina de cuajar mientras se enfría."
+    },
+    {
+      "id": "p_00027",
+      "receta_id": "r_vasca",
+      "orden": 6,
+      "texto": "Dejá enfriar y llevala a la heladera toda la noche.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00033",
+      "receta_id": "r_galle",
+      "orden": 1,
+      "texto": "Precalentá el horno a 180 °C.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00034",
+      "receta_id": "r_galle",
+      "orden": 2,
+      "texto": "Procesá los garbanzos con el aceite hasta que quede un puré.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00035",
+      "receta_id": "r_galle",
+      "orden": 3,
+      "texto": "Sumá la harina de garbanzos, el comino y la sal, y formá una masa.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00036",
+      "receta_id": "r_galle",
+      "orden": 4,
+      "texto": "Estirá la masa entre dos papeles y cortá las galletitas.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00037",
+      "receta_id": "r_galle",
+      "orden": 5,
+      "texto": "Horneá 15 minutos, hasta que estén doradas.",
+      "timer_min": 15,
+      "tip": ""
+    },
+    {
+      "id": "p_00042",
+      "receta_id": "r_torti",
+      "orden": 1,
+      "texto": "Pisá la banana con un tenedor y mezclala con los huevos y la canela.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00043",
+      "receta_id": "r_torti",
+      "orden": 2,
+      "texto": "Derretí la manteca en una sartén a fuego medio.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00044",
+      "receta_id": "r_torti",
+      "orden": 3,
+      "texto": "Volcá la mezcla y cociná 2 minutos y medio de cada lado.",
+      "timer_min": 2.5,
+      "tip": ""
+    },
+    {
+      "id": "p_00052",
+      "receta_id": "r_pollo",
+      "orden": 1,
+      "texto": "Dorá los muslos de pollo del lado de la piel y reservalos.",
+      "timer_min": 8,
+      "tip": ""
+    },
+    {
+      "id": "p_00053",
+      "receta_id": "r_pollo",
+      "orden": 2,
+      "texto": "En la misma olla, rehogá las cebollas con el ajo y el comino.",
+      "timer_min": 10,
+      "tip": ""
+    },
+    {
+      "id": "p_00054",
+      "receta_id": "r_pollo",
+      "orden": 3,
+      "texto": "Volvé a poner el pollo, sumá el caldo y cociná tapado.",
+      "timer_min": 35,
+      "tip": ""
+    },
+    {
+      "id": "p_00055",
+      "receta_id": "r_pollo",
+      "orden": 4,
+      "texto": "Al final, agregá las aceitunas y el jugo de limón.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00061",
+      "receta_id": "r_sopa",
+      "orden": 1,
+      "texto": "Rehogá la cebolla picada en una olla con un chorrito de aceite.",
+      "timer_min": 5,
+      "tip": ""
+    },
+    {
+      "id": "p_00062",
+      "receta_id": "r_sopa",
+      "orden": 2,
+      "texto": "Sumá el zapallo y el caldo, y cociná hasta que el zapallo esté tierno.",
+      "timer_min": 25,
+      "tip": ""
+    },
+    {
+      "id": "p_00063",
+      "receta_id": "r_sopa",
+      "orden": 3,
+      "texto": "Procesá todo, agregá la crema de leche y condimentá con nuez moscada.",
+      "timer_min": null,
+      "tip": ""
+    },
+    {
+      "id": "p_00065",
+      "receta_id": "r_desc",
+      "orden": 1,
+      "texto": "Licuá todo.",
+      "timer_min": null,
+      "tip": ""
+    }
+  ],
+  "notas": [
+    {
+      "id": "n_00001",
+      "receta_id": "r_vasca",
+      "fecha": "2026-09-12T21:00:00.000Z",
+      "quien": "pareja",
+      "texto": "Quedó perfecta a los 33 minutos. La próxima, un poco menos de azúcar."
+    },
+    {
+      "id": "n_00002",
+      "receta_id": "r_sopa",
+      "fecha": "2026-10-05T21:00:00.000Z",
+      "quien": "camilo",
+      "texto": "Con jengibre rallado queda buenísima."
+    }
+  ],
+  "compras": [],
+  "bandeja": [
+    {
+      "id": "b_00066",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00001",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_brown",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00067",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00002",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_vasca",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00068",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.instagram.com/reel/PRUEBA00003/",
+      "plataforma": "instagram",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_galle",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00069",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00004",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_torti",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00070",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.instagram.com/reel/PRUEBA00005/",
+      "plataforma": "instagram",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_pollo",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00071",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/watch?v=prueba00006",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_sopa",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00072",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00010",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "pendiente",
+      "motivo": "",
+      "receta_id": "",
+      "intentos": 0,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00073",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.instagram.com/reel/PRUEBA00011/",
+      "plataforma": "instagram",
+      "quien": "pareja",
+      "estado": "pendiente",
+      "motivo": "",
+      "receta_id": "",
+      "intentos": 0,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00074",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00012",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "procesando",
+      "motivo": "",
+      "receta_id": "",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00075",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.instagram.com/reel/PRUEBA00013/",
+      "plataforma": "instagram",
+      "quien": "pareja",
+      "estado": "ayuda",
+      "motivo": "Instagram pide iniciar sesión. Mandá 2 o 3 capturas.",
+      "receta_id": "",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00076",
+      "creado": "2026-10-11T10:00:00.000Z",
+      "url": "https://www.youtube.com/shorts/prueba00014",
+      "plataforma": "youtube",
+      "quien": "pareja",
+      "estado": "descartada",
+      "motivo": "",
+      "receta_id": "",
+      "intentos": 1,
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    }
+  ]
+}
