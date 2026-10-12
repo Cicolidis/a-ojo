@@ -876,3 +876,308 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 @media (prefers-reduced-motion: no-preference) {
   .chip, .boton-principal, .boton-secundario { transition: background-color 0.15s, color 0.15s; }
 }
+
+/* Navegación inferior (Recetas · Compras · Bandeja) */
+
+.con-navegacion { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+.navegacion {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--margen) env(safe-area-inset-bottom);
+  border-top: 1px solid var(--borde);
+  background: var(--superficie);
+}
+
+.nav-item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 180px;
+  min-height: 60px;
+  padding: 8px 0 6px;
+  color: var(--tinta-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.nav-item[aria-current="page"] { color: var(--acento); font-weight: 600; }
+
+.nav-icono { position: relative; display: inline-flex; }
+
+.nav-cuenta {
+  position: absolute;
+  top: -4px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--acento);
+  color: var(--superficie);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.aviso-bandeja { color: var(--tinta); }
+.aviso-bandeja > div { flex: 1; }
+.aviso-bandeja > .icono { color: var(--tinta-2); }
+
+/* Casillas (compras y «Agregar a compras») */
+
+input[type="checkbox"] {
+  appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 2px solid var(--borde-control);
+  border-radius: 7px;
+  background: var(--superficie);
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked { border-color: var(--acento); background: var(--acento); }
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  width: 6px;
+  height: 11px;
+  border: solid var(--superficie);
+  border-width: 0 2.5px 2.5px 0;
+  transform: translate(0, -1px) rotate(45deg);
+}
+
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.casilla-texto { flex: 1; }
+.casilla.opcional .casilla-texto { color: var(--tinta-2); }
+
+.lista-casillas, .lista-compras, .lista-lugares, .compras-recetas ul {
+  margin: 0;
+  padding: 2px 14px;
+  border-radius: 16px;
+  background: var(--superficie);
+  list-style: none;
+}
+
+.lista-casillas li, .lista-compras li, .lista-lugares li, .compras-recetas li { border-bottom: 1px solid var(--linea); }
+
+.lista-casillas li:last-child, .lista-compras li:last-child, .lista-lugares li:last-child, .compras-recetas li:last-child {
+  border-bottom: none;
+}
+
+/* Agregar a compras */
+
+.agregar-lista { display: flex; flex-direction: column; gap: 12px; }
+
+.agregar-revisar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--superficie-2);
+  font-size: 14px;
+}
+
+.aviso-lista {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 4px;
+  border-radius: 14px;
+  background: var(--superficie-2);
+  font-size: 14px;
+}
+
+/* Lista de compras */
+
+.compras, .bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: calc(28px + env(safe-area-inset-top));
+  padding-left: var(--margen);
+  padding-right: var(--margen);
+}
+
+.sumar { display: flex; gap: 8px; }
+.sumar input { flex: 1; }
+
+.compras-recetas { display: flex; flex-direction: column; gap: 6px; }
+
+.compras-recetas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.compras-recetas a { display: flex; align-items: center; min-height: 44px; font-weight: 500; }
+
+.compras-lista { display: flex; flex-direction: column; gap: 16px; }
+
+.compras-grupo { display: flex; flex-direction: column; gap: 6px; }
+
+.compras-grupo .etiqueta-seccion { margin-left: 4px; }
+
+.lista-compras { padding-right: 4px; }
+
+.compra { display: flex; align-items: center; gap: 4px; }
+
+.compra label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.compra-texto { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+
+.compra-desglose { font-size: 13px; color: var(--tinta-2); }
+
+.compra.hecha .compra-texto, .compra.hecha .cantidad { color: var(--tinta-2); text-decoration: line-through; }
+
+.compra .boton-texto { align-self: center; padding: 0 10px; }
+
+.compras-acciones { display: flex; flex-direction: column; gap: 10px; }
+
+.compras-acciones .boton-texto { align-self: center; }
+
+/* Hoja inferior para mover un ítem de lugar */
+
+.hoja {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90dvh;
+  margin: auto auto 0;
+  padding: 22px var(--margen) calc(20px + env(safe-area-inset-bottom));
+  border: none;
+  border-radius: 22px 22px 0 0;
+  background: var(--superficie);
+  color: var(--tinta);
+}
+
+.hoja[open] { display: flex; flex-direction: column; gap: 16px; }
+
+.hoja::backdrop { background: rgba(42, 33, 27, 0.45); }
+
+.hoja h2 { font: 500 22px/1.2 var(--serif); }
+
+.opciones-lugar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+.opcion-lugar {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--borde-control);
+  border-radius: 14px;
+  background: var(--superficie);
+  font-weight: 500;
+}
+
+.opcion-lugar[aria-pressed="true"] { border-color: var(--tinta); background: var(--tinta); color: var(--superficie); }
+
+/* Dónde compramos */
+
+.bloque { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+.lista-lugares li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 0;
+}
+
+.lista-lugares select { width: auto; min-width: 150px; min-height: 44px; padding: 6px 10px; font-size: 15px; }
+
+/* Bandeja */
+
+.lista-links { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.tarjeta-link {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--superficie);
+}
+
+.link-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+
+.link-cabeza strong { display: block; font-weight: 600; }
+
+.link-cabeza .boton-redondo { flex: none; border: 1px solid var(--borde-control); }
+
+.motivo { display: flex; gap: 8px; color: var(--alerta); font-size: 14px; line-height: 1.4; }
+
+.tarjeta-link .form-botones > * { flex: 1; min-height: 48px; border-radius: 14px; font-size: 15px; }
+
+label.boton-principal { position: relative; cursor: pointer; }
+label.boton-principal:focus-within { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+.tarjeta-link .boton-texto { align-self: center; }
+
+.miniaturas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+
+.miniaturas img { width: 100%; aspect-ratio: 3 / 4; border-radius: 10px; object-fit: cover; background: var(--superficie-2); }
+
+.link-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+
+.ok-texto { display: flex; align-items: center; gap: 6px; color: var(--ok); font-size: 14px; font-weight: 500; }
+
+.tarjeta-reciente {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--superficie);
+  color: var(--tinta);
+}
+
+.mini-foto { flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 12px; }
+
+.mini-foto img { width: 100%; height: 100%; object-fit: cover; }
+
+.reciente-texto { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+
+.reciente-texto strong { font: 500 17px/1.2 var(--serif); }
+
+.confianza {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--superficie-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.confianza.alta { color: var(--ok); }
+.confianza.media { color: var(--atencion); }
+.confianza.baja { color: var(--alerta); }

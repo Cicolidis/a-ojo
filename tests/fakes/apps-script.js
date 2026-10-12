@@ -189,6 +189,7 @@ class DriveFalso {
       isTrashed: () => a.papelera,
       setTrashed: x => { a.papelera = x; return a; },
       setSharing: (acceso, permiso) => { a.acceso = acceso; a.permiso = permiso; return a; },
+      getBlob: () => ({ getBytes: () => a.bytes, getContentType: () => a.mime, getName: () => a.nombre }),
     };
     this.porId.set(a.id, a);
     return a;
@@ -202,6 +203,11 @@ class DriveFalso {
         const c = this.porId.get(id);
         if (!c || !c.carpetas) throw new Error('No item with the given ID could be found');
         return c;
+      },
+      getFileById: id => {
+        const a = this.porId.get(id);
+        if (!a || !a.bytes) throw new Error('No item with the given ID could be found');
+        return a;
       },
       Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' },
       Permission: { VIEW: 'VIEW' },
@@ -243,6 +249,7 @@ function cargarProyecto() {
         if (s.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) throw new Error('Could not decode string.');
         return [...Buffer.from(s, 'base64')];
       },
+      base64Encode: bytes => Buffer.from(bytes).toString('base64'),
       newBlob: (bytes, mime, nombre) => ({
         getBytes: () => bytes,
         getContentType: () => mime,

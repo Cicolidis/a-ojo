@@ -76,12 +76,13 @@ function receta(cambios = {}) {
 // Un JPEG mínimo en base64 (solo importa que decodifique).
 const FOTO = { base64: Buffer.from('foto de prueba').toString('base64'), mime: 'image/jpeg' };
 
-test('setup crea las 6 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
+test('setup crea las 7 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
   const p = proyecto();
   assert.deepEqual(p.planilla.getSheets().map(h => h.getName()),
-    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras']);
-  const enc = p.planilla.getSheetByName('Bandeja').getRange(1, 1, 1, 10).getValues()[0];
-  assert.deepEqual(enc, ['id', 'creado', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'actualizado']);
+    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras', 'Lugares']);
+  const enc = p.planilla.getSheetByName('Bandeja').getRange(1, 1, 1, 11).getValues()[0];
+  assert.deepEqual(enc, ['id', 'creado', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'actualizado', 'capturas']);
+  assert.deepEqual(p.planilla.getSheetByName('Compras').getRange(1, 9, 1, 3).getValues()[0], ['rol', 'lugar', 'porciones']);
   assert.equal(p.planilla.getSheetByName('Recetas').getLastColumn(), 20);
   const ings = p.planilla.getSheetByName('Ingredientes');
   assert.deepEqual(ings.getRange(1, 9, 1, 4).getValues()[0], ['seccion', 'rol', 'seccion_usuario', 'rol_usuario']);
@@ -89,17 +90,18 @@ test('setup crea las 6 hojas en orden, con encabezados, y borra la hoja por defe
   assert.ok(p.registro.some(l => l.includes(p.token)), 'el token aparece en el registro');
 });
 
-test('setup crea la carpeta "A ojo/fotos" una sola vez', () => {
+test('setup crea las carpetas "A ojo/fotos" y "A ojo/capturas" una sola vez', () => {
   const p = proyecto();
   const id = p.propiedades.get('CARPETA_FOTOS');
   const [aOjo] = p.drive.raiz.carpetas;
   assert.equal(aOjo.nombre, 'A ojo');
-  assert.equal(aOjo.carpetas[0].nombre, 'fotos');
+  assert.deepEqual(aOjo.carpetas.map(c => c.nombre), ['fotos', 'capturas']);
   assert.equal(aOjo.carpetas[0].id, id);
+  assert.equal(aOjo.carpetas[1].id, p.propiedades.get('CARPETA_CAPTURAS'));
   p.ctx.setup();
   assert.equal(p.propiedades.get('CARPETA_FOTOS'), id);
   assert.equal(p.drive.raiz.carpetas.length, 1);
-  assert.equal(aOjo.carpetas.length, 1);
+  assert.equal(aOjo.carpetas.length, 2);
 
   // Si la mandan a la papelera, se crea otra.
   aOjo.carpetas[0].setTrashed(true);
@@ -111,12 +113,12 @@ test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   const p = proyecto();
   p.capturar('https://youtube.com/shorts/cyTOswdJ4TY');
   const token = p.token;
-  p.evaluar("ESQUEMA.Bandeja.columnas.push({ nombre: 'capturas', tipo: 'texto' })");
+  p.evaluar("ESQUEMA.Bandeja.columnas.push({ nombre: 'apodo', tipo: 'texto' })");
   p.ctx.setup();
   assert.equal(p.propiedades.get('TOKEN'), token, 'no cambia el token');
   const bandeja = p.planilla.getSheetByName('Bandeja');
-  assert.equal(bandeja.getLastColumn(), 11);
-  assert.equal(bandeja.getRange(1, 11).getValues()[0][0], 'capturas');
+  assert.equal(bandeja.getLastColumn(), 12);
+  assert.equal(bandeja.getRange(1, 12).getValues()[0][0], 'apodo');
   assert.equal(p.filas('Bandeja').length, 1);
 });
 
@@ -239,7 +241,7 @@ test('bandeja.pendientes devuelve solo pendientes, de la más vieja a la más nu
   assert.deepEqual(r.data.filas.map(f => f.id), [a, c]);
 });
 
-test('todo: completo sin since; con since solo lo cambiado (compras siempre entera)', async () => {
+test('todo: completo sin since; con since solo lo cambiado (compras y lugares siempre enteras)', async () => {
   const p = proyecto();
   const id = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;
 
@@ -247,10 +249,13 @@ test('todo: completo sin since; con since solo lo cambiado (compras siempre ente
   assert.equal(completo.data.completo, true);
   assert.equal(completo.data.bandeja.length, 1);
   for (const k of ['recetas', 'ingredientes', 'pasos', 'notas', 'compras']) assert.deepEqual(completo.data[k], []);
+  assert.equal(completo.data.lugares.length, 9, 'el mapa inicial');
 
   const desde = completo.data.ahora;
   await new Promise(r => setTimeout(r, 5));
-  assert.equal(p.get({ action: 'todo', t: p.token, since: desde }).data.bandeja.length, 0);
+  const sinCambios = p.get({ action: 'todo', t: p.token, since: desde }).data;
+  assert.equal(sinCambios.bandeja.length, 0);
+  assert.equal(sinCambios.lugares.length, 9);
 
   p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'procesando' });
   const delta = p.get({ action: 'todo', t: p.token, since: desde });
@@ -632,4 +637,197 @@ test('borrarFilas_ borra filas salteadas sin tocar las demás', () => {
   assert.deepEqual(p.filas('Notas').map(n => n.texto), ['c', 'e']);
   p.ctx.borrarFilas_('Notas', []);
   assert.equal(p.filas('Notas').length, 2);
+});
+
+// Fase 4b: compras, lugares y capturas.
+
+/** Ítems de compras como los arma la app (con ids propios). */
+function itemsCompra(sufijo = 'a') {
+  return [
+    { id: 'c_choco' + sufijo, nombre: 'chocolate semiamargo', cantidad: 400, unidad: 'g', gondola: 'almacén', rol: 'principal' },
+    { id: 'c_huevo' + sufijo, nombre: 'huevos', cantidad: 6, unidad: 'u', gondola: 'lácteos y huevos', rol: 'principal' },
+    { id: 'c_sal00' + sufijo, nombre: 'sal', cantidad: null, unidad: 'a ojo', gondola: 'almacén', rol: 'condimento' },
+  ];
+}
+
+test('setup siembra Lugares con el mapa inicial una sola vez', () => {
+  const p = proyecto();
+  const lugares = p.filas('Lugares');
+  assert.equal(lugares.length, 9);
+  assert.deepEqual(lugares.filter(l => l.por === 'ingrediente').map(l => [l.clave, l.lugar]),
+    [['huevos', 'almacenata'], ['yogur', 'almacenata']]);
+  assert.equal(lugares.find(l => l.clave === 'almacén').lugar, 'supermercado');
+  p.ctx.setup();
+  assert.equal(p.filas('Lugares').length, 9, 'no vuelve a sembrar');
+});
+
+test('compras.agregar suma los ítems, no duplica al reintentar y, con receta_id, reemplaza los de esa receta', async () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const agregar = cuerpo => p.postJson(Object.assign({ action: 'compras.agregar', t: p.token }, cuerpo));
+
+  const r = agregar({ receta_id: id, porciones: 24, items: itemsCompra() });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.deepEqual([r.data.nuevos, r.data.quitados], [3, 0]);
+  assert.equal(agregar({ receta_id: id, porciones: 24, items: itemsCompra() }).data.nuevos, 0, 'un reintento no duplica');
+  let compras = p.filas('Compras');
+  assert.equal(compras.length, 3);
+  const choco = compras.find(c => c.id === 'c_chocoa');
+  assert.deepEqual([choco.receta_id, choco.porciones, choco.cantidad, choco.rol, choco.lugar, choco.hecho],
+    [id, 24, 400, 'principal', '', false]);
+  assert.equal(typeof choco.creado, 'string');
+
+  // Marcado: volver a mandar el mismo ítem no lo desmarca.
+  p.postJson({ action: 'compras.marcar', t: p.token, ids: ['c_chocoa'], hecho: true });
+  agregar({ receta_id: id, items: itemsCompra() });
+  assert.equal(p.filas('Compras').find(c => c.id === 'c_chocoa').hecho, true);
+
+  // Agregarla de nuevo (otras porciones, ids nuevos) reemplaza; lo agregado a mano queda.
+  agregar({ items: [{ id: 'c_mano1', nombre: 'Servilletas' }] });
+  const otra = agregar({ receta_id: id, porciones: 12, items: itemsCompra('b').slice(0, 2) });
+  assert.deepEqual([otra.data.nuevos, otra.data.quitados], [2, 3]);
+  compras = p.filas('Compras');
+  assert.deepEqual(compras.map(c => c.id).sort(), ['c_chocob', 'c_huevob', 'c_mano1']);
+  const mano = compras.find(c => c.id === 'c_mano1');
+  assert.deepEqual([mano.receta_id, mano.unidad, mano.rol, mano.gondola], ['', 'a ojo', 'principal', '']);
+
+  // Validaciones: juntan todos los errores.
+  const mal = agregar({ items: [
+    { id: 'x1', nombre: 'a' },
+    { id: 'c_bien1', nombre: '', unidad: 'puñado', cantidad: -1, gondola: 'kiosco', rol: 'sabroso', lugar: 'chino' },
+    { id: 'c_bien2', nombre: 'b', cantidad: 2, unidad: 'a ojo' },
+  ] });
+  assert.equal(mal.error, 'items_invalidos');
+  assert.equal(mal.detalles.length, 8);
+  assert.equal(agregar({ items: [] }).error, 'sin_items');
+  assert.equal(agregar({ receta_id: 'r_nada0', items: itemsCompra('c') }).status, 404);
+  assert.equal(agregar({ porciones: 0, items: itemsCompra('c') }).error, 'porciones_invalidas');
+});
+
+test('compras.marcar, compras.mover y compras.quitar son idempotentes y llegan en todo', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('compras.agregar', { items: itemsCompra() });
+
+  assert.deepEqual(accion('compras.marcar', { ids: ['c_chocoa', 'c_huevoa', 'c_nada00'], hecho: true }).data.ids, ['c_chocoa', 'c_huevoa']);
+  accion('compras.marcar', { ids: ['c_huevoa'], hecho: 'false' });
+  assert.deepEqual(p.filas('Compras').map(c => c.hecho), [true, false, false]);
+
+  accion('compras.mover', { ids: ['c_sal00a'], lugar: 'dietética' });
+  accion('compras.mover', { ids: ['c_huevoa'], lugar: 'revisar' });
+  accion('compras.mover', { ids: ['c_huevoa'], lugar: '' });
+  assert.deepEqual(p.filas('Compras').map(c => c.lugar), ['', '', 'dietética']);
+
+  assert.equal(accion('compras.quitar', { ids: ['c_chocoa', 'c_sal00a'] }).data.quitados, 2);
+  assert.equal(accion('compras.quitar', { ids: ['c_chocoa', 'c_sal00a'] }).data.quitados, 0, 'un reintento no falla');
+  assert.deepEqual(p.get({ action: 'todo', t: p.token }).data.compras.map(c => c.id), ['c_huevoa']);
+
+  assert.equal(accion('compras.marcar', { ids: ['c_huevoa'] }).error, 'sin_hecho');
+  assert.equal(accion('compras.marcar', { ids: [], hecho: true }).error, 'sin_ids');
+  assert.equal(accion('compras.mover', { ids: ['c_huevoa'], lugar: 'chino' }).error, 'lugar_invalido');
+  assert.equal(accion('compras.quitar', { ids: ['r_abc12'] }).error, 'id_invalido');
+});
+
+test('lugares.asignar cambia el lugar de un tipo y guarda u olvida el de un ingrediente', () => {
+  const p = proyecto();
+  const asignar = cuerpo => p.postJson(Object.assign({ action: 'lugares.asignar', t: p.token }, cuerpo));
+
+  assert.equal(asignar({ por: 'tipo', clave: 'almacén', lugar: 'almacenata' }).ok, true);
+  assert.equal(p.filas('Lugares').find(l => l.clave === 'almacén').lugar, 'almacenata');
+
+  const r = asignar({ por: 'ingrediente', clave: '  Nueces  Pecán ', lugar: 'dietética' });
+  assert.equal(r.data.clave, 'Nueces Pecán');
+  asignar({ por: 'ingrediente', clave: 'nueces pecan', lugar: 'feria' });
+  let reglas = p.filas('Lugares').filter(l => l.por === 'ingrediente');
+  assert.deepEqual(reglas.map(l => [l.clave, l.lugar]), [['huevos', 'almacenata'], ['yogur', 'almacenata'], ['Nueces Pecán', 'feria']],
+    'se compara sin tildes ni mayúsculas');
+
+  asignar({ por: 'ingrediente', clave: 'Huevos', lugar: '' });
+  asignar({ por: 'ingrediente', clave: 'Huevos', lugar: '' });
+  reglas = p.filas('Lugares').filter(l => l.por === 'ingrediente');
+  assert.deepEqual(reglas.map(l => l.clave), ['yogur', 'Nueces Pecán']);
+  assert.equal(p.filas('Lugares').length, 9);
+
+  assert.equal(asignar({ por: 'tipo', clave: 'almacén', lugar: '' }).error, 'lugar_invalido');
+  assert.equal(asignar({ por: 'tipo', clave: 'kiosco', lugar: 'feria' }).error, 'clave_invalida');
+  assert.equal(asignar({ por: 'ingrediente', clave: ' ', lugar: 'feria' }).error, 'clave_invalida');
+  assert.equal(asignar({ por: 'ingrediente', clave: 'pan', lugar: 'chino' }).error, 'lugar_invalido');
+  assert.equal(asignar({ por: 'otra', clave: 'pan', lugar: 'feria' }).error, 'por_invalido');
+});
+
+test('bandeja.actualizar: volver a pendiente desde ayuda o descartada reinicia los intentos', () => {
+  const p = proyecto();
+  const id = p.capturar('https://www.instagram.com/reel/Ddthx0exm4L/').data.id;
+  const act = estado => p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado, motivo: 'Instagram pide iniciar sesión' });
+  act('procesando');
+  act('procesando');
+  act('ayuda');
+  assert.equal(act('pendiente').ok, true);
+  assert.deepEqual([p.filas('Bandeja')[0].intentos, p.filas('Bandeja')[0].motivo], [0, '']);
+  act('procesando');
+  assert.equal(act('pendiente').ok, true);
+  assert.equal(p.filas('Bandeja')[0].intentos, 1, 'una corrida cortada no los reinicia');
+});
+
+test('capturas.subir las guarda privadas, deja la fila pendiente y no duplica al reintentar; capturas.bajar las devuelve', () => {
+  const p = proyecto();
+  const id = p.capturar('https://www.instagram.com/reel/Ddthx0exm4L/').data.id;
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'procesando' });
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'ayuda', motivo: 'Instagram pide iniciar sesión' });
+  const subir = cuerpo => p.postJson(Object.assign({ action: 'capturas.subir', t: p.token, bandeja_id: id, lote: 'k3x9a0' }, cuerpo));
+  const png = { base64: Buffer.from('otra captura').toString('base64'), mime: 'image/png' };
+
+  const r = subir({ imagenes: [FOTO, png] });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.deepEqual(r.data, { id, estado: 'pendiente', capturas: 2 });
+  assert.equal(subir({ imagenes: [FOTO, png] }).data.capturas, 2, 'el mismo lote no duplica');
+  const fila = p.filas('Bandeja')[0];
+  assert.deepEqual([fila.estado, fila.motivo, fila.intentos], ['pendiente', '', 0]);
+  assert.equal(fila.capturas.split(',').length, 2);
+
+  const archivos = p.drive.archivosVivos();
+  assert.deepEqual(archivos.map(a => a.nombre), [id + '-k3x9a0-1.jpg', id + '-k3x9a0-2.png']);
+  assert.ok(archivos.every(a => a.acceso === null), 'privadas: sin link público');
+  const [, capturas] = p.drive.raiz.carpetas[0].carpetas;
+  assert.equal(capturas.archivos.length, 2, 'en A ojo/capturas');
+
+  // Otro envío se suma a los anteriores.
+  assert.equal(subir({ lote: 'otro123', imagenes: [FOTO] }).data.capturas, 3);
+  const bajadas = p.get({ action: 'capturas.bajar', t: p.token, bandeja_id: id }).data.imagenes;
+  assert.equal(bajadas.length, 3);
+  assert.deepEqual([bajadas[1].nombre, bajadas[1].mime, bajadas[1].base64], [id + '-k3x9a0-2.png', 'image/png', png.base64]);
+  // Si borran una en Drive, se saltea.
+  archivos[0].setTrashed(true);
+  assert.equal(p.get({ action: 'capturas.bajar', t: p.token, bandeja_id: id }).data.imagenes.length, 2);
+
+  assert.equal(subir({ imagenes: [] }).error, 'sin_imagenes');
+  assert.equal(subir({ imagenes: Array(7).fill(FOTO) }).error, 'demasiadas');
+  assert.equal(subir({ lote: 'a', imagenes: [FOTO] }).error, 'lote_invalido');
+  const mala = subir({ imagenes: [FOTO, { base64: 'xx', mime: 'image/gif' }] });
+  assert.deepEqual([mala.error, mala.mensaje], ['foto_invalida', 'La captura 2 tiene que ser image/jpeg, image/png, image/webp.']);
+  assert.equal(subir({ bandeja_id: 'b_nada0', imagenes: [FOTO] }).status, 404);
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'procesando' });
+  assert.equal(subir({ lote: 'tercer1', imagenes: [FOTO] }).error, 'procesando');
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'lista' });
+  assert.equal(subir({ lote: 'tercer1', imagenes: [FOTO] }).error, 'ya_lista');
+  assert.equal(p.get({ action: 'capturas.bajar', t: p.token, bandeja_id: 'b_nada0' }).status, 404);
+});
+
+test('compras y capturas piden correr setup() si faltan sus columnas; todo anda sin la hoja Lugares', () => {
+  const p = proyecto();
+  for (const [hoja, columna] of [['Compras', 'lugar'], ['Bandeja', 'capturas']]) {
+    const sh = p.planilla.getSheetByName(hoja);
+    const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    sh.getRange(1, enc.indexOf(columna) + 1).setValues([['']]);
+  }
+  assert.equal(p.postJson({ action: 'compras.agregar', t: p.token, items: itemsCompra() }).error, 'falta_columna');
+  assert.equal(p.postJson({ action: 'compras.mover', t: p.token, ids: ['c_chocoa'], lugar: 'feria' }).error, 'falta_columna');
+  const id = p.capturar('https://www.instagram.com/reel/Ddthx0exm4L/').data.id;
+  assert.equal(p.postJson({ action: 'capturas.subir', t: p.token, bandeja_id: id, lote: 'k3x9a0', imagenes: [FOTO] }).error, 'falta_columna');
+  assert.equal(p.drive.archivosVivos().length, 0, 'no guarda nada en Drive');
+
+  p.planilla.deleteSheet(p.planilla.getSheetByName('Lugares'));
+  const todo = p.get({ action: 'todo', t: p.token });
+  assert.equal(todo.ok, true);
+  assert.deepEqual(todo.data.lugares, []);
 });

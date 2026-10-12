@@ -7,6 +7,7 @@ import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, textoTraduccion } from '../formato.js';
 import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
+import { recetasEnLista } from '../compras.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { progresoGuardado } from './cocina.js';
 import { estrellas, segmentado } from './controles.js';
@@ -149,6 +150,7 @@ export function montar(contenedor, { app, volver, editar }, id) {
     const n = app.porciones.get(id) || base;
     const factor = base ? n / base : 1;
     const { secciones, utensilios } = agrupar(r.ingredientes);
+    const enCompras = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
     rellenar(zonaIngredientes,
       h('h2', { id: 'titulo-ingredientes' }, 'Ingredientes'),
       base ? porciones(base, n) : null,
@@ -163,6 +165,9 @@ export function montar(contenedor, { app, volver, editar }, id) {
       utensilios.length ? h('p', { class: 'utensilios' },
         h('span', { class: 'etiqueta-seccion' }, 'También vas a necesitar'), enUnaLinea(utensilios, factor)) : null,
       factor !== 1 ? h('p', { class: 'secundario' }, 'Ojo: los pasos dicen las cantidades para ' + base + '.') : null,
+      h('a', { class: 'boton-secundario boton-chico', href: '#/compras/agregar/' + id }, icono('compras', 18),
+        !enCompras ? 'Agregar a compras'
+          : 'En compras' + (enCompras.porciones ? ' para ' + enCompras.porciones : '') + ' · Cambiar'),
       h('a', { class: 'boton-texto', href: '#/ingredientes/' + id }, icono('lapiz', 18), 'Editar ingredientes'),
     );
   }

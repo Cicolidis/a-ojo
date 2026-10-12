@@ -8,8 +8,9 @@
 // prueba sin el token real. El token de la API falsa es «prueba»:
 //   http://localhost:4173/#/config?api=http%3A%2F%2Flocalhost%3A4173%2Fapi-falsa&t=prueba&quien=camilo
 //
-// La API falsa responde ping y todo, y acepta las ediciones de la app (POST):
-// las guarda en memoria, así `todo` las devuelve, hasta que se reinicia el servidor.
+// La API falsa responde ping y todo, y acepta las ediciones de la app (POST) y
+// capturas.subir: las guarda en memoria, así `todo` las devuelve, hasta que se
+// reinicia el servidor. De las capturas solo guarda ids falsos.
 // /api-falsa/cortar?segundos=N la deja sin responder N segundos, como si no
 // hubiera conexión (para probar la cola offline).
 
@@ -66,7 +67,8 @@ function dentroDe(raiz, ruta) {
 let datosFalsos = null;
 const datos = () => (datosFalsos ||= JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8')));
 let cortadaHasta = 0;
-const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar'];
+const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
+  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -92,6 +94,7 @@ async function apiFalsa(req, url, res) {
   const ahora = new Date().toISOString();
   if (q.action === 'ping') return responder({ ok: true, data: { version: 'falsa', ahora, mensaje: 'Conectado' } });
   if (req.method === 'POST' && EDICIONES.includes(q.action)) return responder(await editarFalsa(q, ahora));
+  if (req.method === 'POST' && q.action === 'capturas.subir') return responder(subirFalsa(q, ahora));
   if (q.action !== 'todo') {
     return responder({ ok: false, error: 'accion_desconocida', mensaje: 'La API falsa no conoce «' + q.action + '».', status: 404 });
   }
@@ -112,6 +115,7 @@ async function apiFalsa(req, url, res) {
       pasos: todo.pasos.filter(p => ids.has(p.receta_id)),
       notas: todo.notas.filter(n => cambio(n.creado || n.fecha)),
       compras: todo.compras,
+      lugares: todo.lugares || [],
       bandeja: todo.bandeja.filter(b => cambio(b.actualizado)),
     },
   });
@@ -124,19 +128,49 @@ async function apiFalsa(req, url, res) {
 async function editarFalsa(pedido, ahora) {
   const { aplicarEdicion } = await import(pathToFileURL(path.join(RAIZ, 'js', 'ediciones.js')).href);
   const { action, t, ...cuerpo } = pedido;
-  const recetaId = action === 'nota.agregar' ? cuerpo.receta_id : cuerpo.id;
+  const recetaId = action === 'nota.agregar' || action === 'compras.agregar' ? cuerpo.receta_id
+    : action.startsWith('receta.') ? cuerpo.id : '';
   const todo = datos();
-  if (!todo.recetas.some(r => r.id === recetaId)) {
+  if (recetaId && !todo.recetas.some(r => r.id === recetaId)) {
     return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la receta «' + recetaId + '».', status: 404 };
   }
+  if (action === 'bandeja.actualizar' && !todo.bandeja.some(b => b.id === cuerpo.id)) {
+    return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + cuerpo.id + '» en la bandeja.', status: 404 };
+  }
   datosFalsos = aplicarEdicion(todo, { accion: action, datos: cuerpo });
+  const tocar = (lista, id, campos) => lista.map(x => (x.id === id ? Object.assign({}, x, campos) : x));
   if (action === 'nota.agregar') {
     datosFalsos.notas = datosFalsos.notas.map(n => (n.id === cuerpo.id && !n.creado ? Object.assign({}, n, { creado: ahora }) : n));
-  } else {
-    datosFalsos.recetas = datosFalsos.recetas.map(r => (r.id === recetaId ? Object.assign({}, r, { actualizado: ahora }) : r));
+  } else if (action.startsWith('receta.')) {
+    datosFalsos.recetas = tocar(datosFalsos.recetas, recetaId, { actualizado: ahora });
+  } else if (action === 'bandeja.actualizar') {
+    datosFalsos.bandeja = tocar(datosFalsos.bandeja, cuerpo.id, { actualizado: ahora });
+  } else if (action === 'compras.agregar') {
+    datosFalsos.compras = datosFalsos.compras.map(c => (c.creado ? c : Object.assign({}, c, { creado: ahora })));
   }
-  console.log('API falsa: ' + action + ' ' + recetaId);
-  return { ok: true, data: { id: action === 'nota.agregar' ? cuerpo.id : recetaId } };
+  const detalle = recetaId || cuerpo.id || (cuerpo.ids || []).join(',') || cuerpo.clave || (cuerpo.items || []).map(i => i.nombre).join(', ');
+  console.log('API falsa: ' + action + ' ' + detalle);
+  return { ok: true, data: { id: cuerpo.id || recetaId } };
+}
+
+/** capturas.subir: deja la fila pendiente con ids falsos (las imágenes no se guardan). */
+function subirFalsa(q, ahora) {
+  const todo = datos();
+  const fila = todo.bandeja.find(b => b.id === q.bandeja_id);
+  if (!fila) return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + q.bandeja_id + '» en la bandeja.', status: 404 };
+  if (fila.estado === 'lista' || fila.estado === 'procesando') {
+    return { ok: false, error: fila.estado === 'lista' ? 'ya_lista' : 'procesando', mensaje: 'La fila está ' + fila.estado + '.', status: 409 };
+  }
+  const imagenes = Array.isArray(q.imagenes) ? q.imagenes : [];
+  if (!imagenes.length) return { ok: false, error: 'sin_imagenes', mensaje: 'Falta al menos una captura.', status: 400 };
+  const ids = imagenes.map((_, i) => 'falsa-' + q.lote + '-' + (i + 1));
+  const todas = [...new Set(String(fila.capturas || '').split(',').filter(Boolean).concat(ids))];
+  datosFalsos = Object.assign({}, todo, { bandeja: todo.bandeja.map(b => (b.id === fila.id
+    ? Object.assign({}, b, { capturas: todas.join(','), estado: 'pendiente', motivo: '', intentos: 0, actualizado: ahora })
+    : b)) });
+  const kb = Math.round(imagenes.reduce((n, img) => n + String(img.base64 || '').length * 0.75, 0) / 1024);
+  console.log('API falsa: capturas.subir ' + fila.id + ' (' + imagenes.length + ' imágenes, ' + kb + ' KB)');
+  return { ok: true, data: { id: fila.id, estado: 'pendiente', capturas: todas.length } };
 }
 
 http.createServer((req, res) => {

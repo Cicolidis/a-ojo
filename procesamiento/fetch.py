@@ -24,6 +24,7 @@ import sys
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
+from pathlib import Path
 
 import comun
 from comun import ErrorDescarga, fallar, log, salida
@@ -468,10 +469,16 @@ def cmd_video(args):
 
 
 def cmd_foto(args):
-    """Deja foto.jpg (hasta 1200 px de ancho): la miniatura, un cuadro del video o una imagen."""
+    """Deja foto.jpg (hasta 1200 px de ancho): la miniatura, un cuadro del video o una imagen (de la web o local)."""
     d = comun.dir_trabajo(args.bandeja_id)
     destino = d / 'foto.jpg'
-    if args.segundo is not None:
+    if args.archivo:
+        archivo = Path(args.archivo).expanduser()
+        if not archivo.is_file():
+            fallar('sin_archivo', f'No encontré {archivo}.')
+        origen, extra = str(archivo), []
+        descripcion = f'imagen {archivo.name}'
+    elif args.segundo is not None:
         videos = [v for v in d.glob('video.*') if not v.name.endswith('.part')]
         if not videos:
             fallar('sin_video', 'Primero corré «fetch video» para esta fila.')
@@ -550,6 +557,7 @@ def main(argv=None):
     g = f.add_mutually_exclusive_group()
     g.add_argument('--segundo', type=float)
     g.add_argument('--url')
+    g.add_argument('--archivo', help='una imagen local, por ejemplo una captura (capturas/2.jpg)')
     f.set_defaults(fn=cmd_foto)
 
     args = p.parse_args(argv)

@@ -49,6 +49,12 @@ const TRAZOS = {
   mas: '<path d="M12 5v14M5 12h14"/>',
   menos: '<path d="M5 12h14"/>',
   lapiz: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  recetas: '<path d="M4 5.5c2.5-1 5.5-1 8 .5v13c-2.5-1.5-5.5-1.5-8-.5z"/><path d="M20 5.5c-2.5-1-5.5-1-8 .5v13c2.5-1.5 5.5-1.5 8-.5z"/>',
+  compras: '<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 10V7a3 3 0 016 0v3"/>',
+  bandeja: '<path d="M4 13l2.5-8h11l2.5 8v6H4z"/><path d="M4 13h4.5l1 2.5h5l1-2.5H20"/>',
+  mover: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  compartir: '<path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/>',
+  imagen: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-9 8.5"/>',
 };
 
 export function icono(nombre, tamano = 20) {

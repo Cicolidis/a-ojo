@@ -1,6 +1,5 @@
 /**
  * Acciones de la API (§4). Cada una recibe la petición ya validada y devuelve `data`.
- * Las de las fases siguientes (compras.*, capturas.*) se suman acá.
  *
  * Las que usa la app se reintentan desde su cola offline: tienen que ser
  * idempotentes (mandar dos veces lo mismo deja todo igual).
@@ -71,7 +70,7 @@ function claveDe_(url) {
 /**
  * GET todo { since? }
  * Sin `since`: todo. Con `since`: solo lo cambiado después de esa fecha, salvo
- * Compras, que va siempre completa (es chica y así cubre los borrados).
+ * Compras y Lugares, que van siempre completas (son chicas y así cubren los borrados).
  * `ahora` es el valor a usar como próximo `since`.
  */
 function accionTodo_(req) {
@@ -93,6 +92,8 @@ function accionTodo_(req) {
     let notas = leerDatos_('Notas');
     let bandeja = leerDatos_('Bandeja');
     const compras = leerDatos_('Compras');
+    // Antes de correr setup() la hoja no existe: la app usa el lugar por defecto.
+    const lugares = planilla_().getSheetByName('Lugares') ? leerDatos_('Lugares') : [];
 
     if (since) {
       recetas = recetas.filter(r => cambio(r.actualizado));
@@ -112,6 +113,7 @@ function accionTodo_(req) {
       pasos: pasos,
       notas: notas,
       compras: compras,
+      lugares: lugares,
       bandeja: bandeja,
     };
   });
@@ -129,7 +131,11 @@ function accionBandejaPendientes_() {
   return { filas: filas };
 }
 
-/** POST bandeja.actualizar { id, estado, motivo?, receta_id? } */
+/**
+ * POST bandeja.actualizar { id, estado, motivo?, receta_id? }
+ * La usan /recetas y la app (Descartar, Probar de nuevo). Volver a `pendiente`
+ * desde `ayuda` o `descartada` reinicia los intentos.
+ */
 function accionBandejaActualizar_(req) {
   const id = String(req.id || '').trim();
   const estado = String(req.estado || '').trim();
@@ -143,6 +149,7 @@ function accionBandejaActualizar_(req) {
     if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + id + '» en la bandeja.');
 
     const datos = encontrada.datos;
+    if (estado === 'pendiente' && (datos.estado === 'ayuda' || datos.estado === 'descartada')) datos.intentos = 0;
     datos.estado = estado;
     datos.motivo = estado === 'ayuda' ? String(req.motivo || '') : '';
     if (req.receta_id !== undefined && req.receta_id !== null) datos.receta_id = String(req.receta_id);
@@ -576,4 +583,236 @@ function accionNotaAgregar_(req) {
     agregarFila_('Notas', nota);
     return { id: nota.id, fecha: nota.fecha };
   });
+}
+
+// Lista de compras (§7.2). Los ids de los ítems los genera la app: un reintento no duplica nada.
+
+const ID_COMPRA_ = /^c_[0-9a-z]{5,12}$/;
+const MAX_ITEMS_COMPRA_ = 150;
+
+/** Los `ids` de la petición, validados. */
+function idsCompras_(req) {
+  const ids = Array.isArray(req.ids) ? req.ids.map(id => String(id || '').trim()) : [];
+  if (!ids.length) throw errorApi_('sin_ids', 400, 'Falta «ids».');
+  if (ids.length > MAX_ITEMS_COMPRA_) throw errorApi_('demasiados', 400, 'Son demasiados ítems de una vez.');
+  const malos = ids.filter(id => !ID_COMPRA_.test(id));
+  if (malos.length) throw errorApi_('id_invalido', 400, 'No son ids de compras: ' + malos.join(', ') + '.');
+  return ids;
+}
+
+/** Filas de Compras con esos ids (las que ya no existen se ignoran: las borró el otro celular). */
+function filasCompras_(ids) {
+  return leerFilas_('Compras').filter(f => ids.indexOf(f.datos.id) !== -1);
+}
+
+/**
+ * POST compras.agregar { receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }
+ * Suma los ítems que todavía no están (por id); los que ya están no se tocan, así
+ * se conservan `hecho` y `lugar`. Con `receta_id`, los ítems de esa receta que no
+ * vengan se borran: volver a agregarla (con otras porciones) la reemplaza.
+ */
+function accionComprasAgregar_(req) {
+  const lista = Array.isArray(req.items) ? req.items : [];
+  if (!lista.length) throw errorApi_('sin_items', 400, 'Falta «items».');
+  if (lista.length > MAX_ITEMS_COMPRA_) throw errorApi_('demasiados', 400, 'Son demasiados ítems de una vez.');
+  const recetaId = vacio_(req.receta_id) ? '' : String(req.receta_id).trim();
+  let porciones = null;
+  if (!vacio_(req.porciones)) {
+    porciones = Number(req.porciones);
+    if (!Number.isInteger(porciones) || porciones < 1 || porciones > 999) {
+      throw errorApi_('porciones_invalidas', 400, '«porciones» tiene que ser un número entero desde 1.');
+    }
+  }
+
+  const errores = [];
+  const vistos = {};
+  const items = lista.map((it, i) => {
+    const donde = 'ítem ' + (i + 1);
+    it = it || {};
+    const id = String(it.id || '').trim();
+    if (!ID_COMPRA_.test(id)) errores.push(donde + ': «' + id + '» no es un id de compras');
+    else if (vistos[id]) errores.push(donde + ': «' + id + '» está repetido');
+    vistos[id] = true;
+    const nombre = vacio_(it.nombre) ? '' : String(it.nombre).trim();
+    if (!nombre) errores.push(donde + ': falta el nombre');
+    if (nombre.length > 80) errores.push(donde + ': el nombre es muy largo');
+    const unidad = vacio_(it.unidad) ? 'a ojo' : String(it.unidad).trim();
+    if (ENUMS.unidad.indexOf(unidad) === -1) errores.push(donde + ': unidad «' + unidad + '» no es válida');
+    let cantidad = null;
+    if (!vacio_(it.cantidad)) {
+      cantidad = Number(it.cantidad);
+      if (!isFinite(cantidad) || cantidad <= 0) errores.push(donde + ': la cantidad tiene que ser un número mayor que 0');
+      if (unidad === 'a ojo') errores.push(donde + ': con unidad «a ojo» la cantidad va vacía');
+    }
+    const gondola = vacio_(it.gondola) ? '' : String(it.gondola).trim();
+    if (gondola && ENUMS.gondola.indexOf(gondola) === -1) errores.push(donde + ': góndola «' + gondola + '» no es válida');
+    const rol = vacio_(it.rol) ? 'principal' : String(it.rol).trim();
+    if (ENUMS.rol.indexOf(rol) === -1) errores.push(donde + ': rol «' + rol + '» no es válido');
+    const lugar = vacio_(it.lugar) ? '' : String(it.lugar).trim();
+    if (lugar && ENUMS.lugarCompra.indexOf(lugar) === -1) errores.push(donde + ': lugar «' + lugar + '» no es válido');
+    return { id: id, nombre: nombre, cantidad: cantidad, unidad: unidad, gondola: gondola, rol: rol, lugar: lugar };
+  });
+  if (errores.length) {
+    const err = errorApi_('items_invalidos', 400, 'Revisá la lista: ' + errores.join('; ') + '.');
+    err.detalles = errores;
+    throw err;
+  }
+
+  return conLock_(() => {
+    exigirColumnas_('Compras', ['rol', 'lugar', 'porciones']);
+    if (recetaId) filaReceta_(recetaId);
+    const filas = leerFilas_('Compras');
+    const ids = items.map(it => it.id);
+    const sobran = recetaId ? filas.filter(f => f.datos.receta_id === recetaId && ids.indexOf(f.datos.id) === -1) : [];
+    borrarFilas_('Compras', sobran.map(f => f.fila));
+    const existentes = filas.map(f => f.datos.id);
+    const ahora = ahoraIso_();
+    const nuevos = items.filter(it => existentes.indexOf(it.id) === -1).map(it => Object.assign({}, it, {
+      receta_id: recetaId,
+      porciones: porciones,
+      hecho: false,
+      creado: ahora,
+    }));
+    agregarFilas_('Compras', nuevos);
+    return { ids: ids, nuevos: nuevos.length, quitados: sobran.length };
+  });
+}
+
+/** POST compras.marcar { ids, hecho } */
+function accionComprasMarcar_(req) {
+  const ids = idsCompras_(req);
+  if (req.hecho !== true && req.hecho !== false && req.hecho !== 'true' && req.hecho !== 'false') {
+    throw errorApi_('sin_hecho', 400, '«hecho» tiene que ser true o false.');
+  }
+  const hecho = req.hecho === true || req.hecho === 'true';
+  return conLock_(() => {
+    const filas = filasCompras_(ids);
+    filas.forEach(f => {
+      f.datos.hecho = hecho;
+      escribirFila_('Compras', f.fila, f.datos);
+    });
+    return { ids: filas.map(f => f.datos.id), hecho: hecho };
+  });
+}
+
+/** POST compras.mover { ids, lugar } (vacío: el que da la regla) */
+function accionComprasMover_(req) {
+  const ids = idsCompras_(req);
+  const lugar = vacio_(req.lugar) ? '' : String(req.lugar).trim();
+  if (lugar && ENUMS.lugarCompra.indexOf(lugar) === -1) {
+    throw errorApi_('lugar_invalido', 400, '«lugar» tiene que ser uno de: ' + ENUMS.lugarCompra.join(', ') + ' (o vacío).');
+  }
+  return conLock_(() => {
+    exigirColumnas_('Compras', ['lugar']);
+    const filas = filasCompras_(ids);
+    filas.forEach(f => {
+      f.datos.lugar = lugar;
+      escribirFila_('Compras', f.fila, f.datos);
+    });
+    return { ids: filas.map(f => f.datos.id), lugar: lugar };
+  });
+}
+
+/** POST compras.quitar { ids }: limpiar los marcados, sacar una receta o un ítem. */
+function accionComprasQuitar_(req) {
+  const ids = idsCompras_(req);
+  return conLock_(() => {
+    const filas = filasCompras_(ids);
+    borrarFilas_('Compras', filas.map(f => f.fila));
+    return { quitados: filas.length };
+  });
+}
+
+/**
+ * POST lugares.asignar { por, clave, lugar }
+ * Dónde se compra cada tipo de producto (la góndola) o un ingrediente puntual.
+ * Por ingrediente, `lugar` vacío borra la regla; el nombre se compara sin tildes
+ * ni mayúsculas, pero se guarda como vino (así se muestra bien).
+ */
+function accionLugaresAsignar_(req) {
+  const por = String(req.por || '').trim();
+  if (ENUMS.porLugar.indexOf(por) === -1) throw errorApi_('por_invalido', 400, '«por» tiene que ser «tipo» o «ingrediente».');
+  const lugar = vacio_(req.lugar) ? '' : String(req.lugar).trim();
+  if (lugar && ENUMS.lugar.indexOf(lugar) === -1) {
+    throw errorApi_('lugar_invalido', 400, '«lugar» tiene que ser uno de: ' + ENUMS.lugar.join(', ') + '.');
+  }
+  let clave;
+  if (por === 'tipo') {
+    clave = String(req.clave || '').trim();
+    if (ENUMS.gondola.indexOf(clave) === -1) throw errorApi_('clave_invalida', 400, '«' + clave + '» no es un tipo de producto.');
+    if (!lugar) throw errorApi_('lugar_invalido', 400, 'Cada tipo de producto tiene que tener un lugar.');
+  } else {
+    clave = String(req.clave || '').replace(/\s+/g, ' ').trim();
+    if (!claveTexto_(clave)) throw errorApi_('clave_invalida', 400, 'Falta el ingrediente («clave»).');
+    if (clave.length > 60) throw errorApi_('clave_invalida', 400, 'El nombre del ingrediente es muy largo.');
+  }
+  const misma = c => (por === 'tipo' ? c === clave : claveTexto_(c) === claveTexto_(clave));
+
+  return conLock_(() => {
+    const filas = leerFilas_('Lugares').filter(f => f.datos.por === por && misma(f.datos.clave));
+    // Si por alguna edición a mano quedaron dos reglas iguales, sobrevive la primera.
+    borrarFilas_('Lugares', filas.slice(lugar ? 1 : 0).map(f => f.fila));
+    const ahora = ahoraIso_();
+    if (lugar && filas.length) {
+      Object.assign(filas[0].datos, { lugar: lugar, actualizado: ahora });
+      escribirFila_('Lugares', filas[0].fila, filas[0].datos);
+    } else if (lugar) {
+      agregarFila_('Lugares', {
+        id: nuevoId_(ESQUEMA.Lugares.prefijo, leerDatos_('Lugares').map(l => l.id)),
+        por: por, clave: clave, lugar: lugar, actualizado: ahora,
+      });
+    }
+    return { por: por, clave: clave, lugar: lugar };
+  });
+}
+
+// Capturas (capa 6): cuando un link necesita ayuda, suben desde la app 2 o 3 capturas del video.
+
+const MAX_CAPTURAS_ = 6;
+
+/** Las capturas que ya tiene una fila de la bandeja: «id1,id2» → ['id1', 'id2']. */
+function listaCapturas_(texto) {
+  return String(texto || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * POST capturas.subir { bandeja_id, lote, imagenes: [{ base64, mime }] }
+ * Las guarda en Drive (privadas) y deja la fila en `pendiente`, sin motivo y con
+ * los intentos en 0, para que /recetas la vuelva a procesar. `lote` lo genera la
+ * app: si el envío se reintenta, no se duplican las imágenes.
+ */
+function accionCapturasSubir_(req) {
+  const bandejaId = String(req.bandeja_id || '').trim();
+  if (!bandejaId) throw errorApi_('sin_id', 400, 'Falta «bandeja_id».');
+  const lote = String(req.lote || '').trim();
+  if (!/^[0-9a-z]{6,16}$/.test(lote)) throw errorApi_('lote_invalido', 400, '«lote» tiene que ser un código de 6 a 16 letras o números.');
+  const lista = Array.isArray(req.imagenes) ? req.imagenes : [];
+  if (!lista.length) throw errorApi_('sin_imagenes', 400, 'Falta al menos una captura.');
+  if (lista.length > MAX_CAPTURAS_) throw errorApi_('demasiadas', 400, 'Mandá hasta ' + MAX_CAPTURAS_ + ' capturas.');
+  const imagenes = lista.map((img, i) => leerImagen_(img, 'La captura ' + (i + 1)));
+
+  return conLock_(() => {
+    exigirColumnas_('Bandeja', ['capturas']);
+    const encontrada = leerFilas_('Bandeja').filter(f => f.datos.id === bandejaId)[0];
+    if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + bandejaId + '» en la bandeja.');
+    const datos = encontrada.datos;
+    if (datos.estado === 'lista') throw errorApi_('ya_lista', 409, 'Ese link ya es una receta.');
+    if (datos.estado === 'procesando') throw errorApi_('procesando', 409, 'La Mac lo está procesando ahora. Probá en unos minutos.');
+
+    const ids = imagenes.map((img, i) => guardarCaptura_(bandejaId + '-' + lote + '-' + (i + 1), img));
+    const todas = listaCapturas_(datos.capturas);
+    ids.forEach(id => { if (todas.indexOf(id) === -1) todas.push(id); });
+    Object.assign(datos, { capturas: todas.join(','), estado: 'pendiente', motivo: '', intentos: 0, actualizado: ahoraIso_() });
+    escribirFila_('Bandeja', encontrada.fila, datos);
+    return { id: bandejaId, estado: datos.estado, capturas: todas.length };
+  });
+}
+
+/** GET capturas.bajar { bandeja_id }: las capturas de la fila en base64 (las usa /recetas). */
+function accionCapturasBajar_(req) {
+  const bandejaId = String(req.bandeja_id || '').trim();
+  if (!bandejaId) throw errorApi_('sin_id', 400, 'Falta «bandeja_id».');
+  const fila = leerDatos_('Bandeja').filter(b => b.id === bandejaId)[0];
+  if (!fila) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + bandejaId + '» en la bandeja.');
+  return { id: bandejaId, imagenes: leerCapturas_(listaCapturas_(fila.capturas)) };
 }

@@ -34,13 +34,15 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 
 - PWA sin build: módulos ES servidos tal cual por GitHub Pages (`.github/workflows/pages.yml`). Nada de dependencias ni frameworks.
 - El texto de las recetas viene de terceros: el DOM se arma con `h()` de `js/dom.js`, que usa `textContent`. **Nunca `innerHTML` con datos**, y solo links `http(s)` (`urlSegura`).
-- La lógica pura va en `js/datos.js`, `js/formato.js`, `js/cocina.js`, `js/ingredientes.js`, `js/ediciones.js`, `js/config.js` y `js/rutas.js`, con sus tests en `tests/app.test.js`. Las vistas (`js/vistas/`) solo arman DOM; `rellenar()` de `dom.js` reemplaza contenido con las mismas reglas que `h()`.
+- La lógica pura va en `js/datos.js`, `js/formato.js`, `js/cocina.js`, `js/ingredientes.js`, `js/compras.js`, `js/bandeja.js`, `js/ediciones.js`, `js/config.js` y `js/rutas.js`, con sus tests en `tests/app.test.js`. Las vistas (`js/vistas/`) solo arman DOM; `rellenar()` de `dom.js` reemplaza contenido con las mismas reglas que `h()`.
 - **Archivo nuevo en `app/` → sumarlo a `ARCHIVOS` en `sw.js`**: si no, no funciona sin conexión. El test de precache lo exige.
 - El service worker no intercepta la API. `__VERSION__` en `sw.js` lo reemplaza el workflow por el commit; con el literal (desarrollo) la interfaz va primero a la red.
 - Para probar: `npm run app` (API falsa con `tests/fixtures/todo.json`, token `prueba`). **No usar el token real en el navegador**: el link real lo genera Camilo con `npm run link-config`. La API falsa guarda las ediciones en memoria, y `/api-falsa/cortar?segundos=N` simula que no hay conexión.
 - **Ediciones:** se arman con `ediciones.js` y pasan por `editar()` de `app.js`, que las aplica al instante y las deja en la cola (IndexedDB). `sincronizar` primero manda la cola y después pide `todo`. Una acción nueva necesita su caso en `aplicarEdicion()`, igual al de la API.
 - Si la app empieza a usar columnas nuevas, subir `VERSION_DATOS` en `datos.js`: los snapshots viejos se piden enteros de nuevo.
 - Los ingredientes se muestran por sección y rol con `rolDe()` / `seccionDe()` (`ingredientes.js`): lo editado por ellos gana sobre lo de `/recetas`.
+- **Compras:** el lugar de cada ítem lo calcula `lugarDe()` (`compras.js`) con las reglas de la hoja `Lugares`; en la Sheet solo se guarda adonde lo movieron. Los ids de los ítems (`c_…`) los genera la app.
+- **Capturas:** no van por la cola (pesan megas): se achican con `imagenes.js` y se mandan directo con un `lote` fijo por selección, así un reintento no las duplica. En Drive quedan privadas («A ojo/capturas»); `/recetas` las baja con `procesamiento/aojo api capturas <id>`.
 
 ## Tests
 

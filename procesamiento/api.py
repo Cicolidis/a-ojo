@@ -7,6 +7,7 @@ Uso (por medio de procesamiento/aojo):
   api capturar <url> [--quien camilo]
   api actualizar <bandeja_id> <estado> [--motivo "…"] [--dry-run]
   api upsert <bandeja_id> [--dry-run]    manda trabajo/<id>/receta.json (y foto.jpg si existe)
+  api capturas <bandeja_id>              baja las capturas que subieron desde la app a trabajo/<id>/capturas/
   api sin-clasificar                     recetas con ingredientes sin rol (para /recetas --clasificar)
   api ingredientes <receta_id>           la receta guardada: ingredientes con id, pasos y notas
   api clasificar <receta_id> [--dry-run] manda trabajo/<receta_id>/clasificacion.json
@@ -83,7 +84,9 @@ def dry_run(args):
 
 ROLES = ('principal', 'condimento', 'opcional', 'utensilio')
 
-RESUMEN_FILA = ('id', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'creado', 'actualizado')
+RESUMEN_FILA = ('id', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'creado', 'actualizado',
+                'capturas')
+EXTENSIONES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
 
 
 def cmd_ping(_args):
@@ -138,6 +141,24 @@ def cmd_upsert(args):
     log(args.bandeja_id, 'upsert', ('(dry-run) válida' if dry_run(args) else f'{r.get("id")} '
                                     f'({"nueva" if r.get("nueva") else "actualizada"})'))
     salida({'ok': True, 'dry_run': dry_run(args), **r})
+
+
+def cmd_capturas(args):
+    """Baja las capturas de la fila (capa 6) a trabajo/<id>/capturas/1.jpg, 2.png… Borra las de una bajada anterior."""
+    r = llamar('GET', 'capturas.bajar', {'bandeja_id': args.bandeja_id})
+    d = comun.dir_trabajo(args.bandeja_id) / 'capturas'
+    d.mkdir(exist_ok=True)
+    for vieja in d.iterdir():
+        vieja.unlink()
+    archivos = []
+    for n, img in enumerate(r.get('imagenes') or [], 1):
+        ruta = d / f'{n}.{EXTENSIONES.get(img.get("mime"), "jpg")}'
+        ruta.write_bytes(base64.b64decode(img.get('base64') or ''))
+        archivos.append(str(ruta))
+    if not archivos:
+        fallar('sin_capturas', 'La fila no tiene capturas (o las borraron de Drive).')
+    log(args.bandeja_id, 'capturas', f'{len(archivos)} bajadas')
+    salida({'ok': True, 'id': args.bandeja_id, 'total': len(archivos), 'archivos': archivos})
 
 
 def sin_clasificar(todo):
@@ -229,6 +250,10 @@ def main(argv=None):
     s.add_argument('bandeja_id')
     s.add_argument('--dry-run', action='store_true')
     s.set_defaults(fn=cmd_upsert)
+
+    s = sub.add_parser('capturas')
+    s.add_argument('bandeja_id')
+    s.set_defaults(fn=cmd_capturas)
 
     sub.add_parser('sin-clasificar').set_defaults(fn=cmd_sin_clasificar)
 

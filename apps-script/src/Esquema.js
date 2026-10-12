@@ -19,10 +19,32 @@ const ENUMS = {
   capa: ['descripcion', 'subtitulos', 'web', 'audio', 'frames', 'capturas'],
   // Rol de un ingrediente en la receta: lo infaltable, lo que da sabor, lo que se puede saltear y lo que no se come.
   rol: ['principal', 'condimento', 'opcional', 'utensilio'],
+  // Dónde se compra cada cosa (§7.2). El supermercado incluye al chino.
+  lugar: ['supermercado', 'verdulería', 'carnicería', 'panadería', 'almacenata', 'dietética', 'feria'],
+  // Compras.lugar: un lugar, «revisar» (Revisá si tenés) o vacío (el que da la regla).
+  lugarCompra: ['supermercado', 'verdulería', 'carnicería', 'panadería', 'almacenata', 'dietética', 'feria', 'revisar'],
+  // Las reglas de la hoja Lugares son por tipo de producto (la góndola) o por ingrediente.
+  porLugar: ['tipo', 'ingrediente'],
 };
 
 // En Ingredientes.seccion_usuario: los usuarios sacaron el ingrediente de la sección que le puso /recetas.
 const SIN_SECCION = '-';
+
+// En Compras.lugar: el ítem va a «Revisá si tenés» (condimentos y utensilios, salvo que lo muevan).
+const REVISAR = 'revisar';
+
+// Lo que siembra setup() en la hoja Lugares si está vacía. Después lo editan desde la app.
+const LUGARES_INICIALES = [
+  { por: 'tipo', clave: 'verdulería', lugar: 'verdulería' },
+  { por: 'tipo', clave: 'almacén', lugar: 'supermercado' },
+  { por: 'tipo', clave: 'lácteos y huevos', lugar: 'supermercado' },
+  { por: 'tipo', clave: 'carnicería', lugar: 'carnicería' },
+  { por: 'tipo', clave: 'panadería', lugar: 'panadería' },
+  { por: 'tipo', clave: 'congelados', lugar: 'supermercado' },
+  { por: 'tipo', clave: 'otros', lugar: 'supermercado' },
+  { por: 'ingrediente', clave: 'huevos', lugar: 'almacenata' },
+  { por: 'ingrediente', clave: 'yogur', lugar: 'almacenata' },
+];
 
 const ESQUEMA = {
   Bandeja: {
@@ -38,6 +60,8 @@ const ESQUEMA = {
       col_('receta_id'),
       col_('intentos', 'numero'),
       col_('actualizado', 'fecha'),
+      // Ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma.
+      col_('capturas'),
     ],
   },
   Recetas: {
@@ -120,6 +144,23 @@ const ESQUEMA = {
       col_('gondola', 'texto', { enum: 'gondola' }),
       col_('hecho', 'bool'),
       col_('creado', 'fecha'),
+      // El rol del ingrediente en la receta: condimentos y utensilios van a «Revisá si tenés».
+      col_('rol', 'texto', { enum: 'rol' }),
+      // Vacío: el lugar que da la regla (hoja Lugares). Si no, adonde lo movieron.
+      col_('lugar', 'texto', { enum: 'lugarCompra' }),
+      // Para cuántas porciones se agregó la receta.
+      col_('porciones', 'numero'),
+    ],
+  },
+  Lugares: {
+    prefijo: 'l',
+    columnas: [
+      col_('id'),
+      col_('por', 'texto', { enum: 'porLugar' }),
+      // La góndola (por tipo) o el nombre del ingrediente, sin tildes y en minúsculas.
+      col_('clave'),
+      col_('lugar', 'texto', { enum: 'lugar' }),
+      col_('actualizado', 'fecha'),
     ],
   },
 };

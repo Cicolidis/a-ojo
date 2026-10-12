@@ -134,6 +134,15 @@ test('formatearCantidad, formatearMinutos y compañía', async () => {
   assert.equal(f.textoTraduccion('es'), '');
 });
 
+test('fechaHora: hoy, ayer o la fecha, con la hora', async () => {
+  const f = await cargar('formato.js');
+  const ahora = new Date(2026, 9, 12, 18, 0);
+  assert.equal(f.fechaHora(new Date(2026, 9, 12, 14, 32).toISOString(), ahora), 'hoy 14:32');
+  assert.equal(f.fechaHora(new Date(2026, 9, 11, 9, 5).toISOString(), ahora), 'ayer 9:05');
+  assert.equal(f.fechaHora(new Date(2026, 9, 2, 20, 0).toISOString(), ahora), '2/10 20:00');
+  assert.equal(f.fechaHora('nada', ahora), '');
+});
+
 test('ingredientesDelPaso: busca los ingredientes nombrados en el paso', async () => {
   const { ingredientesDelPaso } = await cargar('cocina.js');
   const todo = fixture();
@@ -348,6 +357,10 @@ test('leerRuta', async () => {
   assert.deepEqual(leerRuta('#/receta/r_7f3k2'), { nombre: 'receta', id: 'r_7f3k2' });
   assert.deepEqual(leerRuta('#/cocina/r_7f3k2/'), { nombre: 'cocina', id: 'r_7f3k2' });
   assert.deepEqual(leerRuta('#/ingredientes/r_7f3k2'), { nombre: 'ingredientes', id: 'r_7f3k2' });
+  assert.deepEqual(leerRuta('#/compras'), { nombre: 'compras' });
+  assert.deepEqual(leerRuta('#/compras/agregar/r_7f3k2'), { nombre: 'agregar', id: 'r_7f3k2' });
+  assert.deepEqual(leerRuta('#/lugares/'), { nombre: 'lugares' });
+  assert.deepEqual(leerRuta('#/bandeja'), { nombre: 'bandeja' });
   assert.deepEqual(leerRuta('#/config?api=x&t=y'), { nombre: 'config' });
   assert.deepEqual(leerRuta('#/cualquiera'), { nombre: 'biblioteca' });
 });
@@ -367,4 +380,218 @@ test('sw.js precachea exactamente los archivos de la app', () => {
   });
   recorrer('');
   assert.deepEqual(precache, archivos.sort());
+});
+
+// Fase 4b: compras y bandeja.
+
+const itemCompra = (id, receta_id, nombre, cantidad, unidad, gondola, rol = 'principal', extra = {}) =>
+  Object.assign({ id, receta_id, nombre, cantidad, unidad, gondola, rol, lugar: '', hecho: false }, extra);
+
+test('compras: el lugar de cada ítem sale de dónde lo movieron, su rol, la regla del ingrediente o la de su tipo', async () => {
+  const c = await cargar('compras.js');
+  const lugares = fixture().lugares;
+  assert.equal(c.lugarDe({ nombre: 'Huevos', gondola: 'lácteos y huevos', rol: 'principal' }, lugares), 'almacenata');
+  assert.equal(c.lugarDe({ nombre: 'huevo', gondola: 'lácteos y huevos' }, lugares), 'almacenata', 'en singular también');
+  assert.equal(c.lugarDe({ nombre: 'yogur griego', gondola: 'lácteos y huevos' }, lugares), 'almacenata', 'la regla vale para lo que empieza igual');
+  assert.equal(c.lugarDe({ nombre: 'manteca', gondola: 'lácteos y huevos', rol: 'principal' }, lugares), 'supermercado');
+  assert.equal(c.lugarDe({ nombre: 'zapallo', gondola: 'verdulería' }, lugares), 'verdulería');
+  assert.equal(c.lugarDe({ nombre: 'sal', gondola: 'almacén', rol: 'condimento' }, lugares), 'revisar');
+  assert.equal(c.lugarDe({ nombre: 'papel manteca', gondola: 'otros', rol: 'utensilio' }, lugares), 'revisar');
+  assert.equal(c.lugarDe({ nombre: 'sal', gondola: 'almacén', rol: 'condimento', lugar: 'dietética' }, lugares), 'dietética', 'lo movieron');
+  assert.equal(c.lugarDe({ nombre: 'huevos', rol: 'principal', lugar: 'revisar' }, lugares), 'revisar');
+  assert.equal(c.lugarDe({ nombre: 'servilletas', gondola: '' }, lugares), 'supermercado', 'sin regla');
+  assert.equal(c.lugarDe({ nombre: 'servilletas', lugar: 'chino' }, []), 'supermercado', 'un lugar desconocido no cuenta');
+
+  const mas = lugares.concat({ por: 'ingrediente', clave: 'yogur griego', lugar: 'dietética' });
+  assert.equal(c.lugarPorRegla({ nombre: 'Yogur griego natural' }, mas), 'dietética', 'la regla más larga gana');
+  assert.equal(c.lugarPorRegla({ nombre: 'yogur' }, mas), 'almacenata');
+
+  assert.ok(c.mismoNombre('Limón', 'limones'));
+  assert.ok(c.mismoNombre('cebollas', 'Cebolla'));
+  assert.ok(!c.mismoNombre('huevos', 'huevos de codorniz'));
+  assert.ok(!c.mismoNombre('', ''));
+  assert.equal(c.claveIngrediente('  Nueces  Pecán '), 'nueces pecan');
+  assert.equal(c.reglaIngrediente('Huevo', lugares).lugar, 'almacenata');
+  assert.equal(c.reglaIngrediente('huevos de codorniz', lugares), null);
+  assert.equal(c.nombreLugar('revisar'), 'Revisá si tenés');
+  assert.equal(c.nombreLugar('dietética'), 'Dietética');
+});
+
+test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios para revisar', async () => {
+  const { indexar, aplicarDelta } = await cargar('datos.js');
+  const c = await cargar('compras.js');
+  const { porId } = indexar(aplicarDelta(null, fixture()));
+  const brownie = porId.get('r_brown');
+  const elegidos = c.elegidosIniciales(brownie);
+  assert.equal(elegidos.size, 5, 'los principales');
+  assert.ok(!elegidos.has('i_00009'), 'las nueces son opcionales: arrancan sin marcar');
+  elegidos.delete('i_00003'); // ya tienen azúcar
+  elegidos.add('i_00009');
+  let n = 0;
+  const items = c.itemsDeReceta(brownie, 12, elegidos, () => 'c_prueba' + n++);
+  assert.deepEqual(items.map(i => [i.nombre, i.cantidad, i.unidad, i.rol]), [
+    ['chocolate semiamargo', 400, 'g', 'principal'],
+    ['manteca', 400, 'g', 'principal'],
+    ['huevos', 6, 'u', 'principal'],
+    ['harina 0000', 200, 'g', 'principal'],
+    ['esencia de vainilla', 2, 'cdita', 'condimento'],
+    ['sal', null, 'a ojo', 'condimento'],
+    ['pimienta', null, 'a ojo', 'condimento'],
+    ['nueces', 200, 'g', 'opcional'],
+  ]);
+  assert.deepEqual([items[0].id, items[0].gondola], ['c_prueba0', 'almacén']);
+  // Una receta vieja, sin roles: todo es principal.
+  const torti = porId.get('r_torti');
+  assert.deepEqual(c.itemsDeReceta(torti, 2, c.elegidosIniciales(torti), () => 'c_x').map(i => [i.nombre, i.cantidad]),
+    [['banana', 2], ['huevos', 4], ['canela', 1], ['manteca', 2]]);
+});
+
+test('armarLista: por lugar, sumando entre recetas con el desglose, y «Revisá si tenés» al final', async () => {
+  const c = await cargar('compras.js');
+  const lugares = fixture().lugares;
+  const it = itemCompra;
+  const compras = [
+    it('c_1', 'r_brown', 'huevos', 6, 'u', 'lácteos y huevos'),
+    it('c_2', 'r_brown', 'harina 0000', 200, 'g', 'almacén'),
+    it('c_3', 'r_brown', 'sal', null, 'a ojo', 'almacén', 'condimento'),
+    it('c_4', 'r_brown', 'nueces', 200, 'g', 'almacén', 'opcional'),
+    it('c_5', 'r_vasca', 'huevo', 4, 'u', 'lácteos y huevos'),
+    it('c_6', 'r_vasca', 'Harina 0000', 1, 'cda', 'almacén'),
+    it('c_7', 'r_vasca', 'crema de leche', 250, 'ml', 'lácteos y huevos'),
+    it('c_8', 'r_vasca', 'papel manteca', null, 'a ojo', 'otros', 'utensilio'),
+    it('c_9', 'r_sopa', 'crema de leche', 100, 'ml', 'lácteos y huevos', 'opcional'),
+    it('c_10', 'r_sopa', 'zapallo', 1, 'kg', 'verdulería'),
+    it('c_11', 'r_sopa', 'zapallo', 300, 'g', 'verdulería'),
+    it('c_12', 'r_sopa', 'nuez moscada', null, 'a ojo', 'almacén', 'condimento'),
+    it('c_13', '', 'Servilletas', null, 'a ojo', ''),
+    it('c_14', 'r_sopa', 'caldo de verduras', 1, 'l', 'almacén', 'principal', { lugar: 'dietética' }),
+  ];
+  const lista = c.armarLista(compras, lugares);
+  assert.deepEqual(lista.map(g => g.nombre), ['Supermercado', 'Verdulería', 'Almacenata', 'Dietética', 'Revisá si tenés']);
+  const filas = (l, de = lista) => de.find(g => g.lugar === l).filas.map(f => [f.nombre, f.cantidad, f.desglose]);
+  assert.deepEqual(filas('supermercado'), [
+    ['Harina 0000', '200 g + 1 cda', ''],
+    ['Nueces', '200 g', ''],
+    ['Crema de leche', '350 ml', '(250 + 100)'],
+    ['Servilletas', '', ''],
+  ], 'por tipo de producto y nombre');
+  assert.deepEqual(filas('verdulería'), [['Zapallo', '1,3 kg', '(1 kg + 300 g)']]);
+  assert.deepEqual(filas('almacenata'), [['Huevos', '10', '(6 + 4)']]);
+  assert.deepEqual(filas('dietética'), [['Caldo de verduras', '1 l', '']]);
+  assert.deepEqual(filas('revisar'), [['Nuez moscada', '', ''], ['Sal', '', ''], ['Papel manteca', '', '']]);
+  assert.equal(lista[0].filas[1].opcional, true);
+  assert.equal(lista[0].filas[2].opcional, false, 'la crema solo es opcional en una');
+  assert.deepEqual(lista.find(g => g.lugar === 'almacenata').filas[0].ids, ['c_1', 'c_5']);
+  assert.equal(c.cuantasPorComprar(lista), 7);
+
+  // Lo que está para revisar se suma a lo mismo que ya está para comprar.
+  const conSal = c.armarLista(compras.concat(it('c_15', '', 'Sal', null, 'a ojo', '')), lugares);
+  assert.deepEqual(conSal[0].filas.find(f => f.nombre === 'Sal').ids, ['c_15', 'c_3']);
+  assert.ok(!filas('revisar', conSal).some(f => f[0] === 'Sal'));
+
+  // Una fila está hecha cuando está todo lo de todas las recetas.
+  const marcar = ids => compras.map(x => (ids.includes(x.id) ? Object.assign({}, x, { hecho: true }) : x));
+  assert.equal(c.armarLista(marcar(['c_1']), lugares).find(g => g.lugar === 'almacenata').filas[0].hecho, false);
+  const hechas = c.armarLista(marcar(['c_1', 'c_5', 'c_3']), lugares);
+  assert.equal(hechas.find(g => g.lugar === 'almacenata').filas[0].hecho, true);
+  assert.equal(c.cuantasPorComprar(hechas), 6);
+  assert.equal(c.textoWhatsApp(hechas), [
+    '*Supermercado*', '- Harina 0000: 200 g + 1 cda', '- Nueces: 200 g', '- Crema de leche: 350 ml', '- Servilletas', '',
+    '*Verdulería*', '- Zapallo: 1,3 kg', '',
+    '*Dietética*', '- Caldo de verduras: 1 l', '',
+    '*Revisá si tenés*', '- Nuez moscada', '- Papel manteca',
+  ].join('\n'));
+  assert.equal(c.textoWhatsApp(c.armarLista([], lugares)), '');
+  assert.deepEqual(c.recetasEnLista(compras).map(r => [r.receta_id, r.ids.length]), [['r_brown', 4], ['r_vasca', 4], ['r_sopa', 5]]);
+});
+
+test('sumarCantidades: gramos y mililitros se pasan a kilos y litros; lo «a ojo» no suma', async () => {
+  const { sumarCantidades } = await cargar('compras.js');
+  assert.equal(sumarCantidades([{ cantidad: 2.5, unidad: 'g' }]), '2,5 g');
+  assert.equal(sumarCantidades([{ cantidad: 0.5, unidad: 'taza' }, { cantidad: 0.25, unidad: 'taza' }]), '¾ taza');
+  assert.equal(sumarCantidades([{ cantidad: 2, unidad: 'cda' }, { cantidad: 1, unidad: 'cda' }]), '3 cdas');
+  assert.equal(sumarCantidades([{ cantidad: 1500, unidad: 'ml' }]), '1,5 l');
+  assert.equal(sumarCantidades([{ cantidad: 0.75, unidad: 'kg' }, { cantidad: 250, unidad: 'g' }]), '1 kg');
+  assert.equal(sumarCantidades([{ cantidad: null, unidad: 'a ojo' }, { cantidad: 2, unidad: 'u' }]), '2');
+  assert.equal(sumarCantidades([{ cantidad: null, unidad: 'a ojo' }]), '');
+});
+
+test('agruparBandeja: ayuda, esperando a la Mac, recién llegadas y la última corrida', async () => {
+  const { indexar, aplicarDelta } = await cargar('datos.js');
+  const b = await cargar('bandeja.js');
+  const datos = aplicarDelta(null, fixture());
+  const { porId } = indexar(datos);
+  const g = b.agruparBandeja(datos.bandeja, porId, Date.parse('2026-10-12T12:00:00.000Z'));
+  assert.deepEqual(g.ayuda.map(f => f.id), ['b_00075']);
+  assert.deepEqual(g.esperando.map(f => f.id), ['b_00074', 'b_00072', 'b_00073'], 'la que se está procesando, primero');
+  assert.deepEqual(g.recientes.map(r => r.receta.id).sort(), ['r_brown', 'r_galle', 'r_pollo', 'r_sopa', 'r_torti', 'r_vasca']);
+  assert.equal(g.ultimaCorrida, '2026-10-11T10:00:00.000Z');
+  assert.deepEqual(b.agruparBandeja(datos.bandeja, porId, Date.parse('2026-10-20T12:00:00.000Z')).recientes, [], 'solo la última semana');
+  assert.deepEqual(b.agruparBandeja([], porId), { ayuda: [], esperando: [], recientes: [], ultimaCorrida: '' });
+
+  assert.equal(b.cuantasCapturas({ capturas: 'a, b' }), 2);
+  assert.equal(b.cuantasCapturas({ capturas: '' }), 0);
+  assert.equal(b.descripcionLink({ plataforma: 'youtube', url: 'https://www.youtube.com/shorts/abc' }), 'Short de YouTube');
+  assert.equal(b.descripcionLink({ plataforma: 'youtube', url: 'https://www.youtube.com/watch?v=abc' }), 'Video de YouTube');
+  assert.equal(b.descripcionLink({ plataforma: 'instagram', url: 'https://www.instagram.com/reel/abc/' }), 'Reel de Instagram');
+  assert.equal(b.descripcionLink({ plataforma: 'web', url: 'https://www.paulinacocina.net/receta/' }), 'paulinacocina.net');
+});
+
+test('aplicarEdicion: compras, lugares y bandeja, como la API, e idempotentes', async () => {
+  const { aplicarDelta } = await cargar('datos.js');
+  const { aplicarEdicion, aplicarCola, nuevaEdicion } = await cargar('ediciones.js');
+  const datos = aplicarDelta(null, fixture());
+  const items = [
+    { id: 'c_aaaaaaaa', nombre: 'huevos', cantidad: 6, unidad: 'u', gondola: 'lácteos y huevos', rol: 'principal' },
+    { id: 'c_bbbbbbbb', nombre: 'sal', cantidad: null, unidad: 'a ojo', gondola: 'almacén', rol: 'condimento' },
+  ];
+  const agregar = nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 12, items });
+  let d = aplicarCola(datos, [agregar, agregar]);
+  assert.deepEqual(d.compras[0], { id: 'c_aaaaaaaa', receta_id: 'r_brown', nombre: 'huevos', cantidad: 6, unidad: 'u',
+    gondola: 'lácteos y huevos', hecho: false, rol: 'principal', lugar: '', porciones: 12 });
+  assert.equal(d.compras.length, 2, 'dos veces no duplica');
+  d = aplicarEdicion(d, nuevaEdicion('compras.marcar', { ids: ['c_aaaaaaaa'], hecho: true }));
+  d = aplicarEdicion(d, nuevaEdicion('compras.mover', { ids: ['c_bbbbbbbb'], lugar: 'dietética' }));
+  d = aplicarEdicion(d, agregar);
+  assert.deepEqual(d.compras.map(c => [c.hecho, c.lugar]), [[true, ''], [false, 'dietética']], 'volver a mandarla no pisa lo marcado ni lo movido');
+
+  // Agregarla con otros ids la reemplaza; lo agregado a mano queda.
+  d = aplicarEdicion(d, nuevaEdicion('compras.agregar', { items: [{ id: 'c_cccccccc', nombre: 'Servilletas' }] }));
+  d = aplicarEdicion(d, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 6,
+    items: [Object.assign({}, items[0], { id: 'c_dddddddd', cantidad: 3 })] }));
+  assert.deepEqual(d.compras.map(c => c.id), ['c_cccccccc', 'c_dddddddd']);
+  assert.deepEqual([d.compras[0].unidad, d.compras[0].rol, d.compras[0].receta_id], ['a ojo', 'principal', '']);
+  const quitar = nuevaEdicion('compras.quitar', { ids: ['c_cccccccc'] });
+  d = aplicarCola(d, [quitar, quitar]);
+  assert.deepEqual(d.compras.map(c => c.id), ['c_dddddddd']);
+
+  const nueces = nuevaEdicion('lugares.asignar', { por: 'ingrediente', clave: 'Nueces', lugar: 'dietética' });
+  d = aplicarCola(d, [nueces, nueces]);
+  assert.deepEqual(d.lugares.filter(l => l.clave === 'Nueces').map(l => l.lugar), ['dietética']);
+  d = aplicarEdicion(d, nuevaEdicion('lugares.asignar', { por: 'tipo', clave: 'almacén', lugar: 'almacenata' }));
+  assert.equal(d.lugares.find(l => l.clave === 'almacén').lugar, 'almacenata');
+  d = aplicarEdicion(d, nuevaEdicion('lugares.asignar', { por: 'ingrediente', clave: 'HUEVOS', lugar: '' }));
+  assert.ok(!d.lugares.some(l => l.clave === 'huevos'));
+  assert.equal(d.lugares.length, 9);
+
+  d = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00075', estado: 'pendiente' }));
+  const ayuda = d.bandeja.find(b => b.id === 'b_00075');
+  assert.deepEqual([ayuda.estado, ayuda.motivo, ayuda.intentos], ['pendiente', '', 0]);
+  d = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00072', estado: 'descartada' }));
+  assert.equal(d.bandeja.find(b => b.id === 'b_00072').estado, 'descartada');
+  assert.deepEqual(datos.compras, [], 'no cambia los datos originales');
+});
+
+test('aplicarDelta y trajoCambios con lugares', async () => {
+  const { aplicarDelta, trajoCambios } = await cargar('datos.js');
+  const todo = fixture();
+  const datos = aplicarDelta(null, todo);
+  assert.equal(datos.lugares.length, 9);
+  const vacio = { ahora: '2026-10-12T10:00:00.000Z', completo: false, recetas: [], ingredientes: [], pasos: [], notas: [], bandeja: [], compras: [] };
+  assert.equal(trajoCambios(datos, Object.assign({}, vacio, { lugares: todo.lugares })), false);
+  const otros = todo.lugares.map(l => (l.clave === 'almacén' ? Object.assign({}, l, { lugar: 'feria' }) : l));
+  assert.equal(trajoCambios(datos, Object.assign({}, vacio, { lugares: otros })), true);
+  assert.equal(aplicarDelta(datos, Object.assign({}, vacio, { lugares: otros })).lugares[1].lugar, 'feria');
+  assert.equal(aplicarDelta(datos, vacio).lugares.length, 9, 'una API vieja, sin lugares, no los borra');
+  assert.equal(trajoCambios(datos, vacio), false);
 });

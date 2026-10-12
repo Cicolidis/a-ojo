@@ -17,7 +17,7 @@
 - Procesamiento en la Mac con el comando `/recetas` de Claude Code.
 - App PWA con 5 pantallas: Biblioteca, Ficha, Modo cocina, Lista de compras y Bandeja.
 - Estados de receta (para probar / probada / favorita), valoración, notas con fecha.
-- Lista de compras consolidada por góndola, exportable a WhatsApp.
+- Lista de compras consolidada por lugar (supermercado, verdulería…), exportable a WhatsApp.
 
 ### Queda para después (v2+)
 - Plan semanal.
@@ -81,6 +81,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | receta_id | texto | se completa cuando está `lista` |
 | intentos | número | |
 | actualizado | fecha-hora ISO | |
+| capturas | texto | ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma |
 
 **Deduplicación:** si la URL normalizada ya existe, no se crea una fila nueva y la API responde `duplicada`.
 
@@ -128,8 +129,23 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 Cada vez que cocinan algo, suman una nota: es el **historial de cocción**. `fecha` es la del celular (puede haberla escrito sin conexión) y `creado`, cuándo llegó a la Sheet: con eso se arma el delta de `todo`.
 
 ### `Compras`
-| id | receta_id (o vacío si se agregó a mano) | nombre | cantidad | unidad | gondola | hecho (bool) | creado |
-|---|---|---|---|---|---|---|---|
+| id | receta_id (o vacío si se agregó a mano) | nombre | cantidad | unidad | gondola | hecho (bool) | creado | rol | lugar | porciones |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+- El `id` lo genera el celular (`c_…`): así un reintento de la cola no duplica nada.
+- `rol`: el del ingrediente. Los condimentos y utensilios van a «Revisá si tenés».
+- `lugar`: vacío = el que da la regla de `Lugares`. Si no, adonde lo movieron: un lugar o `revisar`.
+- `porciones`: para cuántas se agregó la receta.
+
+### `Lugares`
+| id | por | clave | lugar | actualizado |
+|---|---|---|---|---|
+
+Dónde se compra cada cosa, compartido por los dos:
+- `por = tipo`: la `clave` es una góndola. `por = ingrediente`: la `clave` es un nombre («huevos», «nueces»), que se compara sin tildes ni mayúsculas, tolera el plural y vale para lo que empieza igual («yogur» → «yogur griego»).
+- Lugares: `supermercado` (incluye al chino) · `verdulería` · `carnicería` · `panadería` · `almacenata` · `dietética` · `feria`.
+- `setup()` la siembra si está vacía: verdulería, carnicería y panadería en su propio lugar; almacén, lácteos y huevos, congelados y otros en el supermercado; huevos y yogur en la almacenata.
+- El lugar de un ítem de la lista sale, en este orden, de: adonde lo movieron, «Revisá si tenés» (condimentos y utensilios), la regla del ingrediente (gana la más larga), la de su tipo o, si no hay, el supermercado.
 
 ---
 
@@ -142,19 +158,22 @@ Cada vez que cocinan algo, suman una nota: es el **historial de cocción**. `fec
 | Método | `action` | Entrada | Salida |
 |---|---|---|---|
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
-| GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras y bandeja (solo lo cambiado desde `since`) |
+| GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
 | POST | `receta.upsert` | receta completa (con ingredientes y pasos) | `{id}` |
 | POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
 | POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
 | POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
 | POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (`/recetas --clasificar`: todos los ingredientes) |
 | POST | `nota.agregar` | `{id?, receta_id, quien, texto, fecha?}` | `{id}` (con el id de la app, un reintento no la duplica) |
-| POST | `compras.agregar` | `{receta_id, porciones?}` o `{nombre, cantidad, unidad}` | `{ids}` |
-| POST | `compras.marcar` | `{id, hecho}` | `{ok}` |
-| POST | `compras.limpiar` | — | borra los marcados |
+| POST | `compras.agregar` | `{receta_id?, porciones?, items: [{id, nombre, cantidad, unidad, gondola, rol, lugar?}]}` | `{ids, nuevos, quitados}` (suma lo que no está; con `receta_id`, lo de esa receta que no vino se borra: volver a agregarla la reemplaza) |
+| POST | `compras.marcar` | `{ids, hecho}` | `{ids, hecho}` |
+| POST | `compras.mover` | `{ids, lugar}` | `{ids, lugar}` (`lugar` vacío: el de la regla) |
+| POST | `compras.quitar` | `{ids}` | `{quitados}` (limpiar los marcados, sacar una receta o un ítem) |
+| POST | `lugares.asignar` | `{por, clave, lugar}` | `{por, clave, lugar}` (por ingrediente, `lugar` vacío borra la regla) |
 | GET | `bandeja.pendientes` | — | filas `pendiente` (las usa `/recetas`) |
-| POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?}` | `{ok}` |
-| POST | `capturas.subir` | `{bandeja_id, imagenes: [base64]}` | guarda en Drive y deja la fila en `pendiente` con marca `capturas` |
+| POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?}` | `{id, estado, intentos}` (volver a `pendiente` desde `ayuda` o `descartada` reinicia los intentos) |
+| POST | `capturas.subir` | `{bandeja_id, lote, imagenes: [{base64, mime}]}` (hasta 6) | `{id, estado, capturas}`: las guarda en Drive, privadas, y deja la fila en `pendiente` (el `lote` evita duplicarlas al reintentar) |
+| GET | `capturas.bajar` | `{bandeja_id}` | `{imagenes: [{id, nombre, mime, base64}]}` (las usa `/recetas`) |
 
 **Nota técnica:** HTTP Shortcuts, la extensión y la app mandan `POST` con `Content-Type: text/plain` para evitar el preflight de CORS, que Apps Script no maneja. El cuerpo es JSON como texto.
 
@@ -192,7 +211,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 4. **Capa 3: link externo.** Si la descripción remite a una web con la receta (ej.: "RECIPE ⬇️ https://…"), se lee esa página.
 5. **Capa 4: audio.** Si con lo anterior faltan cantidades o pasos, se baja el audio y se transcribe con `faster-whisper` (modelo `small`, idioma autodetectado).
 6. **Capa 5: fotogramas.** Si todavía faltan datos, se extrae 1 cuadro cada 3 segundos con `ffmpeg`, se arman mosaicos y Claude lee el texto sobreimpreso.
-7. **Capa 6: capturas.** Si la fila tiene capturas subidas por el usuario, se leen.
+7. **Capa 6: capturas.** Si la fila tiene capturas subidas desde la app, se bajan (`capturas.bajar`) y se leen primero. Si Instagram pide iniciar sesión pero las capturas alcanzan, la receta se arma con ellas.
 8. Claude **estructura la receta** (§6.2), elige la foto, **copia la miniatura a Drive**, hace `receta.upsert` y deja la bandeja en `lista`.
 9. Si nada alcanza, la fila pasa a `ayuda` con un motivo legible (ej.: "Instagram pide iniciar sesión. Mandá 2 o 3 capturas").
 
@@ -245,24 +264,29 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 ## 7. App (PWA)
 
 ### 7.1 Técnica
-- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/compras`, `#/bandeja`).
+- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`).
 - `manifest.json` (nombre "A ojo", íconos, `display: standalone`, `theme_color #A6461F`, `background_color #F5EEE3`).
 - Service worker: guarda la interfaz en caché y funciona offline.
 - Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
 - Búsqueda local, sin tildes y sin distinguir mayúsculas, sobre título, ingredientes y etiquetas.
 - **Wake Lock API** en el modo cocina: la pantalla no se apaga.
 - **Web Share API** para la lista de compras. Si no está disponible, se abre `https://wa.me/?text=…`.
+- Las capturas se achican en el celular (JPEG de hasta 1600 px) y se mandan directo, sin pasar por la cola: piden conexión.
 - Configuración inicial (URL de la API, token, quién soy) mediante un **link de configuración** único con parámetros, para no tipear nada en el celular.
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con fecha ("Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); botones "Agregar a compras" y "Empezar a cocinar".
+2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con fecha ("Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N · Cambiar") y "Empezar a cocinar".
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
+   - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí).
 3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (con las cantidades de la vista de porciones), el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
-4. **Lista de compras:** agrupada por góndola, cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes, "Mandar por WhatsApp" y limpiar los marcados.
-5. **Bandeja:** tarjetas por link con estado ("Esperando a la Mac…", "Necesita ayuda" con los botones Subir capturas / Descartar, "Recién llegadas" con la marca de confianza) y la hora del último procesamiento.
+4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
+   - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
+   - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
+   - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
+5. **Bandeja:** la hora del último procesamiento y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
 
 Navegación inferior: **Recetas · Compras · Bandeja**.
 
@@ -332,9 +356,9 @@ Cada fase termina con una demo funcionando y un commit.
 - **Listo cuando:** las recetas muestran los ingredientes por sección y rol; sin conexión, en un celular se cambia un rol, se cocina una receta para otra cantidad de porciones y se guarda "¿Cómo salió?"; al volver la conexión, el otro celular ve el estado, la valoración, la nota, la vista y el rol nuevos.
 
 ### Fase 4b: compras y bandeja
-- Lista de compras por lugar y exportación a WhatsApp.
-- Pantalla Bandeja con la subida de capturas.
-- **Listo cuando:** arman la compra de 3 recetas y la mandan por WhatsApp.
+- Lista de compras por lugar (con el paso para elegir, mover y las reglas de `Lugares`) y exportación a WhatsApp.
+- Navegación inferior y pantalla Bandeja con la subida de capturas; la capa 6 de `/recetas`.
+- **Listo cuando:** arman la compra de 3 recetas (con un opcional elegido y un ítem movido de lugar) y la mandan por WhatsApp; y una fila en "Necesita ayuda" se resuelve subiendo capturas desde el celular y corriendo `/recetas`.
 
 ### Fase 5: pulido
 - Logo e íconos, pantallas vacías, microanimaciones, revisión de accesibilidad.

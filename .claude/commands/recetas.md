@@ -36,6 +36,8 @@ Procesá las filas **de a una, en orden**. Después de cada una, contá en una l
 
 ### 1.2 Capas, solo mientras falten datos
 
+Si la fila trae `capturas` (las subieron desde la app porque el link necesitaba ayuda), empezá por ellas: `procesamiento/aojo api capturas <id>` las deja en `<dir>/capturas/` y devuelve las rutas. Leelas todas con Read: suelen tener justo lo que faltaba (la lista de ingredientes, el texto del video, la receta del caption). Después seguí con las capas de abajo como siempre.
+
 La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es legítimamente «a ojo»: sal, pimienta, aceite para engrasar, decoración) y los pasos se entienden de punta a punta. Apenas alcance, dejá de bajar cosas.
 
 1. **Metadatos y subtítulos (capas 1 y 2):** `procesamiento/aojo fetch meta <id> <url>`.
@@ -44,11 +46,11 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 2. **Web externa (capa 3):** si la descripción remite a una receta escrita («RECIPE ⬇️», «receta completa en…», un link a un blog), consultala **siempre**, aunque los subtítulos parezcan completos, porque suele tener las cantidades exactas: `procesamiento/aojo fetch web <link> --id <id>`. Si `receta` viene armada (JSON-LD), usala; si no, leé `texto`. Si la página bloquea la descarga, probá con WebFetch.
 3. **Audio (capa 4):** si todavía faltan cantidades o pasos, `procesamiento/aojo fetch audio <id>` y después `procesamiento/aojo transcribe <id>`. En Instagram, el caption suele tener los ingredientes y el audio los pasos. Si viene `sin_voz: true`, es un video con música: pasá a la capa 5.
 4. **Fotogramas (capa 5):** si todavía falta algo, `procesamiento/aojo fetch video <id>` y después `procesamiento/aojo frames <id>`. Leé los mosaicos con Read: cada uno trae `segundos`, en orden de izquierda a derecha y de arriba abajo. Buscá el texto sobreimpreso (cantidades, temperaturas, tiempos).
-5. **Capturas (capa 6):** llegan en la Fase 4 (`capturas.subir`). Por ahora no hay.
+5. **Capturas (capa 6):** las de arriba. Si `fetch meta` falla con `login` o `privado` pero las capturas alcanzan, armá la receta con ellas: `titulo` y `autor` salen de las capturas (si no se ve el autor, dejalo vacío) y `fuente_url` es la de la fila. Sumá `capturas` a `origen_datos`.
 
 ### 1.3 Armar y guardar la receta
 
-1. **Foto:** `procesamiento/aojo fetch foto <id>` (en un Short usa la miniatura vertical). Miralá con Read. Si no se ve el plato (una cara, una placa con texto, algo crudo), elegí un cuadro del plato terminado con `procesamiento/aojo fetch foto <id> --segundo N` (necesita el video; los segundos salen de los mosaicos) o, si vino de la web, `--url <receta.imagen>`.
+1. **Foto:** `procesamiento/aojo fetch foto <id>` (en un Short usa la miniatura vertical). Miralá con Read. Si no se ve el plato (una cara, una placa con texto, algo crudo), elegí un cuadro del plato terminado con `procesamiento/aojo fetch foto <id> --segundo N` (necesita el video; los segundos salen de los mosaicos), si vino de la web `--url <receta.imagen>` o, si una captura muestra el plato, `--archivo <dir>/capturas/N.jpg`. Si no hay ninguna imagen del plato, guardala sin foto (no mandes una captura de texto).
 2. **Receta:** escribí `<dir>/receta.json` con Write. `dir` es el que devolvió `fetch meta` (`~/.a-ojo/trabajo/<id>`). El formato está en §2.
 3. **Relectura antes de guardar:** volvé a leer la descripción entera (y la receta de la web, si hubo) **línea por línea**. Por cada dato, comprobá que esté en `receta.json`: cantidades, técnicas, advertencias, variantes, rinde, conservación (freezer, heladera, cuántos días) y sugerencias para servir. Hacé lo mismo con lo que se dice en el audio o en los subtítulos. Si falta algo, sumalo antes de mandar.
 4. **Guardar:** `procesamiento/aojo api upsert <id>`. Manda la receta y la foto, y deja la fila en `lista`. Si responde `receta_invalida`, los `detalles` dicen qué corregir: arreglá `receta.json` y volvé a mandar.
@@ -57,7 +59,7 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 
 | `error` | Qué hacer |
 |---|---|
-| `login`, `privado` | `api actualizar <id> ayuda --motivo "<motivo del JSON>"` |
+| `login`, `privado` | Si la fila tiene capturas y alcanzan, seguí con ellas (§1.2). Si no, `api actualizar <id> ayuda --motivo "<motivo del JSON>"` |
 | `no_disponible` | `ayuda` con «El video ya no está disponible.» |
 | `limite` | La fila vuelve a `pendiente`. **Cortá la corrida**: la plataforma está limitando. Avisá que conviene esperar un rato |
 | `red` | La fila vuelve a `pendiente` y cortá la corrida |
@@ -65,6 +67,8 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 | cualquier otro | Si `intentos` < 3, la fila vuelve a `pendiente`. Si no, `ayuda` con un motivo legible |
 
 Si el video **no es una receta** o, después de todas las capas, no se puede saber ni qué lleva, pasala a `ayuda`: «No encontré la receta en el video. Mandá 2 o 3 capturas.» Si solo faltan algunas cantidades, **no** es `ayuda`: guardala con confianza `baja`.
+
+Si ya tenía capturas y no alcanzan, el motivo dice qué falta: «Las capturas no muestran los ingredientes. Mandá una de la lista.» (las capturas nuevas se suman a las anteriores).
 
 Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y diciendo qué hacer.
 

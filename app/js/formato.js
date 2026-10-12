@@ -71,6 +71,18 @@ export function fechaCorta(iso, hoy = new Date()) {
   return d.getFullYear() === hoy.getFullYear() ? base : base + '/' + String(d.getFullYear()).slice(-2);
 }
 
+/** «hoy 14:32», «ayer 9:05» o «12/10 14:32» (en la hora del celular). */
+export function fechaHora(iso, ahora = new Date()) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const hora = d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+  const dia = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dias = Math.round((dia(ahora) - dia(d)) / (24 * 60 * 60 * 1000));
+  if (dias === 0) return 'hoy ' + hora;
+  if (dias === 1) return 'ayer ' + hora;
+  return fechaCorta(iso, ahora) + ' ' + hora;
+}
+
 /** Primera letra en mayúscula: «chocolate semiamargo» → «Chocolate semiamargo». */
 export function capitalizar(texto) {
   const s = String(texto ?? '');

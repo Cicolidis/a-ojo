@@ -11,6 +11,10 @@ import * as biblioteca from './vistas/biblioteca.js';
 import * as ficha from './vistas/ficha.js';
 import * as cocina from './vistas/cocina.js';
 import * as ingredientes from './vistas/ingredientes.js';
+import * as agregar from './vistas/agregar.js';
+import * as compras from './vistas/compras.js';
+import * as lugares from './vistas/lugares.js';
+import * as bandeja from './vistas/bandeja.js';
 import * as bienvenida from './vistas/bienvenida.js';
 
 const CINCO_MIN_MS = 5 * 60 * 1000;
@@ -72,11 +76,15 @@ function mostrar({ enfocar = false } = {}) {
   contenedor.replaceChildren();
   if (ruta.nombre !== 'biblioteca') window.scrollTo(0, 0);
 
-  const ctx = { app, volver, reemplazar, editar, avisar };
+  const ctx = { app, volver, reemplazar, editar, avisar, sincronizar: sincronizarAhora };
   if (!app.config) vista = bienvenida.montar(contenedor, ctx);
   else if (ruta.nombre === 'receta') vista = ficha.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'cocina') vista = cocina.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'ingredientes') vista = ingredientes.montar(contenedor, ctx, ruta.id);
+  else if (ruta.nombre === 'agregar') vista = agregar.montar(contenedor, ctx, ruta.id);
+  else if (ruta.nombre === 'compras') vista = compras.montar(contenedor, ctx);
+  else if (ruta.nombre === 'lugares') vista = lugares.montar(contenedor, ctx);
+  else if (ruta.nombre === 'bandeja') vista = bandeja.montar(contenedor, ctx);
   else vista = biblioteca.montar(contenedor, ctx);
 
   if (enfocar) {

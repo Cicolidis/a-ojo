@@ -3,6 +3,7 @@
 import { h, icono, foto } from '../dom.js';
 import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, resumenBandeja } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
+import { navegacion } from './controles.js';
 
 export function montar(contenedor, { app }) {
   const estado = app.biblioteca;
@@ -11,6 +12,7 @@ export function montar(contenedor, { app }) {
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar recetas' });
   const aviso = h('div');
   const grilla = h('div');
+  const nav = navegacion('biblioteca', app);
   const buscador = h('input', {
     type: 'search',
     placeholder: 'Nombre o ingrediente… (ej: garbanzos)',
@@ -24,7 +26,7 @@ export function montar(contenedor, { app }) {
     },
   });
 
-  contenedor.append(h('div', { class: 'biblioteca' },
+  contenedor.append(h('div', { class: 'biblioteca con-navegacion' },
     h('div', { class: 'encabezado' }, h('span', { class: 'marca' }, 'A ojo'), cuenta),
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, '¿Qué cocinamos hoy?'),
     sync,
@@ -32,7 +34,7 @@ export function montar(contenedor, { app }) {
     chips,
     aviso,
     grilla,
-  ));
+  ), nav);
 
   function pintarChips() {
     const filtros = FILTROS.concat(etiquetasFrecuentes(app.indice.lista).map(filtroEtiqueta),
@@ -56,11 +58,12 @@ export function montar(contenedor, { app }) {
     const partes = [];
     if (b.esperando) partes.push(b.esperando + ' esperando a la Mac');
     if (b.ayuda) partes.push(b.ayuda + (b.ayuda === 1 ? ' necesita ayuda' : ' necesitan ayuda'));
-    aviso.replaceChildren(h('div', { class: 'aviso-bandeja' },
+    aviso.replaceChildren(h('a', { class: 'aviso-bandeja', href: '#/bandeja' },
       h('span', { class: 'numero', 'aria-hidden': 'true' }, b.total),
       h('div', null,
         h('strong', null, b.total === 1 ? '1 link en la bandeja' : b.total + ' links en la bandeja'),
         h('span', { class: 'secundario' }, partes.join(' · '))),
+      icono('derecha', 20),
     ));
   }
 
@@ -87,6 +90,7 @@ export function montar(contenedor, { app }) {
       pendientes === 1 ? '1 cambio sin mandar' : pendientes ? pendientes + ' cambios sin mandar' : '',
     ].filter(Boolean).join(' · ');
     sync.classList.toggle('error', app.sync.estado === 'error');
+    nav.actualizar();
     pintarChips();
     pintarAviso();
     pintarGrilla();

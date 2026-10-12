@@ -910,6 +910,71 @@
     }
   ],
   "compras": [],
+  "lugares": [
+    {
+      "id": "l_00001",
+      "por": "tipo",
+      "clave": "verdulería",
+      "lugar": "verdulería",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00002",
+      "por": "tipo",
+      "clave": "almacén",
+      "lugar": "supermercado",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00003",
+      "por": "tipo",
+      "clave": "lácteos y huevos",
+      "lugar": "supermercado",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00004",
+      "por": "tipo",
+      "clave": "carnicería",
+      "lugar": "carnicería",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00005",
+      "por": "tipo",
+      "clave": "panadería",
+      "lugar": "panadería",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00006",
+      "por": "tipo",
+      "clave": "congelados",
+      "lugar": "supermercado",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00007",
+      "por": "tipo",
+      "clave": "otros",
+      "lugar": "supermercado",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00008",
+      "por": "ingrediente",
+      "clave": "huevos",
+      "lugar": "almacenata",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "l_00009",
+      "por": "ingrediente",
+      "clave": "yogur",
+      "lugar": "almacenata",
+      "actualizado": "2026-10-11T10:00:00.000Z"
+    }
+  ],
   "bandeja": [
     {
       "id": "b_00066",

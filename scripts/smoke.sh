@@ -41,7 +41,7 @@ revisar "ping sin token → 401" "$(echo "$R" | campo status)" "401"
 R=$(api_get "action=ping&t=$A_OJO_TOKEN")
 revisar "ping con token" "$(echo "$R" | campo ok)" "true"
 revisar "no faltan hojas" "$(echo "$R" | campo data.hojas_faltantes)" "[]"
-revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.3.0"
+revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.4.0"
 
 R=$(api_post "{\"action\":\"capturar\",\"t\":\"$A_OJO_TOKEN\",\"url\":\"$URL_PRUEBA?utm_source=prueba\",\"quien\":\"camilo\"}")
 ID=$(echo "$R" | campo data.id)
@@ -57,6 +57,8 @@ revisar "aparece en bandeja.pendientes" "$(echo "$R" | node -e 'let s="";process
 R=$(api_get "action=todo&t=$A_OJO_TOKEN")
 AHORA=$(echo "$R" | campo data.ahora)
 revisar "todo responde completo" "$(echo "$R" | campo data.completo)" "true"
+LUGARES=$(echo "$R" | campo data.lugares.length)
+revisar "todo trae los lugares (corré setup() si no)" "$([ "${LUGARES:-0}" -gt 0 ] 2>/dev/null && echo si || echo no)" "si"
 
 R=$(api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"procesando\"}")
 revisar "bandeja.actualizar suma un intento" "$(echo "$R" | campo data.intentos)" "1"
@@ -92,6 +94,21 @@ for CUERPO in '"action":"receta.estado","estado":"probada"' '"action":"receta.po
 done
 R=$(api_post "{\"action\":\"nota.agregar\",\"t\":\"$A_OJO_TOKEN\",\"receta_id\":\"r_nada0\",\"quien\":\"camilo\",\"texto\":\"x\"}")
 revisar "nota.agregar responde no_encontrada" "$(echo "$R" | campo error)" "no_encontrada"
+
+# Compras: un ítem de prueba que se agrega y se quita enseguida.
+COMPRA="c_humo$(echo "$SELLO" | tail -c 7)"
+R=$(api_post "{\"action\":\"compras.agregar\",\"t\":\"$A_OJO_TOKEN\",\"items\":[{\"id\":\"$COMPRA\",\"nombre\":\"Prueba de humo\"}]}")
+revisar "compras.agregar suma un ítem" "$(echo "$R" | campo data.nuevos)" "1"
+R=$(api_post "{\"action\":\"compras.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"$COMPRA\"]}")
+revisar "compras.quitar lo saca" "$(echo "$R" | campo data.quitados)" "1"
+R=$(api_post "{\"action\":\"lugares.asignar\",\"t\":\"$A_OJO_TOKEN\",\"por\":\"nada\",\"clave\":\"x\",\"lugar\":\"feria\"}")
+revisar "lugares.asignar valida" "$(echo "$R" | campo error)" "por_invalido"
+
+# Capturas: la fila de prueba no tiene; subir con un lote inválido no escribe nada.
+R=$(api_get "action=capturas.bajar&t=$A_OJO_TOKEN&bandeja_id=$ID")
+revisar "capturas.bajar sin capturas" "$(echo "$R" | campo data.imagenes.length)" "0"
+R=$(api_post "{\"action\":\"capturas.subir\",\"t\":\"$A_OJO_TOKEN\",\"bandeja_id\":\"$ID\",\"lote\":\"x\",\"imagenes\":[]}")
+revisar "capturas.subir valida" "$(echo "$R" | campo error)" "lote_invalido"
 
 echo
 if [ "$FALLAS" -eq 0 ]; then echo "Todo bien."; else echo "$FALLAS verificaciones fallaron."; exit 1; fi

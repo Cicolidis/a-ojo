@@ -2,6 +2,7 @@
 
 Correr con: npm run test:py
 """
+import base64
 import contextlib
 import io
 import json
@@ -364,6 +365,53 @@ class TestClasificar(unittest.TestCase):
         llamar.assert_not_called()
         self.assertEqual((r['error'], codigo), ('clasificacion_invalida', 1))
         self.assertIn('infaltable', r['motivo'])
+
+
+class TestCapturas(unittest.TestCase):
+    def test_baja_las_capturas_a_la_carpeta_de_trabajo(self):
+        imagenes = [
+            {'id': 'a', 'nombre': 'b_cap01-k3x9a0-1.jpg', 'mime': 'image/jpeg', 'base64': base64.b64encode(b'uno').decode()},
+            {'id': 'b', 'nombre': 'b_cap01-k3x9a0-2.png', 'mime': 'image/png', 'base64': base64.b64encode(b'dos').decode()},
+        ]
+        carpeta = comun.dir_trabajo('b_cap01') / 'capturas'
+        carpeta.mkdir(exist_ok=True)
+        (carpeta / '9.jpg').write_bytes(b'de una bajada anterior')
+        with mock.patch.object(api, 'llamar', return_value={'id': 'b_cap01', 'imagenes': imagenes}) as llamar:
+            r, codigo = correr_api('capturas', 'b_cap01')
+        llamar.assert_called_once_with('GET', 'capturas.bajar', {'bandeja_id': 'b_cap01'})
+        self.assertEqual((codigo, r['total']), (0, 2))
+        self.assertEqual([Path(a).name for a in r['archivos']], ['1.jpg', '2.png'])
+        self.assertEqual(Path(r['archivos'][1]).read_bytes(), b'dos')
+        self.assertFalse((carpeta / '9.jpg').exists())
+
+        with mock.patch.object(api, 'llamar', return_value={'id': 'b_cap01', 'imagenes': []}):
+            r, codigo = correr_api('capturas', 'b_cap01')
+        self.assertEqual((r['error'], codigo), ('sin_capturas', 1))
+
+    def test_las_filas_dicen_si_tienen_capturas(self):
+        with mock.patch.object(api, 'llamar', return_value={'filas': [{'id': 'b_1', 'url': 'u', 'capturas': 'x,y'}]}):
+            r, _ = correr_api('pendientes')
+        self.assertEqual(r['filas'][0]['capturas'], 'x,y')
+
+    def test_foto_desde_una_captura(self):
+        captura = comun.dir_trabajo('b_foto1') / 'capturas' / '2.jpg'
+        captura.parent.mkdir(exist_ok=True)
+        captura.write_bytes(b'imagen')
+
+        def convertir(cmd, **_):
+            Path(cmd[-1]).write_bytes(b'jpg')
+            return subprocess.CompletedProcess(cmd, 0, '', '')
+
+        with mock.patch.object(fetch.subprocess, 'run', side_effect=convertir) as run, \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            fetch.main(['foto', 'b_foto1', '--archivo', str(captura)])
+        self.assertEqual(json.loads(out.getvalue())['origen'], 'imagen 2.jpg')
+        cmd = run.call_args[0][0]
+        self.assertEqual(cmd[cmd.index('-i') + 1], str(captura))
+
+        with self.assertRaises(SystemExit), contextlib.redirect_stdout(io.StringIO()) as out:
+            fetch.main(['foto', 'b_foto1', '--archivo', '/no/existe.jpg'])
+        self.assertEqual(json.loads(out.getvalue())['error'], 'sin_archivo')
 
 
 class TestVarios(unittest.TestCase):

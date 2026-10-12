@@ -5,6 +5,7 @@
 // Puro, sin DOM ni IndexedDB.
 
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
+import { claveIngrediente } from './compras.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -37,6 +38,10 @@ export function aplicarEdicion(datos, { accion, datos: d }) {
   const enReceta = cambios => Object.assign({}, datos, {
     recetas: datos.recetas.map(r => (r.id === d.id ? Object.assign({}, r, cambios(r)) : r)),
   });
+  const compras = datos.compras || [];
+  const enCompras = cambios => Object.assign({}, datos, {
+    compras: compras.map(c => (d.ids.includes(c.id) ? Object.assign({}, c, cambios) : c)),
+  });
   switch (accion) {
     case 'receta.estado':
       return enReceta(() => {
@@ -57,6 +62,51 @@ export function aplicarEdicion(datos, { accion, datos: d }) {
         }),
       });
     }
+    case 'compras.agregar': {
+      // Como la API: suma lo que no está (por id) y, con receta_id, saca lo de esa receta que no vino.
+      const ids = new Set(d.items.map(i => i.id));
+      const existentes = new Set(compras.map(c => c.id));
+      const quedan = compras.filter(c => !(d.receta_id && c.receta_id === d.receta_id && !ids.has(c.id)));
+      const nuevos = d.items.filter(i => !existentes.has(i.id)).map(i => ({
+        id: i.id,
+        receta_id: d.receta_id || '',
+        nombre: i.nombre,
+        cantidad: i.cantidad ?? null,
+        unidad: i.unidad || 'a ojo',
+        gondola: i.gondola || '',
+        hecho: false,
+        rol: i.rol || 'principal',
+        lugar: i.lugar || '',
+        porciones: d.porciones ?? null,
+      }));
+      return Object.assign({}, datos, { compras: quedan.concat(nuevos) });
+    }
+    case 'compras.marcar':
+      return enCompras({ hecho: d.hecho === true || d.hecho === 'true' });
+    case 'compras.mover':
+      return enCompras({ lugar: d.lugar || '' });
+    case 'compras.quitar':
+      return Object.assign({}, datos, { compras: compras.filter(c => !d.ids.includes(c.id)) });
+    case 'lugares.asignar': {
+      const lugares = datos.lugares || [];
+      const clave = d.por === 'ingrediente' ? String(d.clave).replace(/\s+/g, ' ').trim() : d.clave;
+      const misma = l => l.por === d.por && (d.por === 'tipo' ? l.clave === clave : claveIngrediente(l.clave) === claveIngrediente(clave));
+      if (!d.lugar) return Object.assign({}, datos, { lugares: lugares.filter(l => !misma(l)) });
+      if (!lugares.some(misma)) return Object.assign({}, datos, { lugares: lugares.concat({ id: '', por: d.por, clave, lugar: d.lugar }) });
+      return Object.assign({}, datos, { lugares: lugares.map(l => (misma(l) ? Object.assign({}, l, { lugar: d.lugar }) : l)) });
+    }
+    case 'bandeja.actualizar':
+      return Object.assign({}, datos, {
+        bandeja: datos.bandeja.map(b => {
+          if (b.id !== d.id) return b;
+          const reinicia = d.estado === 'pendiente' && (b.estado === 'ayuda' || b.estado === 'descartada');
+          return Object.assign({}, b, {
+            estado: d.estado,
+            motivo: d.estado === 'ayuda' ? d.motivo || '' : '',
+            intentos: reinicia ? 0 : b.intentos,
+          });
+        }),
+      });
     case 'nota.agregar':
       if (datos.notas.some(n => n.id === d.id)) return datos;
       return Object.assign({}, datos, {

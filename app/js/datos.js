@@ -5,13 +5,14 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // Subirla cuando la app empiece a usar columnas nuevas: los snapshots guardados con
 // otra versión se piden enteros de nuevo, así no les faltan esas columnas.
 // 2: secciones y roles de ingredientes, vistas de porciones (Fase 4a).
-export const VERSION_DATOS = 2;
+// 3: lugares, compras con rol y lugar, capturas de la bandeja (Fase 4b).
+export const VERSION_DATOS = 3;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.
  * Completa: reemplaza todo. Delta: si una receta cambió, vienen todos sus
  * ingredientes y pasos y reemplazan a los anteriores; notas y bandeja se
- * actualizan por id; compras viene siempre entera.
+ * actualizan por id; compras y lugares vienen siempre enteras.
  */
 export function aplicarDelta(datos, resp) {
   if (resp.completo || !datos) {
@@ -24,6 +25,7 @@ export function aplicarDelta(datos, resp) {
       pasos: resp.pasos,
       notas: resp.notas,
       compras: resp.compras,
+      lugares: resp.lugares || [],
       bandeja: resp.bandeja,
     };
   }
@@ -38,6 +40,8 @@ export function aplicarDelta(datos, resp) {
     pasos: deOtras(datos.pasos).concat(resp.pasos),
     notas: porId(datos.notas, resp.notas),
     compras: resp.compras,
+    // Una API de antes de la Fase 4b no la manda.
+    lugares: resp.lugares || datos.lugares || [],
     bandeja: porId(datos.bandeja, resp.bandeja),
   };
 }
@@ -63,7 +67,8 @@ export function necesitaCompleta(datos, ahoraMs = Date.now()) {
 export function trajoCambios(datos, resp) {
   if (resp.completo || !datos) return true;
   return resp.recetas.length > 0 || resp.notas.length > 0 || resp.bandeja.length > 0 ||
-    JSON.stringify(resp.compras) !== JSON.stringify(datos.compras);
+    JSON.stringify(resp.compras) !== JSON.stringify(datos.compras) ||
+    (resp.lugares !== undefined && JSON.stringify(resp.lugares) !== JSON.stringify(datos.lugares));
 }
 
 /** Sin tildes y en minúsculas: «Limón» → «limon». */

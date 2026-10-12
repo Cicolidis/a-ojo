@@ -2,7 +2,7 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 4a (ficha).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas y anotarlas, también sin conexión: estados, valoración, notas, vistas de porciones e ingredientes por sección y rol, editables.
+**Estado: Fase 4b (compras y bandeja).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
@@ -100,7 +100,7 @@ Deja una fila de prueba de `example.com` en estado `descartada`; se puede borrar
 
 **Si una versión nueva usa un servicio de Google que antes no usaba** (como Drive en la Fase 2), antes del deploy hay que correr `setup()` en el editor y aceptar el permiso nuevo. Si no, el web app deja de responder hasta que alguien lo acepte.
 
-**Si una versión nueva suma columnas** (como la Fase 4a), también: `npm run push`, `setup()` en el editor y recién ahí `npm run deploy`. Hasta que se corra, las acciones que escriben esas columnas responden «Corré setup()».
+**Si una versión nueva suma columnas u hojas** (como las fases 4a y 4b), también: `npm run push`, `setup()` en el editor y recién ahí `npm run deploy`. Hasta que se corra, las acciones que escriben esas columnas responden «Corré setup()». En la 4b, `setup()` además crea la hoja `Lugares` con el mapa inicial y la carpeta «A ojo/capturas».
 
 ### 6. Extensión de Chrome
 
@@ -118,8 +118,10 @@ Seguí [`docs/android-http-shortcuts.md`](docs/android-http-shortcuts.md).
 
 La app vive en `app/` y se publica sola en **<https://cicolidis.github.io/a-ojo/>** con cada push a `main` que la toque (`.github/workflows/pages.yml`). Es HTML, CSS y JS con módulos, sin paso de build.
 
-- **Biblioteca:** buscador (sin tildes, sobre título, ingredientes y etiquetas), filtros y el resumen de la bandeja.
-- **Ficha:** ingredientes, pasos con tips y timers, notas y advertencia si la confianza es baja.
+- **Biblioteca:** buscador (sin tildes, sobre título, ingredientes y etiquetas), filtros y el resumen de la bandeja. Abajo, la navegación: Recetas · Compras · Bandeja.
+- **Ficha:** ingredientes por sección y rol, vistas de porciones, pasos con tips y timers, notas, advertencia si la confianza es baja y «Agregar a compras» (un paso para elegir qué comprar).
+- **Compras:** por lugar (supermercado, verdulería, almacenata…), con lo mismo de varias recetas sumado y «Revisá si tenés» al final. Cada ítem se puede mover de lugar y, si se quiere, recordarlo para ese ingrediente; el mapa se edita en «Dónde compramos cada cosa». Se manda por WhatsApp con un título por lugar.
+- **Bandeja:** lo que necesita ayuda (con la subida de capturas), lo que espera a la Mac y las recetas recién llegadas.
 - **Modo cocina:** un paso por pantalla con los ingredientes que usa, pantalla siempre encendida y timers que siguen corriendo entre pasos. Si se cierra a mitad de camino, al volver sigue en el mismo paso.
 - **Sin conexión:** la interfaz y las fotos quedan en caché (service worker) y los datos en IndexedDB. Al abrir pide solo lo cambiado (`todo?since=…`) y, una vez por semana, todo.
 
@@ -142,7 +144,7 @@ Si se rota el token, hay que mandar un link nuevo. Con un link de otra API, la a
 npm run app
 ```
 
-Levanta la app en <http://localhost:4173> con una **API falsa** que responde con `tests/fixtures/todo.json` (token `prueba`): el comando imprime el link de configuración de prueba. Así se prueba todo sin el token real. Para probar sin conexión, cortá el servidor y recargá.
+Levanta la app en <http://localhost:4173> con una **API falsa** que responde con `tests/fixtures/todo.json` (token `prueba`): el comando imprime el link de configuración de prueba. Así se prueba todo sin el token real. La API falsa guarda en memoria las ediciones y las capturas (solo ids, no las imágenes). Para probar sin conexión, abrí <http://localhost:4173/api-falsa/cortar?segundos=30> o cortá el servidor y recargá.
 
 En desarrollo el service worker va primero a la red, así los cambios se ven al recargar. En producción va primero a la caché; cada deploy cambia la versión (el commit) y la app se actualiza sola la próxima vez que se abre (si está en el modo cocina, espera a que se salga).
 
@@ -192,15 +194,24 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 |---|---|---|---|
 | GET/POST | `ping` | — | `{ version, ahora, hojas_faltantes }` |
 | POST | `capturar` | `{ url, quien }`; `url` puede ser un texto con un link adentro | `{ id, estado }` o `{ duplicada: true, id, estado }`. Con `formato=texto`: solo el mensaje |
-| GET | `todo` | `since?` (ISO) | `{ ahora, completo, recetas, ingredientes, pasos, notas, compras, bandeja }`. Usá `ahora` como próximo `since`; `compras` va siempre completa |
+| GET | `todo` | `since?` (ISO) | `{ ahora, completo, recetas, ingredientes, pasos, notas, compras, lugares, bandeja }`. Usá `ahora` como próximo `since`; `compras` y `lugares` van siempre completas |
 | GET | `bandeja.pendientes` | — | `{ filas }`, de la más vieja a la más nueva. Incluye las `procesando` sin cambios hace más de 30 minutos (una corrida que se cortó) |
-| POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento |
+| POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento; volver a `pendiente` desde `ayuda` o `descartada` los reinicia |
 | POST | `receta.upsert` | `{ receta, bandeja_id?, foto?, validar? }` | `{ id, nueva, foto_url, ingredientes, pasos }`. Ver abajo |
 | POST | `receta.estado` | `{ id, estado?, valoracion? }` | `{ id, estado, valoracion }` |
 | POST | `receta.porciones` | `{ id, porciones, quitar? }` | `{ id, porciones_vistas }`: la vista pasa al frente (o se saca) |
 | POST | `receta.ingredientes` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Lo que cambian ellos: va a `rol_usuario` y `seccion_usuario` |
 | POST | `receta.clasificar` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Para `/recetas --clasificar`: tienen que venir todos |
 | POST | `nota.agregar` | `{ id?, receta_id, quien, texto, fecha? }` | `{ id, fecha }`. Con un `id` que ya existe responde `repetida: true` sin duplicarla |
+| POST | `compras.agregar` | `{ receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }` | `{ ids, nuevos, quitados }`. Suma lo que no está (por id); con `receta_id`, lo de esa receta que no vino se borra |
+| POST | `compras.marcar` | `{ ids, hecho }` | `{ ids, hecho }` |
+| POST | `compras.mover` | `{ ids, lugar }` | `{ ids, lugar }`. `lugar`: uno de los 7, `revisar` o vacío (el de la regla) |
+| POST | `compras.quitar` | `{ ids }` | `{ quitados }` |
+| POST | `lugares.asignar` | `{ por: tipo \| ingrediente, clave, lugar }` | `{ por, clave, lugar }`. Por ingrediente, `lugar` vacío borra la regla |
+| POST | `capturas.subir` | `{ bandeja_id, lote, imagenes: [{ base64, mime }] }` (hasta 6) | `{ id, estado, capturas }`. Privadas en «A ojo/capturas»; la fila vuelve a `pendiente` con los intentos en 0 |
+| GET | `capturas.bajar` | `{ bandeja_id }` | `{ id, imagenes: [{ id, nombre, mime, base64 }] }` |
+
+Los ids de los ítems de compras (`c_…`) los genera la app y el `lote` de las capturas también: si la cola o el celular reintentan, no se duplica nada.
 
 **`receta.upsert`:** `receta` trae los campos de la hoja Recetas más `ingredientes: [{ cantidad, unidad, nombre, nota, gondola, seccion, rol }]` y `pasos: [{ texto, timer_min, tip }]` (el formato completo está en [`.claude/commands/recetas.md`](.claude/commands/recetas.md)). Busca la receta por `id`, después por el `receta_id` de la fila de la bandeja y por último por `fuente_url`, así que reprocesar no duplica: actualiza los campos, conserva `estado`, `valoracion`, `porciones_vistas`, `creado` y las notas, y **reemplaza todos** los ingredientes y pasos (las ediciones de rol y sección pasan al ingrediente con la misma sección y el mismo nombre). Con `bandeja_id`, esa fila pasa a `lista`. `foto: { base64, mime }` (jpeg, png o webp, hasta 5 MB) se guarda en Drive, pública con link. Con `validar: true` solo valida. Si hay errores, responde `receta_invalida` con la lista en `detalles`.
 

@@ -27,12 +27,16 @@ function setup() {
     ss.moveActiveSheet(i + 1);
   });
   ss.setActiveSheet(ss.getSheetByName('Bandeja'));
+  const sembrados = sembrarLugares_();
 
-  // La primera vez, esto pide el permiso de Drive (el web app lo necesita para las fotos).
+  // La primera vez, esto pide el permiso de Drive (el web app lo necesita para las fotos y las capturas).
   const fotos = carpetaFotos_();
+  const capturas = carpetaCapturas_();
   const token = asegurarToken_();
   console.log('Listo: hojas creadas o actualizadas (' + nombres.join(', ') + ').');
+  if (sembrados) console.log('Lugares: ' + sembrados + ' reglas iniciales (se editan desde la app).');
   console.log('Carpeta de fotos: A ojo/' + fotos.getName() + ' (' + fotos.getId() + ').');
+  console.log('Carpeta de capturas: A ojo/' + capturas.getName() + ' (' + capturas.getId() + ').');
   console.log('Token de la API: ' + token);
 }
 
@@ -79,6 +83,20 @@ function prepararHoja_(ss, nombre, def) {
   });
 
   sh.autoResizeColumns(1, n);
+}
+
+/** Si la hoja Lugares está vacía, le pone el mapa inicial. Devuelve cuántas reglas sumó. */
+function sembrarLugares_() {
+  const existentes = leerDatos_('Lugares');
+  if (existentes.length) return 0;
+  const ahora = ahoraIso_();
+  const usados = [];
+  agregarFilas_('Lugares', LUGARES_INICIALES.map(r => {
+    const id = nuevoId_(ESQUEMA.Lugares.prefijo, usados);
+    usados.push(id);
+    return Object.assign({ id: id, actualizado: ahora }, r);
+  }));
+  return LUGARES_INICIALES.length;
 }
 
 /** Muestra el token actual en el registro de ejecución. */
