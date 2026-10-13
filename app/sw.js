@@ -40,6 +40,7 @@ const ARCHIVOS = [
   'js/vistas/cocina.js',
   'js/vistas/compras.js',
   'js/vistas/controles.js',
+  'js/vistas/elegir.js',
   'js/vistas/ficha.js',
   'js/vistas/ingredientes.js',
   'js/vistas/lugares.js',

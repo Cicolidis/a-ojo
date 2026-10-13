@@ -119,8 +119,8 @@ Seguí [`docs/android-http-shortcuts.md`](docs/android-http-shortcuts.md).
 La app vive en `app/` y se publica sola en **<https://cicolidis.github.io/a-ojo/>** con cada push a `main` que la toque (`.github/workflows/pages.yml`). Es HTML, CSS y JS con módulos, sin paso de build.
 
 - **Biblioteca:** buscador (sin tildes, sobre título, ingredientes y etiquetas), filtros y el resumen de la bandeja. Abajo, la navegación: Recetas · Compras · Bandeja.
-- **Ficha:** ingredientes por sección y rol, vistas de porciones, pasos con tips y timers, notas, advertencia si la confianza es baja y «Agregar a compras» (un paso para elegir qué comprar).
-- **Compras:** por lugar (supermercado, verdulería, almacenata…), con lo mismo de varias recetas sumado y «Revisá si tenés» al final. Cada ítem se puede mover de lugar y, si se quiere, recordarlo para ese ingrediente; el mapa se edita en «Dónde compramos cada cosa». Se manda por WhatsApp con un título por lugar.
+- **Ficha:** ingredientes por sección y rol, vistas de porciones, pasos con tips y timers, notas, advertencia si la confianza es baja y «Agregar a compras» (un paso para elegir qué comprar; después, «Ver la lista»). También lleva la navegación de abajo.
+- **Compras:** «Agregar una receta» (con un buscador) o algo suelto, y la lista por lugar (supermercado, verdulería, almacenata…), con lo mismo de varias recetas sumado y «Revisá si tenés» al final. Cada ítem se puede mover de lugar y, si se quiere, recordarlo para ese ingrediente; el mapa se edita en «Dónde compramos cada cosa». Se manda por WhatsApp con un título por lugar.
 - **Bandeja:** lo que necesita ayuda (con la subida de capturas), lo que espera a la Mac y las recetas recién llegadas.
 - **Modo cocina:** un paso por pantalla con los ingredientes que usa, pantalla siempre encendida y timers que siguen corriendo entre pasos. Si se cierra a mitad de camino, al volver sigue en el mismo paso.
 - **Sin conexión:** la interfaz y las fotos quedan en caché (service worker) y los datos en IndexedDB. Al abrir pide solo lo cambiado (`todo?since=…`) y, una vez por semana, todo.

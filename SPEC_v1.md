@@ -264,7 +264,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 ## 7. App (PWA)
 
 ### 7.1 Técnica
-- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`).
+- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/recetas`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`).
 - `manifest.json` (nombre "A ojo", íconos, `display: standalone`, `theme_color #A6461F`, `background_color #F5EEE3`).
 - Service worker: guarda la interfaz en caché y funciona offline.
 - Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
@@ -276,19 +276,19 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con fecha ("Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N · Cambiar") y "Empezar a cocinar".
+2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con fecha ("Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
-   - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí).
+   - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí). Desde la ficha, guardar vuelve a la receta con el aviso "✓ Agregada a compras" y su botón "Ver la lista"; desde Compras, vuelve a la lista.
 3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (con las cantidades de la vista de porciones), el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
-4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
+4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Agregar una receta" (un buscador de recetas que marca las que ya están y lleva al paso para elegir), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
    - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
    - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
    - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
 5. **Bandeja:** la hora del último procesamiento y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
 
-Navegación inferior: **Recetas · Compras · Bandeja**.
+Navegación inferior: **Recetas · Compras · Bandeja**, en la Biblioteca, la Ficha, Compras y Bandeja, con cuántas cosas faltan comprar y cuántos links necesitan ayuda.
 
 ---
 

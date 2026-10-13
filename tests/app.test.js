@@ -359,6 +359,7 @@ test('leerRuta', async () => {
   assert.deepEqual(leerRuta('#/ingredientes/r_7f3k2'), { nombre: 'ingredientes', id: 'r_7f3k2' });
   assert.deepEqual(leerRuta('#/compras'), { nombre: 'compras' });
   assert.deepEqual(leerRuta('#/compras/agregar/r_7f3k2'), { nombre: 'agregar', id: 'r_7f3k2' });
+  assert.deepEqual(leerRuta('#/compras/recetas'), { nombre: 'elegir' });
   assert.deepEqual(leerRuta('#/lugares/'), { nombre: 'lugares' });
   assert.deepEqual(leerRuta('#/bandeja'), { nombre: 'bandeja' });
   assert.deepEqual(leerRuta('#/config?api=x&t=y'), { nombre: 'config' });

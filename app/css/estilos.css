@@ -1181,3 +1181,43 @@ label.boton-principal:focus-within { outline: 2px solid var(--acento); outline-o
 .confianza.alta { color: var(--ok); }
 .confianza.media { color: var(--atencion); }
 .confianza.baja { color: var(--alerta); }
+
+/* La ficha también lleva la navegación: «Empezar a cocinar» va justo encima. */
+
+.ficha.con-navegacion { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+
+.barra-acciones.sobre-navegacion { bottom: calc(61px + env(safe-area-inset-bottom)); padding-bottom: 12px; }
+
+body:has(.sobre-navegacion) .aviso { bottom: calc(150px + env(safe-area-inset-bottom)); }
+
+.en-compras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 18px;
+  padding: 2px 14px;
+  border-radius: 14px;
+  background: var(--superficie-2);
+}
+
+.en-compras > span { display: inline-flex; flex: 1 1 auto; align-items: center; gap: 8px; font-weight: 500; }
+
+.en-compras .boton-texto { align-self: center; }
+
+/* Aviso con un link («Ver la lista») */
+
+.aviso { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.aviso:has(a) { padding-top: 0; padding-bottom: 0; }
+
+.aviso a {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 44px;
+  color: var(--superficie);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tarjeta-reciente > .icono { color: var(--tinta-2); }

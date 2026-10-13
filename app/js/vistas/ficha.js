@@ -10,7 +10,7 @@ import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { progresoGuardado } from './cocina.js';
-import { estrellas, segmentado } from './controles.js';
+import { estrellas, navegacion, segmentado } from './controles.js';
 
 const ESTADOS = [
   { valor: 'para_probar', nombre: 'Para probar' },
@@ -107,7 +107,8 @@ export function montar(contenedor, { app, volver, editar }, id) {
     },
   });
 
-  contenedor.append(h('article', { class: 'ficha' },
+  const nav = navegacion('biblioteca', app);
+  contenedor.append(h('article', { class: 'ficha con-navegacion' },
     portada,
     h('div', { class: 'ficha-cuerpo' },
       titulo,
@@ -118,8 +119,8 @@ export function montar(contenedor, { app, volver, editar }, id) {
       h('section', { class: 'seccion' }, tituloNotas, listaNotas, abrirNota, formNota),
       descartar,
     ),
-    h('div', { class: 'barra-acciones' }, botonCocinar),
-  ));
+    h('div', { class: 'barra-acciones sobre-navegacion' }, botonCocinar),
+  ), nav);
 
   function pintarMeta() {
     const fuente = urlSegura(r.fuente_url);
@@ -165,9 +166,12 @@ export function montar(contenedor, { app, volver, editar }, id) {
       utensilios.length ? h('p', { class: 'utensilios' },
         h('span', { class: 'etiqueta-seccion' }, 'También vas a necesitar'), enUnaLinea(utensilios, factor)) : null,
       factor !== 1 ? h('p', { class: 'secundario' }, 'Ojo: los pasos dicen las cantidades para ' + base + '.') : null,
-      h('a', { class: 'boton-secundario boton-chico', href: '#/compras/agregar/' + id }, icono('compras', 18),
-        !enCompras ? 'Agregar a compras'
-          : 'En compras' + (enCompras.porciones ? ' para ' + enCompras.porciones : '') + ' · Cambiar'),
+      !enCompras
+        ? h('a', { class: 'boton-secundario boton-chico', href: '#/compras/agregar/' + id }, icono('compras', 18), 'Agregar a compras')
+        : h('div', { class: 'en-compras' },
+          h('span', null, icono('compras', 18), 'En compras' + (enCompras.porciones ? ' para ' + enCompras.porciones : '')),
+          h('a', { class: 'boton-texto', href: '#/compras' }, 'Ver la lista'),
+          h('a', { class: 'boton-texto', href: '#/compras/agregar/' + id }, 'Cambiar')),
       h('a', { class: 'boton-texto', href: '#/ingredientes/' + id }, icono('lapiz', 18), 'Editar ingredientes'),
     );
   }
@@ -232,6 +236,7 @@ export function montar(contenedor, { app, volver, editar }, id) {
     conFoco(zonaIngredientes, pintarIngredientes);
     pintarPasos();
     pintarNotas();
+    nav.actualizar();
   }
 
   pintar();

@@ -1,6 +1,8 @@
 // Agregar a compras (#/compras/agregar/:id): qué comprar de una receta. Los
 // principales arrancan marcados y los opcionales no; los condimentos y utensilios
 // van a «Revisá si tenés». Si la receta ya está en la lista, guardar la reemplaza.
+// Se llega desde la ficha (y se vuelve ahí, con «Ver la lista» en el aviso) o
+// desde Compras, por el buscador de recetas (y se vuelve a la lista).
 
 import { h, icono, rellenar } from '../dom.js';
 import { capitalizar, formatearCantidad } from '../formato.js';
@@ -25,14 +27,16 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   const enLista = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
   // Vuelve a la lista si se llegó desde ahí; si no, a la receta.
   const desde = history.state && history.state.desde;
-  const salir = () => volver(desde === '#/compras' ? '#/compras' : '#/receta/' + id);
+  const aLaLista = desde === '#/compras';
+  const salir = () => volver(aLaLista ? '#/compras' : '#/receta/' + id);
+  const verLista = aLaLista ? undefined : { texto: 'Ver la lista', href: '#/compras' };
 
   const guardar = () => {
     const items = itemsDeReceta(r, porciones, elegidos, () => idAzar('c'));
     editar(nuevaEdicion('compras.agregar', { receta_id: id, porciones: base ? porciones : null, items }));
     if (base) app.porciones.set(id, porciones);
     salir();
-    avisar(enLista ? '✓ Actualicé la receta en compras' : '✓ Agregada a compras');
+    avisar(enLista ? '✓ Actualicé la receta en compras' : '✓ Agregada a compras', verLista);
   };
   const quitar = () => {
     editar(nuevaEdicion('compras.quitar', { ids: enLista.ids }));

@@ -6,7 +6,7 @@ import { leer, guardar, borrar } from './db.js';
 import { indexar } from './datos.js';
 import { aplicarCola, aplicarEdicion } from './ediciones.js';
 import { sincronizar, precargarFotos } from './sync.js';
-import { h } from './dom.js';
+import { h, rellenar } from './dom.js';
 import * as biblioteca from './vistas/biblioteca.js';
 import * as ficha from './vistas/ficha.js';
 import * as cocina from './vistas/cocina.js';
@@ -15,6 +15,7 @@ import * as agregar from './vistas/agregar.js';
 import * as compras from './vistas/compras.js';
 import * as lugares from './vistas/lugares.js';
 import * as bandeja from './vistas/bandeja.js';
+import * as elegir from './vistas/elegir.js';
 import * as bienvenida from './vistas/bienvenida.js';
 
 const CINCO_MIN_MS = 5 * 60 * 1000;
@@ -83,6 +84,7 @@ function mostrar({ enfocar = false } = {}) {
   else if (ruta.nombre === 'ingredientes') vista = ingredientes.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'agregar') vista = agregar.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'compras') vista = compras.montar(contenedor, ctx);
+  else if (ruta.nombre === 'elegir') vista = elegir.montar(contenedor, ctx);
   else if (ruta.nombre === 'lugares') vista = lugares.montar(contenedor, ctx);
   else if (ruta.nombre === 'bandeja') vista = bandeja.montar(contenedor, ctx);
   else vista = biblioteca.montar(contenedor, ctx);
@@ -117,15 +119,18 @@ function editar(edicion) {
 }
 
 // Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
+// Pueden traer un link: avisar('✓ Agregada a compras', { texto: 'Ver la lista', href: '#/compras' }).
 const zonaAviso = h('div', { class: 'aviso', role: 'status', hidden: true });
 document.body.append(zonaAviso);
 let ocultarAviso = null;
 
-function avisar(texto) {
-  zonaAviso.textContent = texto;
+function avisar(texto, link) {
+  const ocultar = () => { zonaAviso.hidden = true; };
+  rellenar(zonaAviso, h('span', null, texto),
+    link ? h('a', { href: link.href, onclick: ocultar }, link.texto) : null);
   zonaAviso.hidden = false;
   clearTimeout(ocultarAviso);
-  ocultarAviso = setTimeout(() => { zonaAviso.hidden = true; }, 6000);
+  ocultarAviso = setTimeout(ocultar, link ? 8000 : 6000);
 }
 
 /** Link de configuración: guarda, borra el token de la barra de direcciones y sincroniza. */

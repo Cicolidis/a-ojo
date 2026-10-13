@@ -37,6 +37,7 @@ export function montar(contenedor, { app, editar }) {
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'Compras'),
     sync,
     zonaRecetas,
+    h('a', { class: 'boton-secundario boton-chico agregar-receta', href: '#/compras/recetas' }, icono('mas', 18), 'Agregar una receta'),
     sumar,
     zonaLista,
     zonaAcciones,
@@ -124,7 +125,7 @@ export function montar(contenedor, { app, editar }) {
     if (!grupos.length) {
       rellenar(zonaLista, h('p', { class: 'vacio' }, !app.datos
         ? (app.sync.estado === 'sincronizando' ? 'Bajando la lista…' : 'Todavía no se bajó la lista.')
-        : 'La lista está vacía. En una receta, tocá «Agregar a compras».'));
+        : 'La lista está vacía. Agregá una receta o sumá algo a mano.'));
     } else {
       rellenar(zonaLista, grupos.map(g => h('section', { class: 'compras-grupo', 'aria-label': g.nombre },
         h('h2', { class: 'etiqueta-seccion' }, g.nombre),

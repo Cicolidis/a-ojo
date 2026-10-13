@@ -1,5 +1,5 @@
 // Rutas por hash: #/, #/receta/:id, #/cocina/:id, #/ingredientes/:id, #/compras,
-// #/compras/agregar/:id, #/lugares, #/bandeja y #/config?…  Pura.
+// #/compras/recetas, #/compras/agregar/:id, #/lugares, #/bandeja y #/config?…  Pura.
 
 export function leerRuta(hash) {
   const h = String(hash || '').replace(/^#/, '');
@@ -10,6 +10,7 @@ export function leerRuta(hash) {
   if ((m = /^\/cocina\/([\w-]+)$/.exec(ruta))) return { nombre: 'cocina', id: m[1] };
   if ((m = /^\/ingredientes\/([\w-]+)$/.exec(ruta))) return { nombre: 'ingredientes', id: m[1] };
   if (ruta === '/compras') return { nombre: 'compras' };
+  if (ruta === '/compras/recetas') return { nombre: 'elegir' };
   if ((m = /^\/compras\/agregar\/([\w-]+)$/.exec(ruta))) return { nombre: 'agregar', id: m[1] };
   if (ruta === '/lugares') return { nombre: 'lugares' };
   if (ruta === '/bandeja') return { nombre: 'bandeja' };
