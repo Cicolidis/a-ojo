@@ -2,7 +2,7 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 4b (compras y bandeja).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda.
+**Estado: Fase 5 (pulido).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
@@ -144,11 +144,11 @@ Si se rota el token, hay que mandar un link nuevo. Con un link de otra API, la a
 npm run app
 ```
 
-Levanta la app en <http://localhost:4173> con una **API falsa** que responde con `tests/fixtures/todo.json` (token `prueba`): el comando imprime el link de configuración de prueba. Así se prueba todo sin el token real. La API falsa guarda en memoria las ediciones y las capturas (solo ids, no las imágenes). Para probar sin conexión, abrí <http://localhost:4173/api-falsa/cortar?segundos=30> o cortá el servidor y recargá.
+Levanta la app en <http://localhost:4173> con una **API falsa** que responde con `tests/fixtures/todo.json` (token `prueba`): el comando imprime el link de configuración de prueba. Así se prueba todo sin el token real. La API falsa guarda en memoria las ediciones y las capturas (solo ids, no las imágenes). Para probar sin conexión, abrí <http://localhost:4173/api-falsa/cortar?segundos=30> o cortá el servidor y recargá. Para ver la primera carga, <http://localhost:4173/api-falsa/demorar?segundos=6> hace que cada respuesta tarde 6 segundos (con `0` vuelve a lo normal). Para ver las pantallas vacías, levantá el servidor con `node scripts/servir.js --falsa --vacia`: arranca sin recetas, compras ni bandeja.
 
 En desarrollo el service worker va primero a la red, así los cambios se ven al recargar. En producción va primero a la caché; cada deploy cambia la versión (el commit) y la app se actualiza sola la próxima vez que se abre (si está en el modo cocina, espera a que se salga).
 
-Los íconos (`app/iconos/`) salen del logo 2B con `npm run iconos` (Chrome headless).
+Los íconos de la app (`app/iconos/`) y de la extensión (`extension/icons/`) salen del logo 2B con `npm run iconos` (Chrome headless). Después de regenerarlos, recargá la extensión en `chrome://extensions`.
 
 ## Procesamiento: `/recetas`
 

@@ -9,14 +9,13 @@ import { capitalizar, formatearCantidad } from '../formato.js';
 import { agrupar, enUnaLinea, escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
 import { elegidosIniciales, itemsDeReceta, recetasEnLista, vaARevisar } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
-import { contadorPorciones } from './controles.js';
+import { contadorPorciones, sinReceta } from './controles.js';
 
 export function montar(contenedor, { app, volver, editar, avisar }, id) {
   const r = app.indice.porId.get(id);
   if (!r || !r.ingredientes.length) {
-    contenedor.append(h('div', { class: 'bienvenida' },
-      h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'No encontramos esta receta'),
-      h('a', { class: 'boton-secundario', href: '#/' }, 'Ir a las recetas')));
+    contenedor.append(sinReceta(app, id, r && {
+      titulo: 'Esta receta no tiene ingredientes', texto: 'No hay nada para agregar a compras.' }));
     return null;
   }
 
@@ -79,9 +78,11 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
           opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null),
         h('span', { class: 'cantidad' }, formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad))));
 
+    const paraComprar = secciones.filter(s => s.principales.length || s.opcionales.length);
     rellenar(lista,
       h('h2', { class: 'etiqueta-seccion' }, 'Para comprar'),
-      secciones.filter(s => s.principales.length || s.opcionales.length).map(s => h('div', { class: 'grupo-ingredientes' },
+      paraComprar.length ? null : h('p', { class: 'secundario' }, 'Nada: todo lo de esta receta va a «Revisá si tenés».'),
+      paraComprar.map(s => h('div', { class: 'grupo-ingredientes' },
         s.nombre ? h('h3', { class: 'etiqueta-seccion' }, s.nombre) : null,
         h('ul', { class: 'lista-casillas' },
           s.principales.map(i => casilla(i, false)),

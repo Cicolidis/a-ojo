@@ -9,7 +9,7 @@ import { agruparBandeja, cuantasCapturas, descripcionLink } from '../bandeja.js'
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { llamarApi } from '../api.js';
 import { achicarImagen } from '../imagenes.js';
-import { navegacion } from './controles.js';
+import { cargando, navegacion, vacio } from './controles.js';
 
 const MAX_CAPTURAS = 6;
 const CONFIANZA = { alta: 'Confianza alta', media: 'Confianza media', baja: 'Faltan datos' };
@@ -23,8 +23,10 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
   // estado: elegidas · mandando · mandadas. Así una sincronización no las pierde.
   const subidas = new Map();
 
+  const titulo = h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'Bandeja');
+
   contenedor.append(h('div', { class: 'bandeja con-navegacion' },
-    h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'Bandeja'),
+    titulo,
     ultima,
     sync,
     zona,
@@ -43,13 +45,14 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
     const elegidas = archivos.slice(0, MAX_CAPTURAS);
     // El lote se elige acá: si el envío se reintenta, la API no duplica las imágenes.
     subidas.set(fila.id, { archivos: elegidas, urls: elegidas.map(a => URL.createObjectURL(a)), lote: idAzar('x', 10).slice(2), estado: 'elegidas' });
-    pintar();
+    pintar('mandar:' + fila.id);
   }
 
   async function mandar(fila) {
     const s = subidas.get(fila.id);
+    if (s.estado === 'mandando') return;
     s.estado = 'mandando';
-    pintar();
+    pintar('mandar:' + fila.id);
     try {
       const imagenes = [];
       for (const archivo of s.archivos) imagenes.push(await achicarImagen(archivo));
@@ -57,19 +60,22 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
         { metodo: 'POST', timeoutMs: 120000 });
       s.urls.forEach(u => URL.revokeObjectURL(u));
       subidas.set(fila.id, { estado: 'mandadas' });
+      pintar('ok:' + fila.id);
       avisar('✓ Capturas mandadas. Quedó esperando a la Mac.');
       sincronizar();
     } catch (err) {
       s.estado = 'elegidas';
+      pintar('mandar:' + fila.id);
       avisar(err.codigo === 'red' ? 'Sin conexión. Probá de nuevo cuando vuelva.' : 'No se pudieron mandar: ' + err.message);
     }
-    pintar();
   }
 
   function cambiarEstado(fila, estado, aviso) {
     liberar(fila.id);
     editar(nuevaEdicion('bandeja.actualizar', { id: fila.id, estado }));
     pintar();
+    // La tarjeta cambió de lugar o ya no está: el foco vuelve al título.
+    titulo.focus();
     avisar(aviso);
   }
 
@@ -86,26 +92,34 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
   function tarjetaAyuda(fila) {
     const s = subidas.get(fila.id);
     let acciones;
+    const desc = descripcionLink(fila);
     if (s && s.estado === 'mandadas') {
-      acciones = h('p', { class: 'ok-texto' }, icono('check', 18), 'Capturas mandadas. Esperando a la Mac…');
+      acciones = h('p', { class: 'ok-texto', tabindex: '-1', 'data-foco': 'ok:' + fila.id },
+        icono('check', 18), 'Capturas mandadas. Esperando a la Mac…');
     } else if (s) {
+      // Mientras se mandan, los botones quedan con aria-disabled: el foco no se pierde.
       const mandando = s.estado === 'mandando';
       acciones = [
         h('div', { class: 'miniaturas' }, s.urls.map((u, i) => h('img', { src: u, alt: 'Captura ' + (i + 1) }))),
         h('div', { class: 'form-botones' },
-          h('button', { type: 'button', class: 'boton-secundario', disabled: mandando, onclick: () => { liberar(fila.id); pintar(); } }, 'Cancelar'),
-          h('button', { type: 'button', class: 'boton-principal', disabled: mandando, onclick: () => mandar(fila) },
-            mandando ? 'Mandando…' : s.archivos.length === 1 ? 'Mandar 1 captura' : 'Mandar ' + s.archivos.length + ' capturas')),
+          h('button', { type: 'button', class: 'boton-secundario', 'aria-disabled': String(mandando), onclick: () => {
+            if (mandando) return;
+            liberar(fila.id);
+            pintar('subir:' + fila.id);
+          } }, 'Cancelar'),
+          h('button', { type: 'button', class: 'boton-principal', 'aria-disabled': String(mandando), 'data-foco': 'mandar:' + fila.id,
+            onclick: () => mandar(fila) },
+          mandando ? 'Mandando…' : s.archivos.length === 1 ? 'Mandar 1 captura' : 'Mandar ' + s.archivos.length + ' capturas')),
       ];
     } else {
-      const entrada = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'solo-lector',
+      const entrada = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'solo-lector', 'data-foco': 'subir:' + fila.id,
         onchange: e => elegir(fila, [...e.target.files]) });
       acciones = [
         h('div', { class: 'form-botones' },
-          h('button', { type: 'button', class: 'boton-secundario',
+          h('button', { type: 'button', class: 'boton-secundario', 'aria-label': 'Descartar ' + desc,
             onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar'),
           h('label', { class: 'boton-principal' }, entrada, icono('imagen', 20), 'Subir capturas')),
-        h('button', { type: 'button', class: 'boton-texto',
+        h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Probar de nuevo sin capturas: ' + desc,
           onclick: () => cambiarEstado(fila, 'pendiente', 'Lo vuelve a intentar la próxima vez que corra la Mac.') }, 'Probar de nuevo sin capturas'),
       ];
     }
@@ -141,7 +155,9 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
     h('h2', { class: 'etiqueta-seccion' }, titulo),
     h('ul', { class: 'lista-links' }, items));
 
-  function pintar() {
+  /** Repinta y devuelve el foco al control equivalente (data-foco): el indicado o el que lo tenía. */
+  function pintar(foco) {
+    foco = foco || (document.activeElement && document.activeElement.getAttribute('data-foco'));
     const g = agruparBandeja(app.datos?.bandeja, app.indice.porId);
     ultima.textContent = !app.datos ? '' : g.ultimaCorrida
       ? 'La Mac procesó por última vez ' + fechaHora(g.ultimaCorrida) + '.'
@@ -151,10 +167,14 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
       g.ayuda.length ? seccion('Necesita ayuda', g.ayuda.map(tarjetaAyuda)) : null,
       g.esperando.length ? seccion('Esperando a la Mac…', g.esperando.map(tarjetaEsperando)) : null,
       g.recientes.length ? seccion('Recién llegadas', g.recientes.map(tarjetaReciente)) : null,
-      vacia ? h('p', { class: 'vacio' }, !app.datos
-        ? (app.sync.estado === 'sincronizando' ? 'Bajando la bandeja…' : 'Todavía no se bajó la bandeja.')
-        : 'La bandeja está vacía. Compartí un video con «Guardar receta» o guardalo desde la extensión.') : null,
+      !vacia ? null : !app.datos
+        ? (app.sync.estado === 'sincronizando' ? cargando('Bajando la bandeja…')
+          : vacio({ figura: 'aviso', titulo: 'Todavía no se bajó la bandeja', texto: 'Cuando haya conexión, aparece sola.' }))
+        : vacio({ figura: 'bandeja', titulo: 'La bandeja está vacía',
+          texto: 'Compartí un video con «Guardar receta» o guardalo desde la extensión.' }),
     );
+    const el = foco && zona.querySelector('[data-foco="' + foco + '"]');
+    if (el) el.focus({ preventScroll: true });
   }
 
   function actualizar() {

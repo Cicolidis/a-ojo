@@ -9,7 +9,7 @@ import { ingredientesDelPaso } from '../cocina.js';
 import { capitalizar, formatearCantidad, formatearReloj, formatearTimer } from '../formato.js';
 import { escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
-import { estrellas } from './controles.js';
+import { estrellas, sinReceta } from './controles.js';
 
 const clave = id => 'a-ojo:cocina:' + id;
 const SONAR_MS = 2 * 60 * 1000; // Un timer vencido suena hasta 2 minutos; después queda marcado.
@@ -32,9 +32,7 @@ export function progresoGuardado(id, totalPasos) {
 export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   const r = app.indice.porId.get(id);
   if (!r || !r.pasos.length) {
-    contenedor.append(h('div', { class: 'bienvenida' },
-      h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'No encontramos esta receta'),
-      h('a', { class: 'boton-secundario', href: '#/' }, 'Ir a las recetas')));
+    contenedor.append(sinReceta(app, id, r && { titulo: 'Esta receta no tiene pasos', texto: 'Mirá el video para cocinarla.' }));
     return null;
   }
 
@@ -119,13 +117,17 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
       chips = new Map(activos.map(p => {
         const n = pasos.indexOf(p) + 1;
         const texto = h('span');
+        // El texto del chip («Paso 3 · 4:30») es su nombre: tocarlo lleva a ese paso.
         const chip = h('span', { class: 'timer-chip' },
-          h('button', { type: 'button', 'aria-label': 'Ir al paso ' + n, onclick: () => irA(n - 1) }, icono('reloj', 16), texto),
+          h('button', { type: 'button', onclick: () => irA(n - 1) }, icono('reloj', 16), texto),
           h('button', { type: 'button', class: 'parar', 'aria-label': 'Parar el timer del paso ' + n, onclick: () => {
             delete timers[p.id];
             guardar();
             pintarTimers();
-            if (!terminado) pintar(false);
+            if (terminado) return;
+            pintar(false);
+            // El chip ya no está: el foco va al botón del timer, si es este paso, o al título.
+            (raiz.querySelector('.boton-timer') || raiz.querySelector('h1')).focus({ preventScroll: true });
           } }, icono('cerrar', 16)));
         return [p.id, { chip, texto, n, vencido: false }];
       }));
@@ -148,10 +150,11 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   raiz.addEventListener('pointerdown', prepararAudio);
 
   function irA(i) {
+    const antes = actual;
     actual = Math.min(Math.max(i, 0), pasos.length - 1);
     terminado = false;
     guardar();
-    pintar(true);
+    pintar(true, actual > antes ? 'derecha' : actual < antes ? 'izquierda' : null);
   }
 
   /** «¿Cómo salió?»: estrellas y una nota, las dos opcionales. Guardar la marca probada. */
@@ -195,11 +198,13 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
     raiz.querySelector('h1').focus();
   }
 
-  function pintar(enfocar) {
+  /** Pinta el paso actual. `desde` (derecha o izquierda) es de dónde entra, al avanzar o volver. */
+  function pintar(enfocar, desde = null) {
     const p = pasos[actual];
     const ultimo = actual === pasos.length - 1;
     const ingredientes = ingredientesDelPaso(p.texto, r.ingredientes);
-    const texto = h('p', { class: 'paso-texto' + (p.texto.length > 180 ? ' largo' : ''), tabindex: '-1' }, p.texto);
+    const cual = 'Paso ' + (actual + 1) + ' de ' + pasos.length;
+    const titulo = h('h1', { class: 'paso-n', tabindex: '-1' }, cual);
 
     raiz.replaceChildren(
       h('div', { class: 'cocina-arriba' },
@@ -212,12 +217,15 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
         'aria-valuemin': '1',
         'aria-valuemax': String(pasos.length),
         'aria-valuenow': String(actual + 1),
-      }, pasos.map((_, i) => h('span', { class: i <= actual ? 'hecho' : '' }))),
+        'aria-valuetext': cual,
+      }, pasos.map((_, i) => h('span', {
+        class: (i <= actual ? 'hecho' : '') + (desde === 'derecha' && i === actual ? ' recien' : ''),
+      }))),
       zonaTimers,
       anuncio,
-      h('div', { class: 'cocina-paso' },
-        h('p', { class: 'paso-n' }, 'PASO ' + (actual + 1) + ' DE ' + pasos.length),
-        texto,
+      h('div', { class: 'cocina-paso' + (desde ? ' desde-' + desde : '') },
+        titulo,
+        h('p', { class: 'paso-texto' + (p.texto.length > 180 ? ' largo' : '') }, p.texto),
         ingredientes.length ? h('div', { class: 'chips-ingredientes', 'aria-label': 'Ingredientes de este paso' },
           ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad)))) : null,
         ingredientes.length && factor !== 1 ? h('p', { class: 'secundario' },
@@ -230,6 +238,10 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
             timers[p.id] = Date.now() + Number(p.timer_min) * 60 * 1000;
             guardar();
             pintar(false);
+            anuncio.textContent = 'Timer de ' + formatearTimer(p.timer_min) + ' en marcha';
+            // El botón ya no está: el foco va al chip del timer nuevo.
+            const nuevo = chips.get(p.id);
+            if (nuevo) nuevo.chip.querySelector('button').focus({ preventScroll: true });
           },
         }, icono('reloj'), 'Timer de ' + formatearTimer(p.timer_min)) : null,
         p.tip ? h('p', { class: 'tip' }, h('b', null, 'Tip del video: '), p.tip) : null,
@@ -237,8 +249,8 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
       h('div', { class: 'cocina-anteriores' },
         pasos.slice(Math.max(0, actual - 2), actual).map((ant, j, lista) => {
           const n = actual - lista.length + j;
-          return h('button', { type: 'button', 'aria-label': 'Volver al paso ' + (n + 1), onclick: () => irA(n) },
-            icono('check', 18), h('span', null, (n + 1) + ' · ' + ant.texto));
+          return h('button', { type: 'button', onclick: () => irA(n) },
+            h('span', { class: 'solo-lector' }, 'Volver al paso '), icono('check', 18), h('span', null, (n + 1) + ' · ' + ant.texto));
         })),
       h('div', { class: 'cocina-botones' },
         h('button', { type: 'button', class: 'boton-secundario', disabled: actual === 0, onclick: () => irA(actual - 1) }, 'Anterior'),
@@ -251,7 +263,7 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
     pintarTimers();
     if (enfocar) {
       window.scrollTo(0, 0);
-      texto.focus({ preventScroll: true });
+      titulo.focus({ preventScroll: true });
     }
   }
 

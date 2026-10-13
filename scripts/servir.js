@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Servidor local de la PWA (app/), sin dependencias.
 //
-//   node scripts/servir.js [--falsa] [--puerto 4173]
+//   node scripts/servir.js [--falsa] [--vacia] [--puerto 4173]
 //
 // Con --falsa también responde una API de prueba en /api-falsa con los datos de
 // tests/fixtures/todo.json, y sirve sus fotos en /fotos-prueba/. Así la app se
@@ -12,7 +12,9 @@
 // capturas.subir: las guarda en memoria, así `todo` las devuelve, hasta que se
 // reinicia el servidor. De las capturas solo guarda ids falsos.
 // /api-falsa/cortar?segundos=N la deja sin responder N segundos, como si no
-// hubiera conexión (para probar la cola offline).
+// hubiera conexión (para probar la cola offline), y /api-falsa/demorar?segundos=N
+// hace que cada respuesta tarde N segundos (para ver la primera carga; 0 vuelve a lo normal).
+// Con --vacia arranca sin recetas, compras ni bandeja (para ver las pantallas vacías).
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -21,6 +23,7 @@ const { pathToFileURL } = require('node:url');
 
 const args = process.argv.slice(2);
 const FALSA = args.includes('--falsa');
+const VACIA = args.includes('--vacia');
 const PUERTO = Number(args[args.indexOf('--puerto') + 1]) || Number(process.env.PORT) || 4173;
 const RAIZ = path.join(__dirname, '..', 'app');
 const FIXTURES = path.join(__dirname, '..', 'tests', 'fixtures');
@@ -65,8 +68,12 @@ function dentroDe(raiz, ruta) {
 
 // Los datos de la API falsa, en memoria: las ediciones los cambian.
 let datosFalsos = null;
-const datos = () => (datosFalsos ||= JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8')));
+// Con --vacia quedan solo las reglas de Lugares, que setup() siembra siempre.
+const VACIOS = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] };
+const datos = () => (datosFalsos ||= Object.assign(
+  JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8')), VACIA ? VACIOS : {}));
 let cortadaHasta = 0;
+let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
   'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar'];
 
@@ -77,7 +84,7 @@ async function apiFalsa(req, url, res) {
   const responder = cuerpo => setTimeout(() => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify(cuerpo));
-  }, 600);
+  }, demoraMs);
   const q = Object.fromEntries(url.searchParams);
   if (req.method === 'POST') {
     let cuerpo = '';
@@ -180,6 +187,12 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('API falsa sin conexión hasta las ' + new Date(cortadaHasta).toLocaleTimeString('es-AR') + '\n');
   }
+  if (FALSA && url.pathname === '/api-falsa/demorar') {
+    const segundos = Number(url.searchParams.get('segundos'));
+    demoraMs = segundos > 0 ? segundos * 1000 : 600;
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('La API falsa responde en ' + demoraMs / 1000 + ' s\n');
+  }
   if (FALSA && url.pathname === '/api-falsa') {
     return apiFalsa(req, url, res).catch(err => {
       console.error(err);
@@ -194,7 +207,7 @@ http.createServer((req, res) => {
   if (!archivo) return res.writeHead(403).end();
   enviarArchivo(res, archivo);
 }).listen(PUERTO, () => {
-  console.log(`A ojo en http://localhost:${PUERTO}/` + (FALSA ? ' (con la API falsa en /api-falsa)' : ''));
+  console.log(`A ojo en http://localhost:${PUERTO}/` + (FALSA ? ' (con la API falsa en /api-falsa' + (VACIA ? ', sin datos)' : ')') : ''));
   if (FALSA) {
     const api = encodeURIComponent(`http://localhost:${PUERTO}/api-falsa`);
     console.log(`Link de configuración de prueba: http://localhost:${PUERTO}/#/config?api=${api}&t=prueba&quien=camilo`);

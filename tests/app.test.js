@@ -370,6 +370,27 @@ test('leerRuta', async () => {
   assert.deepEqual(leerRuta('#/cualquiera'), { nombre: 'biblioteca' });
 });
 
+test('motivoVacio: por qué la Biblioteca no muestra recetas', async () => {
+  const { motivoVacio } = await cargar('datos.js');
+  const descartada = { estado: 'descartada' };
+  assert.equal(motivoVacio([], {}, { hayDatos: false, sync: 'sincronizando' }), 'cargando');
+  assert.equal(motivoVacio([], {}, { hayDatos: false, sync: 'sin_conexion' }), 'sin_conexion');
+  assert.equal(motivoVacio([], {}, { hayDatos: false, sync: 'error' }), 'sin_datos');
+  assert.equal(motivoVacio([descartada], { texto: ' zapallo ', filtro: 'favorita' }), 'busqueda', 'la búsqueda gana al filtro');
+  assert.equal(motivoVacio([descartada], { filtro: 'favorita' }), 'filtro');
+  assert.equal(motivoVacio([descartada], { texto: '  ' }), 'descartadas', 'solo quedan descartadas');
+  assert.equal(motivoVacio([]), 'vacia');
+});
+
+test('tituloDe: el título de cada pantalla, con el de la receta si hay una', async () => {
+  const { leerRuta, tituloDe } = await cargar('rutas.js');
+  assert.equal(tituloDe(leerRuta('#/')), 'A ojo');
+  assert.equal(tituloDe(leerRuta('#/compras')), 'Compras · A ojo');
+  assert.equal(tituloDe(leerRuta('#/receta/r_1'), { titulo: 'Torta vasca' }), 'Torta vasca · A ojo');
+  assert.equal(tituloDe(leerRuta('#/cocina/r_1'), { titulo: 'Torta vasca' }), 'Modo cocina · Torta vasca · A ojo');
+  assert.equal(tituloDe(leerRuta('#/receta/r_no')), 'A ojo', 'una receta que no está no rompe el título');
+});
+
 test('sw.js precachea exactamente los archivos de la app', () => {
   const sw = fs.readFileSync(path.join(APP, 'sw.js'), 'utf8');
   const lista = /const ARCHIVOS = \[([\s\S]*?)\];/.exec(sw);
@@ -599,4 +620,51 @@ test('aplicarDelta y trajoCambios con lugares', async () => {
   assert.equal(aplicarDelta(datos, Object.assign({}, vacio, { lugares: otros })).lugares[1].lugar, 'feria');
   assert.equal(aplicarDelta(datos, vacio).lugares.length, 9, 'una API vieja, sin lugares, no los borra');
   assert.equal(trajoCambios(datos, vacio), false);
+});
+
+// Fase 5: contraste de los colores de estilos.css, en el modo claro y en el oscuro.
+
+/** Tokens `--nombre: #hex` de un bloque de CSS. */
+const tokensDe = bloque => Object.fromEntries([...bloque.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(m => [m[1], m[2]]));
+
+/** Contraste WCAG 2.x entre dos colores #rrggbb. */
+function contraste(a, b) {
+  const luminancia = hex => {
+    const [r, g, v] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * v;
+  };
+  const [claro, oscuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+  return (claro + 0.05) / (oscuro + 0.05);
+}
+
+test('estilos.css: los pares de colores que se usan tienen contraste AA en los dos modos', () => {
+  const css = fs.readFileSync(path.join(APP, 'css', 'estilos.css'), 'utf8');
+  const claro = tokensDe(/:root\s*{([^}]*)}/.exec(css)[1]);
+  const bloqueOscuro = /@media \(prefers-color-scheme: dark\)\s*{\s*:root\s*{([^}]*)}/.exec(css);
+  assert.ok(bloqueOscuro, 'hay un bloque para el modo oscuro');
+  const oscuro = Object.assign({}, claro, tokensDe(bloqueOscuro[1]));
+  assert.deepEqual(Object.keys(tokensDe(bloqueOscuro[1])).sort(), Object.keys(claro).sort(),
+    'el modo oscuro redefine todos los colores');
+
+  // [texto o borde, fondo, mínimo]: 4,5 para texto y 3 para bordes de controles.
+  const fondos = ['fondo', 'superficie', 'superficie-2'];
+  const pares = [
+    ...['tinta', 'tinta-2', 'tinta-nota', 'acento', 'alerta'].flatMap(t => fondos.map(f => [t, f, 4.5])),
+    ['ok', 'superficie', 4.5], ['ok', 'superficie-2', 4.5], ['atencion', 'superficie-2', 4.5],
+    // Texto claro sobre el botón principal, el aviso, el chip elegido y el timer que sonó.
+    ['superficie', 'acento', 4.5], ['superficie', 'acento-hover', 4.5], ['superficie', 'tinta', 4.5], ['superficie', 'alerta', 4.5],
+    // Botón principal deshabilitado.
+    ['tinta-2', 'superficie-2', 4.5],
+    // Casillas, campos y el borde del elegido en el segmentado.
+    ...fondos.map(f => ['borde-campo', f, 3]),
+    // Anillo de foco y casilla marcada.
+    ...fondos.map(f => ['acento', f, 3]),
+  ];
+  for (const [modo, tokens] of [['claro', claro], ['oscuro', oscuro]]) {
+    for (const [a, b, minimo] of pares) {
+      const c = contraste(tokens[a], tokens[b]);
+      assert.ok(c >= minimo, `modo ${modo}: --${a} sobre --${b} da ${c.toFixed(2)}:1 (mínimo ${minimo})`);
+    }
+  }
 });

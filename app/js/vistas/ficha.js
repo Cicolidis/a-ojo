@@ -10,7 +10,7 @@ import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { progresoGuardado } from './cocina.js';
-import { estrellas, navegacion, segmentado } from './controles.js';
+import { estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
 const ESTADOS = [
   { valor: 'para_probar', nombre: 'Para probar' },
@@ -22,11 +22,7 @@ const MAX_PORCIONES = 99;
 export function montar(contenedor, { app, volver, editar }, id) {
   let r = app.indice.porId.get(id);
   if (!r) {
-    contenedor.append(h('div', { class: 'bienvenida' },
-      h('h1', { class: 'titulo-pantalla', tabindex: '-1' },
-        !app.datos && app.sync.estado === 'sincronizando' ? 'Bajando las recetas…' : 'No encontramos esta receta'),
-      h('a', { class: 'boton-secundario', href: '#/' }, 'Ir a las recetas'),
-    ));
+    contenedor.append(sinReceta(app, id));
     return null;
   }
   // Abre con la última vista de porciones que usaron; lo que elijan se recuerda mientras la app esté abierta.
@@ -49,12 +45,17 @@ export function montar(contenedor, { app, volver, editar }, id) {
     v => editar(nuevaEdicion('receta.estado', { id, valoracion: v })), 'Valoración de la receta');
   const valorar = h('div', { class: 'valorar' }, h('span', { class: 'etiqueta-seccion' }, 'Valoración'), valoracion);
   const recuperar = h('button', { type: 'button', class: 'boton-secundario',
-    onclick: () => cambiarEstado(Number(r.valoracion) > 0 ? 'probada' : 'para_probar') }, 'Recuperarla');
+    onclick: () => {
+      cambiarEstado(Number(r.valoracion) > 0 ? 'probada' : 'para_probar');
+      selector.querySelector('[aria-pressed="true"]').focus();
+    } }, 'Recuperarla');
   const descartada = h('div', { class: 'aviso-descartada' },
     h('p', null, h('strong', null, 'Descartada.'), ' No aparece en las recetas.'), recuperar);
 
   const zonaIngredientes = h('section', { class: 'seccion', 'aria-labelledby': 'titulo-ingredientes' });
   const zonaPasos = h('section', { class: 'seccion' });
+  // Lo que cambia sin mover el foco (las porciones), para el lector de pantalla.
+  const anuncio = h('p', { class: 'solo-lector', role: 'status' });
 
   // Notas: el formulario no se repinta nunca, así no pierde el foco ni lo escrito.
   const tituloNotas = h('h2');
@@ -88,7 +89,10 @@ export function montar(contenedor, { app, volver, editar }, id) {
   },
   textoNota,
   h('div', { class: 'form-botones' },
-    h('button', { type: 'button', class: 'boton-secundario', onclick: cerrarNota }, 'Cancelar'),
+    h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
+      cerrarNota();
+      abrirNota.focus();
+    } }, 'Cancelar'),
     h('button', { type: 'submit', class: 'boton-principal' }, 'Guardar nota')));
 
   const descartar = h('button', { type: 'button', class: 'boton-texto alerta-texto',
@@ -107,8 +111,10 @@ export function montar(contenedor, { app, volver, editar }, id) {
     },
   });
 
+  const barraCocinar = h('div', { class: 'barra-acciones sobre-navegacion' }, botonCocinar);
   const nav = navegacion('biblioteca', app);
   contenedor.append(h('article', { class: 'ficha con-navegacion' },
+    anuncio,
     portada,
     h('div', { class: 'ficha-cuerpo' },
       titulo,
@@ -119,18 +125,20 @@ export function montar(contenedor, { app, volver, editar }, id) {
       h('section', { class: 'seccion' }, tituloNotas, listaNotas, abrirNota, formNota),
       descartar,
     ),
-    h('div', { class: 'barra-acciones sobre-navegacion' }, botonCocinar),
+    barraCocinar,
   ), nav);
 
   function pintarMeta() {
     const fuente = urlSegura(r.fuente_url);
+    const datos = [
+      fuente ? h('a', { href: fuente, target: '_blank', rel: 'noopener noreferrer' }, r.autor || 'Ver el video', icono('externo', 14))
+        : r.autor ? h('span', null, r.autor) : null,
+      r.tiempo_min ? h('span', null, formatearMinutos(r.tiempo_min)) : null,
+      r.molde ? h('span', null, 'Molde ' + r.molde) : null,
+      textoTraduccion(r.idioma_original) ? h('span', null, textoTraduccion(r.idioma_original)) : null,
+    ].filter(Boolean);
     rellenar(zonaMeta,
-      h('div', { class: 'ficha-meta' },
-        fuente ? h('a', { href: fuente, target: '_blank', rel: 'noopener noreferrer' }, r.autor || 'Ver el video', icono('externo', 14)) : r.autor,
-        r.tiempo_min ? h('span', null, formatearMinutos(r.tiempo_min)) : null,
-        r.molde ? h('span', null, 'Molde ' + r.molde) : null,
-        textoTraduccion(r.idioma_original) ? h('span', null, textoTraduccion(r.idioma_original)) : null,
-      ),
+      datos.length ? h('div', { class: 'ficha-meta' }, datos) : null,
       r.confianza === 'baja' ? h('p', { class: 'alerta' }, icono('aviso', 18),
         'Puede que falten cantidades o pasos. Mirá el video antes de empezar.') : null,
     );
@@ -152,6 +160,11 @@ export function montar(contenedor, { app, volver, editar }, id) {
     const factor = base ? n / base : 1;
     const { secciones, utensilios } = agrupar(r.ingredientes);
     const enCompras = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
+    if (!r.ingredientes.length) {
+      return rellenar(zonaIngredientes,
+        h('h2', { id: 'titulo-ingredientes' }, 'Ingredientes'),
+        h('p', { class: 'secundario' }, 'Esta receta no tiene ingredientes cargados. Mirá el video para saber qué lleva.'));
+    }
     rellenar(zonaIngredientes,
       h('h2', { id: 'titulo-ingredientes' }, 'Ingredientes'),
       base ? porciones(base, n) : null,
@@ -179,17 +192,19 @@ export function montar(contenedor, { app, volver, editar }, id) {
   /** Porciones: −/+ para probar otro número y, si hay vistas guardadas, un chip por cada una. */
   function porciones(base, n) {
     const elegir = m => {
+      if (m < 1 || m > MAX_PORCIONES || m === n) return;
       app.porciones.set(id, m);
       conFoco(zonaIngredientes, pintarIngredientes);
+      anuncio.textContent = m === 1 ? '1 porción' : m + ' porciones';
     };
     const chips = chipsPorciones(r);
     const esVista = vistasDe(r).includes(n);
     return h('div', { class: 'porciones' },
       h('div', { class: 'porciones-control' },
-        h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Menos porciones', disabled: n <= 1,
+        h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Menos porciones', 'aria-disabled': String(n <= 1),
           onclick: () => elegir(n - 1) }, icono('menos', 18)),
         h('span', { class: 'porciones-n' }, n === 1 ? '1 porción' : n + ' porciones'),
-        h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Más porciones', disabled: n >= MAX_PORCIONES,
+        h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Más porciones', 'aria-disabled': String(n >= MAX_PORCIONES),
           onclick: () => elegir(n + 1) }, icono('mas', 18))),
       chips.length > 1 ? h('div', { class: 'chips', role: 'group', 'aria-label': 'Porciones guardadas' },
         chips.map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(c.n === n), onclick: () => elegir(c.n) },
@@ -200,11 +215,18 @@ export function montar(contenedor, { app, volver, editar }, id) {
           editar(nuevaEdicion('receta.porciones', { id, porciones: n, quitar: true }));
           app.porciones.set(id, base);
           pintar();
+          // El botón ya no está: el foco va al −/+, que sigue en el mismo lugar.
+          zonaIngredientes.querySelector('.porciones-control button').focus();
         } }, 'Quitar la vista de ' + n) : null,
     );
   }
 
   function pintarPasos() {
+    barraCocinar.hidden = !r.pasos.length;
+    if (!r.pasos.length) {
+      return rellenar(zonaPasos, h('h2', null, 'Pasos'),
+        h('p', { class: 'secundario' }, 'Esta receta no tiene pasos. Mirá el video para cocinarla.'));
+    }
     rellenar(zonaPasos,
       h('h2', null, 'Pasos'),
       h('ol', { class: 'lista-pasos' }, r.pasos.map((p, i) => h('li', null,
@@ -220,9 +242,11 @@ export function montar(contenedor, { app, volver, editar }, id) {
 
   function pintarNotas() {
     tituloNotas.textContent = r.notas.length > 1 ? 'Nuestras notas' : r.notas.length ? 'Nuestra nota' : 'Notas';
-    rellenar(listaNotas, r.notas.map(n => h('div', { class: 'nota' },
-      h('strong', null, 'Nuestra nota · ' + fechaCorta(n.fecha)),
-      h('p', null, n.texto))));
+    rellenar(listaNotas, r.notas.length
+      ? r.notas.map(n => h('div', { class: 'nota' },
+        h('strong', null, 'Nuestra nota · ' + fechaCorta(n.fecha)),
+        h('p', null, n.texto)))
+      : h('p', { class: 'secundario' }, 'Todavía no hay notas. Cuando la cocinen, cuenten cómo salió.'));
   }
 
   function pintar() {

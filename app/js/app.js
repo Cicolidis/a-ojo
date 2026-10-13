@@ -1,6 +1,6 @@
 // Arranque de A ojo: configuración, datos locales, rutas, ediciones y sincronización en segundo plano.
 
-import { leerRuta } from './rutas.js';
+import { leerRuta, tituloDe } from './rutas.js';
 import { leerConfig, guardarConfig, leerLinkConfig } from './config.js';
 import { leer, guardar, borrar } from './db.js';
 import { indexar } from './datos.js';
@@ -21,6 +21,7 @@ import * as bienvenida from './vistas/bienvenida.js';
 const CINCO_MIN_MS = 5 * 60 * 1000;
 const REINTENTO_MS = 60 * 1000;
 const contenedor = document.getElementById('app');
+const menosMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const app = {
   config: leerConfig(),
@@ -65,7 +66,18 @@ function volver(destino) {
  */
 function reemplazar(destino, desde) {
   history.replaceState({ desde }, '', destino);
-  mostrar({ enfocar: true });
+  conTransicion(() => mostrar({ enfocar: true }));
+}
+
+/**
+ * Cambia de pantalla con un fundido corto (View Transitions; el CSS dice cómo).
+ * Sin la API, con «reducir movimiento» o con la app en segundo plano, cambia directo.
+ */
+function conTransicion(cambiar) {
+  if (!document.startViewTransition || menosMovimiento.matches || document.visibilityState !== 'visible') return cambiar();
+  // Si se navega otra vez antes de que termine, el fundido se saltea (y `ready` lo avisa rechazando):
+  // la pantalla cambia igual.
+  document.startViewTransition(cambiar).ready.catch(() => {});
 }
 
 function mostrar({ enfocar = false } = {}) {
@@ -89,6 +101,7 @@ function mostrar({ enfocar = false } = {}) {
   else if (ruta.nombre === 'bandeja') vista = bandeja.montar(contenedor, ctx);
   else vista = biblioteca.montar(contenedor, ctx);
 
+  document.title = app.config ? tituloDe(ruta, ruta.id && app.indice.porId.get(ruta.id)) : 'A ojo';
   if (enfocar) {
     const titulo = contenedor.querySelector('h1, .paso-texto');
     if (titulo) titulo.focus({ preventScroll: true });
@@ -120,17 +133,33 @@ function editar(edicion) {
 
 // Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
 // Pueden traer un link: avisar('✓ Agregada a compras', { texto: 'Ver la lista', href: '#/compras' }).
-const zonaAviso = h('div', { class: 'aviso', role: 'status', hidden: true });
+// La zona (role=status) está siempre en la página, así el lector de pantalla lee cada aviso
+// nuevo. Uno nuevo reemplaza al anterior; mientras su link tiene el foco, no se va.
+const zonaAviso = h('div', { class: 'zona-aviso', role: 'status' });
 document.body.append(zonaAviso);
-let ocultarAviso = null;
 
 function avisar(texto, link) {
-  const ocultar = () => { zonaAviso.hidden = true; };
-  rellenar(zonaAviso, h('span', null, texto),
-    link ? h('a', { href: link.href, onclick: ocultar }, link.texto) : null);
-  zonaAviso.hidden = false;
-  clearTimeout(ocultarAviso);
-  ocultarAviso = setTimeout(ocultar, link ? 8000 : 6000);
+  zonaAviso.querySelectorAll('.aviso').forEach(a => clearTimeout(a.timer));
+  const aviso = h('div', { class: 'aviso' }, h('span', null, texto),
+    link ? h('a', { href: link.href, onclick: () => sacarAviso(aviso) }, link.texto) : null);
+  const programar = ms => {
+    clearTimeout(aviso.timer);
+    aviso.timer = setTimeout(() => sacarAviso(aviso), ms);
+  };
+  aviso.addEventListener('focusin', () => clearTimeout(aviso.timer));
+  aviso.addEventListener('focusout', () => programar(4000));
+  rellenar(zonaAviso, aviso);
+  programar(link ? 8000 : 6000);
+}
+
+/** Saca el aviso con su animación de salida (la del CSS; si no hay, enseguida). */
+function sacarAviso(aviso) {
+  clearTimeout(aviso.timer);
+  if (!aviso.isConnected || aviso.classList.contains('saliendo')) return;
+  if (menosMovimiento.matches) return aviso.remove();
+  aviso.classList.add('saliendo');
+  aviso.addEventListener('animationend', () => aviso.remove(), { once: true });
+  setTimeout(() => aviso.remove(), 400);
 }
 
 /** Link de configuración: guarda, borra el token de la barra de direcciones y sincroniza. */
@@ -226,7 +255,7 @@ async function arrancar() {
     if (!history.state || history.state.desde === undefined) {
       history.replaceState({ desde: new URL(evento.oldURL).hash }, '');
     }
-    mostrar({ enfocar: true });
+    conTransicion(() => mostrar({ enfocar: true }));
   });
   window.addEventListener('online', () => sincronizarAhora());
   document.addEventListener('visibilitychange', () => {

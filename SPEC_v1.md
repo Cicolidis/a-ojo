@@ -265,7 +265,9 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 7.1 Técnica
 - Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/recetas`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`).
-- `manifest.json` (nombre "A ojo", íconos, `display: standalone`, `theme_color #A6461F`, `background_color #F5EEE3`).
+- `manifest.json` (nombre "A ojo", íconos, `display: standalone`, `theme_color #A6461F`, `background_color #F5EEE3`). Sin orientación fija: se puede girar el celular, por ejemplo apoyado de costado mientras cocinan.
+- **Modo oscuro** según el sistema, sin selector (§8).
+- Al cambiar de pantalla, un fundido corto (View Transitions). Todas las animaciones se apagan si el sistema pide reducir el movimiento.
 - Service worker: guarda la interfaz en caché y funciona offline.
 - Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
 - Búsqueda local, sin tildes y sin distinguir mayúsculas, sobre título, ingredientes y etiquetas.
@@ -288,6 +290,13 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
 5. **Bandeja:** la hora del último procesamiento y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
 
+**Estados vacíos y primera carga.**
+- Cada pantalla sin datos lleva un ícono, un título corto, una explicación y, si sirve, una acción: «Borrar la búsqueda», «Ver todas», «Ver las descartadas», «Probá de nuevo», «Volver a la receta».
+- La primera vez, mientras bajan las recetas, se ve el logo con «Bajando las recetas…». Sin conexión y sin nada guardado, un solo aviso con «Probá de nuevo».
+- La Biblioteca sin ninguna receta no muestra el buscador, los filtros ni la cuenta.
+- La ficha sin pasos no ofrece «Empezar a cocinar», y sin ingredientes no ofrece «Agregar a compras» ni «Editar ingredientes». Una receta que no está dice «No encontramos esta receta».
+- Las fotos que faltan muestran una olla tenue sobre el color de relleno.
+
 Navegación inferior: **Recetas · Compras · Bandeja**, en la Biblioteca, la Ficha, Compras y Bandeja, con cuántas cosas faltan comprar y cuántos links necesitan ayuda.
 
 ---
@@ -308,8 +317,23 @@ Navegación inferior: **Recetas · Compras · Bandeja**, en la Biblioteca, la Fi
 | `--ok` | `#4F6B2E` | confianza alta |
 | `--atencion` | `#8A5A10` | confianza media o "revisar" |
 | `--alerta` | `#8A3A1A` | necesita ayuda |
+| `--borde-campo` | `#907C6A` | borde de casillas, campos de texto, selects y del elegido en el segmentado (3:1 o más) |
 
-Todos los pares de texto y fondo tienen que cumplir un contraste de al menos 4,5:1 (WCAG AA).
+Todos los pares de texto y fondo tienen que cumplir un contraste de al menos 4,5:1 (WCAG AA), y los bordes que identifican un control, 3:1. Los revisa un test (`tests/app.test.js`) en los dos modos.
+
+**Modo oscuro** (sigue al sistema): los mismos tonos cálidos, redefinidos en `@media (prefers-color-scheme: dark)`.
+
+| Token | Hex |
+|---|---|
+| `--fondo` | `#1C1612` |
+| `--superficie` | `#28201B` |
+| `--superficie-2` | `#362B23` |
+| `--borde` · `--borde-control` · `--borde-campo` | `#43362C` · `#5A4A3D` · `#8A7867` |
+| `--tinta` · `--tinta-2` · `--tinta-nota` | `#F2E9DC` · `#BCAC9B` · `#DACDBD` |
+| `--acento` · `--acento-hover` | `#E58A60` · `#F0A27E` |
+| `--ok` · `--atencion` · `--alerta` | `#A9C27F` · `#E0B060` · `#F08A6A` |
+
+El texto sobre el acento, la tinta o la alerta usa `--superficie`: en oscuro es oscura, así el botón principal y los avisos se invierten solos. La barra del sistema y el splash siguen en terracota y crema (el manifest no admite colores por modo).
 
 ### Tipografía
 - **Títulos:** Fraunces (Google Fonts), pesos 500 y 700. Títulos de pantalla de 32 px, de receta de 28 px, de tarjeta de 17 px. En el modo cocina, el paso va en Fraunces de 30 px.
@@ -319,12 +343,20 @@ Todos los pares de texto y fondo tienen que cumplir un contraste de al menos 4,5
 - Márgenes laterales de 20 px. Radios: tarjetas de foto 16 px, contenedores 14–16 px, chips 18 px (píldora), botones principales 16–18 px.
 - Área tocable de al menos 44 px. Botones principales de 52 px de alto; en el modo cocina, de 60 px.
 - Íconos: SVG de trazo de 2 px con puntas redondeadas. **Nunca emojis en la interfaz.**
+- El elegido de un selector y la pestaña activa se distinguen también por la forma (un borde, una pastilla), no solo por el color.
+
+### Movimiento
+- Sutil y corto: 150–220 ms con una curva suave. Fundido entre pantallas, avisos que entran y salen, el tilde de compras, el rebote de la estrella elegida, el paso de cocina que entra desde el costado, la hoja de mover que sube.
+- Mientras baja la primera sincronización, el logo «respira».
+- Todo va dentro de `@media (prefers-reduced-motion: no-preference)`: con «quitar animaciones» del sistema, nada se mueve.
 
 ### Tono de los textos
 Rioplatense, cercano y breve: "¿Qué cocinamos hoy?", "Empezar a cocinar", "Listo, siguiente", "Esperando a la Mac…", "Mandá 2 o 3 capturas y lo resolvemos".
 
 ### Logo
 **Elegido: 2 · Monograma «a» con pizca, versión 2B** (fondo terracota `#A6461F`, «a» itálica en Fraunces 700 y granos en crema). Regla: **solo dos colores**, crema y terracota. La variante clara 2A invierte los colores: fondo crema, «a» y granos en terracota. En tamaños chicos, los granos pasan de 3 a 2 (48 px) y desaparecen en 32 px. Referencia en el lienzo, fila "Logo · finalistas". Tiene que funcionar como ícono de la app (512 × 512, con zona segura para la versión adaptable de Android) y en tamaño chico (32 px).
+
+Los íconos de la app y de la extensión salen del mismo origen (`scripts/iconos/icono.html`, con `npm run iconos`). Dentro de la app, el logo aparece en la bienvenida y en la primera carga.
 
 ---
 
@@ -361,7 +393,8 @@ Cada fase termina con una demo funcionando y un commit.
 - **Listo cuando:** arman la compra de 3 recetas (con un opcional elegido y un ítem movido de lugar) y la mandan por WhatsApp; y una fila en "Necesita ayuda" se resuelve subiendo capturas desde el celular y corriendo `/recetas`.
 
 ### Fase 5: pulido
-- Logo e íconos, pantallas vacías, microanimaciones, revisión de accesibilidad.
+- Logo e íconos (también los de la extensión), pantallas vacías y primera carga, microanimaciones, revisión de accesibilidad (AA) y modo oscuro.
+- **Listo cuando:** instalada de cero en Android, muestra el logo mientras baja las recetas; con el celular en modo oscuro, toda la app se ve en la paleta oscura; cada pantalla tiene su estado vacío; las pantallas cambian con un fundido y los avisos entran y salen, y con «quitar animaciones» del sistema nada se mueve; el test de contraste pasa en los dos modos; la extensión muestra el logo 2B.
 
 ---
 

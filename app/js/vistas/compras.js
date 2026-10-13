@@ -5,7 +5,7 @@
 import { h, icono, rellenar } from '../dom.js';
 import { LUGARES, REVISAR, armarLista, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
-import { navegacion } from './controles.js';
+import { cargando, navegacion, vacio } from './controles.js';
 
 export function montar(contenedor, { app, editar }) {
   const sync = h('p', { class: 'estado-sync', role: 'status' });
@@ -33,11 +33,14 @@ export function montar(contenedor, { app, editar }) {
     pintar();
   } }, campo, h('button', { type: 'submit', class: 'boton-secundario boton-chico' }, icono('mas', 18), 'Sumar'));
 
+  const agregarReceta = h('a', { class: 'boton-secundario boton-chico agregar-receta', href: '#/compras/recetas' },
+    icono('mas', 18), 'Agregar una receta');
+
   contenedor.append(h('div', { class: 'compras con-navegacion' },
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'Compras'),
     sync,
     zonaRecetas,
-    h('a', { class: 'boton-secundario boton-chico agregar-receta', href: '#/compras/recetas' }, icono('mas', 18), 'Agregar una receta'),
+    agregarReceta,
     sumar,
     zonaLista,
     zonaAcciones,
@@ -48,7 +51,7 @@ export function montar(contenedor, { app, editar }) {
 
   function marcar(fila, hecho) {
     editar(nuevaEdicion('compras.marcar', { ids: fila.ids, hecho }));
-    pintar('c:' + fila.clave);
+    pintar('c:' + fila.clave, hecho ? fila.clave : null);
   }
 
   function mover(fila, lugar, siempre) {
@@ -79,9 +82,10 @@ export function montar(contenedor, { app, editar }) {
     dialogo.showModal();
   }
 
-  function fila(f, grupo) {
+  /** Una fila de la lista. La `recien` marcada lleva su animación (las demás no se reaniman al repintar). */
+  function fila(f, grupo, recien) {
     const revisar = grupo.lugar === REVISAR;
-    return h('li', { class: 'compra' + (f.hecho ? ' hecha' : '') + (f.opcional ? ' opcional' : '') },
+    return h('li', { class: 'compra' + (f.hecho ? ' hecha' : '') + (f.opcional ? ' opcional' : '') + (f.clave === recien ? ' recien' : '') },
       h('label', null,
         h('input', { type: 'checkbox', checked: f.hecho, 'data-foco': 'c:' + f.clave,
           'aria-label': (revisar ? 'Lo tengo: ' : 'Comprado: ') + f.nombre,
@@ -113,36 +117,47 @@ export function montar(contenedor, { app, editar }) {
             onclick: () => {
               editar(nuevaEdicion('compras.quitar', { ids: x.ids }));
               pintar();
+              agregarReceta.focus();
             } }, 'Quitar'));
       }))));
   }
 
-  /** Repinta la lista y devuelve el foco al control equivalente (data-foco): el indicado o el que lo tenía. */
-  function pintar(foco) {
+  /**
+   * Repinta la lista y devuelve el foco al control equivalente (data-foco): el indicado o el que lo tenía.
+   * `recien`: la clave de la fila que se acaba de marcar, para animarla.
+   */
+  function pintar(foco, recien) {
     foco = foco || (document.activeElement && document.activeElement.getAttribute('data-foco'));
     const grupos = lista();
     pintarRecetas();
+    // Sin datos todavía, sumar no tendría dónde guardarse.
+    agregarReceta.hidden = !app.datos;
+    sumar.hidden = !app.datos;
     if (!grupos.length) {
-      rellenar(zonaLista, h('p', { class: 'vacio' }, !app.datos
-        ? (app.sync.estado === 'sincronizando' ? 'Bajando la lista…' : 'Todavía no se bajó la lista.')
-        : 'La lista está vacía. Agregá una receta o sumá algo a mano.'));
+      rellenar(zonaLista, !app.datos
+        ? (app.sync.estado === 'sincronizando' ? cargando('Bajando la lista…')
+          : vacio({ figura: 'aviso', titulo: 'Todavía no se bajó la lista', texto: 'Cuando haya conexión, aparece sola.' }))
+        : vacio({ figura: 'compras', titulo: 'La lista está vacía', texto: 'Agregá una receta o sumá algo a mano.' }));
     } else {
-      rellenar(zonaLista, grupos.map(g => h('section', { class: 'compras-grupo', 'aria-label': g.nombre },
+      rellenar(zonaLista, grupos.map(g => h('section', { class: 'compras-grupo' },
         h('h2', { class: 'etiqueta-seccion' }, g.nombre),
         g.lugar === REVISAR ? h('p', { class: 'secundario' }, 'Tildá lo que ya tenés; si falta algo, tocá «Comprar».') : null,
-        h('ul', { class: 'lista-compras' }, g.filas.map(f => fila(f, g))))));
+        h('ul', { class: 'lista-compras' }, g.filas.map(f => fila(f, g, recien))))));
     }
 
     const texto = textoWhatsApp(grupos);
     // Se limpian todos los ítems marcados; el número es el de filas tachadas, que es lo que se ve.
     const marcados = (app.datos?.compras || []).filter(c => c.hecho === true || c.hecho === 'true').map(c => c.id);
     const tachadas = grupos.reduce((n, g) => n + g.filas.filter(f => f.hecho).length, 0);
+    const todoListo = grupos.length > 0 && grupos.every(g => g.filas.every(f => f.hecho));
     rellenar(zonaAcciones,
+      todoListo ? h('p', { class: 'listo-todo' }, icono('check', 18), 'Ya está todo.') : null,
       texto ? h('button', { type: 'button', class: 'boton-principal', onclick: () => mandar(texto) },
         icono('compartir', 20), 'Mandar por WhatsApp') : null,
       marcados.length ? h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
         editar(nuevaEdicion('compras.quitar', { ids: marcados }));
         pintar();
+        agregarReceta.focus();
       } }, 'Limpiar marcados' + (tachadas ? ' (' + tachadas + ')' : '')) : null,
       h('a', { class: 'boton-texto', href: '#/lugares' }, icono('mover', 18), 'Dónde compramos cada cosa'),
     );

@@ -1,11 +1,11 @@
 // Biblioteca (#/): buscador, filtros, aviso de la bandeja y grilla de recetas.
 
 import { h, icono, foto } from '../dom.js';
-import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, resumenBandeja } from '../datos.js';
+import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, resumenBandeja } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
-import { navegacion } from './controles.js';
+import { cargando, navegacion, vacio } from './controles.js';
 
-export function montar(contenedor, { app }) {
+export function montar(contenedor, { app, sincronizar }) {
   const estado = app.biblioteca;
   const cuenta = h('span', { class: 'secundario' });
   const sync = h('p', { class: 'estado-sync', role: 'status' });
@@ -26,11 +26,13 @@ export function montar(contenedor, { app }) {
     },
   });
 
+  const campoBuscar = h('label', { class: 'buscador' }, icono('buscar', 18), buscador);
+
   contenedor.append(h('div', { class: 'biblioteca con-navegacion' },
     h('div', { class: 'encabezado' }, h('span', { class: 'marca' }, 'A ojo'), cuenta),
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, '¿Qué cocinamos hoy?'),
     sync,
-    h('label', { class: 'buscador' }, icono('buscar', 18), buscador),
+    campoBuscar,
     chips,
     aviso,
     grilla,
@@ -43,13 +45,26 @@ export function montar(contenedor, { app }) {
     chips.replaceChildren(...filtros.map(f => h('button', {
       type: 'button',
       class: 'chip',
+      'data-filtro': f.id,
       'aria-pressed': String(f.id === estado.filtro),
-      onclick: e => {
-        estado.filtro = f.id;
-        chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
-        pintarGrilla();
-      },
+      onclick: () => elegirFiltro(f.id),
     }, f.nombre)));
+  }
+
+  /** Elige un filtro (desde su chip o desde un estado vacío) y deja el foco en su chip. */
+  function elegirFiltro(id, enfocar = false) {
+    estado.filtro = id;
+    chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filtro === id)));
+    pintarGrilla();
+    const chip = chips.querySelector('[aria-pressed="true"]');
+    if (enfocar && chip) chip.focus();
+  }
+
+  function borrarBusqueda() {
+    estado.texto = '';
+    buscador.value = '';
+    pintarGrilla();
+    buscador.focus();
   }
 
   function pintarAviso() {
@@ -73,20 +88,45 @@ export function montar(contenedor, { app }) {
       grilla.replaceChildren(h('div', { class: 'grilla' }, recetas.map(tarjeta)));
       return;
     }
-    let texto;
-    if (!app.datos) texto = app.sync.estado === 'sincronizando' ? 'Bajando las recetas…' : 'Todavía no se bajaron las recetas.';
-    else if (estado.texto.trim()) texto = 'No hay recetas con «' + estado.texto.trim() + '».';
-    else if (estado.filtro !== 'todas') texto = 'No hay recetas en este filtro.';
-    else texto = 'Todavía no hay recetas. Guardá un link y corré /recetas en la Mac.';
-    grilla.replaceChildren(h('p', { class: 'vacio' }, texto));
+    grilla.replaceChildren(estadoVacio(motivoVacio(app.indice.lista, estado, { hayDatos: !!app.datos, sync: app.sync.estado })));
+  }
+
+  function estadoVacio(motivo) {
+    const otraVez = [{ texto: 'Probá de nuevo', onclick: () => sincronizar() }];
+    if (motivo === 'cargando') return cargando('Bajando las recetas…');
+    if (motivo === 'sin_conexion') {
+      return vacio({ figura: 'aviso', titulo: 'Sin conexión', texto: 'Cuando vuelva, bajamos las recetas.', acciones: otraVez });
+    }
+    if (motivo === 'sin_datos') return vacio({ figura: 'aviso', titulo: 'Todavía no se bajaron las recetas', acciones: otraVez });
+    if (motivo === 'busqueda') {
+      return vacio({ figura: 'buscar', titulo: 'No hay recetas con «' + estado.texto.trim() + '»',
+        texto: 'Probá con otra palabra o con un ingrediente.', acciones: [{ texto: 'Borrar la búsqueda', onclick: borrarBusqueda }] });
+    }
+    if (motivo === 'filtro') {
+      return vacio({ figura: 'recetas', titulo: 'No hay recetas en este filtro',
+        acciones: [{ texto: 'Ver todas', onclick: () => elegirFiltro('todas', true) }] });
+    }
+    if (motivo === 'descartadas') {
+      return vacio({ figura: 'recetas', titulo: 'Todas las recetas están descartadas', texto: 'Se recuperan desde su ficha.',
+        acciones: [{ texto: 'Ver las descartadas', onclick: () => elegirFiltro('descartada', true) }] });
+    }
+    return vacio({ figura: 'recetas', titulo: 'Todavía no hay recetas',
+      texto: 'Guardá un link desde el celular o la extensión y corré /recetas en la Mac.',
+      acciones: resumenBandeja(app.datos?.bandeja).total ? [{ texto: 'Ver la bandeja', href: '#/bandeja' }] : [] });
   }
 
   function actualizar() {
+    // Sin ninguna receta (ni descartada), la cuenta, el buscador y los filtros no sirven.
+    const hayRecetas = app.indice.lista.length > 0;
     const n = app.indice.lista.filter(r => r.estado !== 'descartada').length;
-    cuenta.textContent = app.datos ? (n === 1 ? '1 receta' : n + ' recetas') : '';
+    cuenta.textContent = hayRecetas ? (n === 1 ? '1 receta' : n + ' recetas') : '';
+    campoBuscar.hidden = !hayRecetas;
+    chips.hidden = !hayRecetas;
     const pendientes = app.cola.length;
+    // Sin datos y sin conexión, ya lo dice el estado vacío.
+    const avisarSync = app.sync.estado === 'error' || (app.sync.estado === 'sin_conexion' && app.datos);
     sync.textContent = [
-      app.sync.estado === 'sin_conexion' || app.sync.estado === 'error' ? app.sync.mensaje : '',
+      avisarSync ? app.sync.mensaje : '',
       pendientes === 1 ? '1 cambio sin mandar' : pendientes ? pendientes + ' cambios sin mandar' : '',
     ].filter(Boolean).join(' · ');
     sync.classList.toggle('error', app.sync.estado === 'error');
@@ -109,7 +149,7 @@ export function montar(contenedor, { app }) {
 function tarjeta(r) {
   const meta = [r.autor, formatearMinutos(r.tiempo_min)].filter(Boolean).join(' · ');
   const valoracion = Number(r.valoracion) > 0
-    ? h('span', { class: 'valoracion', 'aria-label': 'Valoración ' + r.valoracion + ' de 5' }, icono('estrella', 12), r.valoracion)
+    ? h('span', { class: 'valoracion', role: 'img', 'aria-label': 'Valoración ' + r.valoracion + ' de 5' }, icono('estrella', 12), r.valoracion)
     : null;
   return h('a', { class: 'tarjeta', href: '#/receta/' + r.id },
     foto(r, 'tarjeta-foto'),

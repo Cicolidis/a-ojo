@@ -75,9 +75,9 @@ export function relleno(id) {
   return RELLENOS[n % RELLENOS.length];
 }
 
-/** Foto de una receta, sobre su color de relleno. Si no hay foto o no carga, queda el color. */
+/** Foto de una receta, sobre su color de relleno. Si no hay foto o no carga, queda el color con una olla tenue. */
 export function foto(receta, clase) {
-  const marco = h('div', { class: clase });
+  const marco = h('div', { class: clase }, h('span', { class: 'foto-vacia' }, icono('cocinar', 36)));
   marco.style.backgroundColor = relleno(receta.id);
   if (/^(https:\/\/|\/)/.test(receta.foto_url || '')) {
     const img = h('img', { src: receta.foto_url, alt: '', loading: 'lazy', decoding: 'async' });

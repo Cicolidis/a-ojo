@@ -17,3 +17,18 @@ export function leerRuta(hash) {
   if (ruta === '/config') return { nombre: 'config' };
   return { nombre: 'biblioteca' };
 }
+
+const NOMBRES = {
+  cocina: 'Modo cocina',
+  ingredientes: 'Editar ingredientes',
+  agregar: 'Agregar a compras',
+  compras: 'Compras',
+  elegir: 'Agregar una receta',
+  lugares: 'Dónde compramos',
+  bandeja: 'Bandeja',
+};
+
+/** Título de la pestaña (y del selector de apps): «Compras · A ojo», «Torta vasca · A ojo». */
+export function tituloDe(ruta, receta) {
+  return [NOMBRES[ruta.nombre], receta && receta.titulo, 'A ojo'].filter(Boolean).join(' · ');
+}

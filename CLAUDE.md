@@ -7,7 +7,8 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 - Todo el texto visible va en **castellano rioplatense** con voseo ("Guardá", "Probá de nuevo"). El código también usa nombres en castellano.
 - **Nunca emojis en la interfaz**: íconos SVG de trazo. Los caracteres "✓" y "…" están permitidos, como indica la spec.
 - **Ningún secreto en el repo**: probablemente sea público cuando se sume GitHub Pages. El token vive en Script Properties, `.env`, `chrome.storage.local` y el celular.
-- Colores y tipografía: §8 de la spec (variante A).
+- Colores y tipografía: §8 de la spec (variante A). **Todo color va como token** en `:root` de `estilos.css` y también en el bloque del modo oscuro; si se usa un par nuevo de texto y fondo, sumarlo al test de contraste (`tests/app.test.js`).
+- **Movimiento:** toda animación o transición va dentro de `@media (prefers-reduced-motion: no-preference)`; del lado de JS, se mira `menosMovimiento` (`app.js`).
 
 ## Apps Script (`apps-script/src`)
 
@@ -34,10 +35,11 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 
 - PWA sin build: módulos ES servidos tal cual por GitHub Pages (`.github/workflows/pages.yml`). Nada de dependencias ni frameworks.
 - El texto de las recetas viene de terceros: el DOM se arma con `h()` de `js/dom.js`, que usa `textContent`. **Nunca `innerHTML` con datos**, y solo links `http(s)` (`urlSegura`).
+- Estados vacíos y de carga: `vacio()`, `cargando()` y `sinReceta()` de `vistas/controles.js`. Un botón que se saca o se deshabilita a sí mismo deja el foco en otro lado (o usa `aria-disabled`, como los −/+).
 - La lógica pura va en `js/datos.js`, `js/formato.js`, `js/cocina.js`, `js/ingredientes.js`, `js/compras.js`, `js/bandeja.js`, `js/ediciones.js`, `js/config.js` y `js/rutas.js`, con sus tests en `tests/app.test.js`. Las vistas (`js/vistas/`) solo arman DOM; `rellenar()` de `dom.js` reemplaza contenido con las mismas reglas que `h()`.
 - **Archivo nuevo en `app/` → sumarlo a `ARCHIVOS` en `sw.js`**: si no, no funciona sin conexión. El test de precache lo exige.
 - El service worker no intercepta la API. `__VERSION__` en `sw.js` lo reemplaza el workflow por el commit; con el literal (desarrollo) la interfaz va primero a la red.
-- Para probar: `npm run app` (API falsa con `tests/fixtures/todo.json`, token `prueba`). **No usar el token real en el navegador**: el link real lo genera Camilo con `npm run link-config`. La API falsa guarda las ediciones en memoria, y `/api-falsa/cortar?segundos=N` simula que no hay conexión.
+- Para probar: `npm run app` (API falsa con `tests/fixtures/todo.json`, token `prueba`). Con `--vacia` arranca sin datos (estados vacíos) y `/api-falsa/demorar?segundos=N` demora cada respuesta (primera carga); en `.claude/launch.json` están `app` y `app-vacia`. **No usar el token real en el navegador**: el link real lo genera Camilo con `npm run link-config`. La API falsa guarda las ediciones en memoria, y `/api-falsa/cortar?segundos=N` simula que no hay conexión.
 - **Ediciones:** se arman con `ediciones.js` y pasan por `editar()` de `app.js`, que las aplica al instante y las deja en la cola (IndexedDB). `sincronizar` primero manda la cola y después pide `todo`. Una acción nueva necesita su caso en `aplicarEdicion()`, igual al de la API.
 - Si la app empieza a usar columnas nuevas, subir `VERSION_DATOS` en `datos.js`: los snapshots viejos se piden enteros de nuevo.
 - Los ingredientes se muestran por sección y rol con `rolDe()` / `seccionDe()` (`ingredientes.js`): lo editado por ellos gana sobre lo de `/recetas`.

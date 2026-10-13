@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- Logo 2B (§8): fondo terracota, «a» itálica de Fraunces 700 y granos crema. Lo usa scripts/iconos.sh. -->
-<!-- ?tam=512&tipo=any|maskable|favicon -->
+<!-- ?tam=512&tipo=any|chico|maskable|favicon -->
+<!-- Granos (§8): 3 en grande, 2 en 48 px (tipo=chico) y ninguno en 32 px o menos (tipo=favicon). -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -15,7 +16,7 @@
     <g id="granos" fill="#F5EEE3">
       <circle cx="150" cy="62" r="8"/>
       <circle cx="166" cy="46" r="5.5"/>
-      <circle cx="177" cy="32" r="3.5"/>
+      <circle id="grano-3" cx="177" cy="32" r="3.5"/>
     </g>
   </g>
 </svg>
@@ -30,6 +31,15 @@
     // A sangre: Android recorta la forma. El contenido entra en la zona segura (círculo del 80 %).
     document.getElementById('fondo').setAttribute('rx', '0');
     document.getElementById('contenido').setAttribute('transform', 'translate(110 110) scale(0.78) translate(-110 -110)');
+  }
+  if (tipo === 'chico') {
+    // En 48 px quedan 2 granos, un poco más grandes para que se lean.
+    document.getElementById('grano-3').remove();
+    const [g1, g2] = document.querySelectorAll('#granos circle');
+    g1.setAttribute('r', '10');
+    g2.setAttribute('r', '7.5');
+    g2.setAttribute('cx', '170');
+    g2.setAttribute('cy', '40');
   }
   if (tipo === 'favicon') {
     // En 32 px los granos desaparecen y la «a» se centra.

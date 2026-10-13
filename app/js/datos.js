@@ -156,6 +156,18 @@ export function buscar(lista, { texto = '', filtro = 'todas' } = {}) {
     palabras.every(p => r.busqueda.includes(p)));
 }
 
+/**
+ * Por qué la Biblioteca no tiene tarjetas para mostrar, para elegir su estado vacío:
+ * cargando · sin_conexion · sin_datos (todavía no bajó nada) · busqueda · filtro ·
+ * descartadas (solo hay descartadas) · vacia (no hay ninguna receta).
+ */
+export function motivoVacio(lista, { texto = '', filtro = 'todas' } = {}, { hayDatos = true, sync = 'ok' } = {}) {
+  if (!hayDatos) return sync === 'sincronizando' ? 'cargando' : sync === 'sin_conexion' ? 'sin_conexion' : 'sin_datos';
+  if (texto.trim()) return 'busqueda';
+  if (filtro !== 'todas') return 'filtro';
+  return lista.some(r => r.estado === 'descartada') ? 'descartadas' : 'vacia';
+}
+
 /** Las `n` etiquetas más usadas (sin contar las descartadas); a igual cantidad, por orden alfabético. */
 export function etiquetasFrecuentes(lista, n = 6) {
   const cuenta = new Map();

@@ -4,8 +4,16 @@
     {
       "name": "app",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/servir.js", "--falsa", "--puerto", "4173"],
-      "port": 4173
+      "runtimeArgs": ["scripts/servir.js", "--falsa"],
+      "port": 4173,
+      "autoPort": true
+    },
+    {
+      "name": "app-vacia",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/servir.js", "--falsa", "--vacia"],
+      "port": 4174,
+      "autoPort": true
     }
   ]
 }

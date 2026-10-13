@@ -6,6 +6,7 @@
 import { h, icono, foto, rellenar } from '../dom.js';
 import { buscar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
+import { cargando, vacio } from './controles.js';
 
 export function montar(contenedor, { app, volver, reemplazar }) {
   let texto = '';
@@ -36,8 +37,17 @@ export function montar(contenedor, { app, volver, reemplazar }) {
     const enLista = new Map(recetasEnLista(app.datos?.compras).map(x => [x.receta_id, x]));
     const recetas = buscar(app.indice.lista, { texto }).filter(r => r.ingredientes.length);
     if (!recetas.length) {
-      return rellenar(lista, h('li', { class: 'vacio' }, !app.datos ? 'Todavía no se bajaron las recetas.'
-        : texto.trim() ? 'No hay recetas con «' + texto.trim() + '».' : 'Todavía no hay recetas.'));
+      let estado;
+      if (!app.datos) {
+        estado = app.sync.estado === 'sincronizando' ? cargando('Bajando las recetas…')
+          : vacio({ figura: 'aviso', titulo: 'Todavía no se bajaron las recetas' });
+      } else if (texto.trim()) {
+        estado = vacio({ figura: 'buscar', titulo: 'No hay recetas con «' + texto.trim() + '»', texto: 'Probá con otra palabra o con un ingrediente.' });
+      } else {
+        estado = vacio({ figura: 'recetas', titulo: 'Todavía no hay recetas con ingredientes',
+          texto: 'Cuando /recetas guarde alguna, la vas a poder sumar desde acá.' });
+      }
+      return rellenar(lista, h('li', null, estado));
     }
     rellenar(lista, recetas.map(r => {
       const x = enLista.get(r.id);

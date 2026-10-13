@@ -6,7 +6,7 @@ import { h, icono } from '../dom.js';
 import { capitalizar, formatearCantidad } from '../formato.js';
 import { NOMBRES_ROL, ROLES, rolDe, seccionDe } from '../ingredientes.js';
 import { nuevaEdicion } from '../ediciones.js';
-import { segmentado } from './controles.js';
+import { segmentado, sinReceta } from './controles.js';
 
 // Valor de «Nueva sección…» en los selectores. Empieza con espacio: ninguna sección puede (se guardan sin espacios a los costados).
 const NUEVA = ' nueva';
@@ -15,9 +15,8 @@ const OPCIONES_ROL = ROLES.map(valor => ({ valor, nombre: NOMBRES_ROL[valor] }))
 export function montar(contenedor, { app, volver, editar }, id) {
   const r = app.indice.porId.get(id);
   if (!r || !r.ingredientes.length) {
-    contenedor.append(h('div', { class: 'bienvenida' },
-      h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'No encontramos esta receta'),
-      h('a', { class: 'boton-secundario', href: '#/' }, 'Ir a las recetas')));
+    contenedor.append(sinReceta(app, id, r && {
+      titulo: 'Esta receta no tiene ingredientes', texto: 'No hay nada para editar.' }));
     return null;
   }
 
@@ -60,6 +59,7 @@ export function montar(contenedor, { app, volver, editar }, id) {
     return nombres.filter(n => !n).concat(nombres.filter(Boolean));
   }
 
+  /** Repinta; `enfocar` es el id del ingrediente cuyo selector recibe el foco, o `{ seccion }` para su «Renombrar». */
   function pintar(enfocar) {
     const nombres = secciones();
     const conSecciones = nombres.some(Boolean);
@@ -68,7 +68,10 @@ export function montar(contenedor, { app, volver, editar }, id) {
       h('ul', { class: 'editor-ingredientes' },
         r.ingredientes.filter(i => elegidos.get(i.id).seccion === nombre).map(i => fila(i, nombres))),
     )));
-    if (enfocar) {
+    if (enfocar && enfocar.seccion !== undefined) {
+      const cabeza = [...lista.querySelectorAll('.editor-cabeza')].find(c => c.querySelector('h2').textContent === enfocar.seccion);
+      if (cabeza) cabeza.querySelector('button').focus();
+    } else if (enfocar) {
       const el = lista.querySelector('[data-id="' + enfocar + '"] select');
       if (el) el.focus();
     }
@@ -79,10 +82,11 @@ export function montar(contenedor, { app, volver, editar }, id) {
     if (!nombre) return h('h2', { class: 'etiqueta-seccion' }, 'Sin sección');
     const titulo = h('div', { class: 'editor-cabeza' },
       h('h2', { class: 'etiqueta-seccion' }, nombre),
-      h('button', { type: 'button', class: 'boton-texto', onclick: () => titulo.replaceWith(campoNombre(nombre, nuevo => {
-        elegidos.forEach(e => { if (e.seccion === nombre) e.seccion = nuevo; });
-        pintar();
-      }, () => pintar())) }, 'Renombrar'));
+      h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Renombrar la sección ' + nombre,
+        onclick: () => titulo.replaceWith(campoNombre(nombre, nuevo => {
+          elegidos.forEach(e => { if (e.seccion === nombre) e.seccion = nuevo; });
+          pintar({ seccion: nuevo });
+        }, () => pintar({ seccion: nombre }))) }, 'Renombrar'));
     return titulo;
   }
 

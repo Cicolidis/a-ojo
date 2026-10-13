@@ -16,13 +16,17 @@
   src: url(../fuentes/work-sans.woff2) format('woff2');
 }
 
+/* Colores: siempre por token, y cada token también en el modo oscuro de abajo.
+   tests/app.test.js revisa el contraste de los pares que se usan, en los dos modos. */
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --fondo: #F5EEE3;
   --superficie: #FFFBF5;
   --superficie-2: #EFE2CF;
   --borde: #E4D7C5;
   --borde-control: #D8C8B2;
+  /* Borde de lo que hay que reconocer como campo (casillas, textos, selects): 3:1 o más. */
+  --borde-campo: #907C6A;
   --linea: #EFE6D9;
   --tinta: #2A211B;
   --tinta-2: #6B5D52;
@@ -32,9 +36,41 @@
   --ok: #4F6B2E;
   --atencion: #8A5A10;
   --alerta: #8A3A1A;
+  --sombra: rgba(42, 33, 27, 0.12);
+  --velo: rgba(42, 33, 27, 0.45);
+  /* Ícono de las fotos que faltan: crema sobre los rellenos, igual en los dos modos. */
+  --sobre-foto: rgba(255, 251, 245, 0.6);
   --serif: 'Fraunces', Georgia, serif;
   --sans: 'Work Sans', system-ui, -apple-system, sans-serif;
   --margen: 20px;
+  /* Movimiento: corto y suave. Todo lo que se mueve va dentro de prefers-reduced-motion: no-preference. */
+  --rapido: 150ms;
+  --medio: 220ms;
+  --curva: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Modo oscuro: sigue al sistema. Los mismos tonos cálidos; el texto sobre el acento,
+   la tinta o la alerta usa --superficie, que acá es oscura, así esos pares se invierten solos. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #1C1612;
+    --superficie: #28201B;
+    --superficie-2: #362B23;
+    --borde: #43362C;
+    --borde-control: #5A4A3D;
+    --borde-campo: #8A7867;
+    --linea: #3A2F27;
+    --tinta: #F2E9DC;
+    --tinta-2: #BCAC9B;
+    --tinta-nota: #DACDBD;
+    --acento: #E58A60;
+    --acento-hover: #F0A27E;
+    --ok: #A9C27F;
+    --atencion: #E0B060;
+    --alerta: #F08A6A;
+    --sombra: rgba(0, 0, 0, 0.4);
+    --velo: rgba(0, 0, 0, 0.6);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -67,7 +103,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   outline-offset: 2px;
 }
 
-h1:focus, .paso-texto:focus { outline: none; }
+h1:focus, .paso-texto:focus, .vacio-titulo:focus, h2[tabindex]:focus, .ok-texto:focus { outline: none; }
+
+/* Sobre fondos oscuros (el aviso, los timers) el anillo va del color del texto. */
+.aviso a:focus-visible, .timer-chip button:focus-visible { outline-color: currentColor; }
+
+::placeholder { color: var(--tinta-2); opacity: 1; }
 
 .icono { display: inline-flex; flex: none; }
 
@@ -112,7 +153,17 @@ h1:focus, .paso-texto:focus { outline: none; }
   color: var(--superficie);
 }
 
-.boton-principal:hover { background: var(--acento-hover); }
+@media (hover: hover) {
+  .boton-principal:not(:disabled, [aria-disabled="true"]):hover { background: var(--acento-hover); }
+}
+
+.boton-principal:active { background: var(--acento-hover); }
+
+.boton-principal:disabled, .boton-principal[aria-disabled="true"] {
+  background: var(--superficie-2);
+  color: var(--tinta-2);
+  cursor: default;
+}
 
 .boton-secundario {
   border: 1px solid var(--borde-control);
@@ -121,7 +172,9 @@ h1:focus, .paso-texto:focus { outline: none; }
   font-weight: 500;
 }
 
-.boton-secundario:disabled { opacity: 0.45; cursor: default; }
+.boton-secundario:active, .boton-redondo:active, .opcion-lugar:active { background: var(--superficie-2); }
+
+.boton-secundario:disabled, .boton-secundario[aria-disabled="true"] { opacity: 0.45; cursor: default; }
 
 .boton-chico { min-height: 44px; padding: 0 16px; border-radius: 14px; font-size: 15px; }
 
@@ -154,7 +207,7 @@ h1:focus, .paso-texto:focus { outline: none; }
 }
 
 .boton-redondo.chico { border: 1px solid var(--borde-control); }
-.boton-redondo:disabled { opacity: 0.45; cursor: default; }
+.boton-redondo:disabled, .boton-redondo[aria-disabled="true"] { opacity: 0.45; cursor: default; }
 
 /* Campos de texto */
 
@@ -162,7 +215,7 @@ textarea, input[type="text"], select {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid var(--borde-control);
+  border: 1px solid var(--borde-campo);
   border-radius: 12px;
   background: var(--superficie);
   color: var(--tinta);
@@ -170,7 +223,11 @@ textarea, input[type="text"], select {
 }
 
 textarea { resize: vertical; }
-textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-color: var(--acento); }
+textarea:focus, input[type="text"]:focus, select:focus {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 1px var(--acento);
+}
 
 /* Controles: selector segmentado y estrellas */
 
@@ -184,7 +241,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 
 .segmentado button {
   flex: 1;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 8px;
   border: none;
   border-radius: 11px;
@@ -198,10 +255,11 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   background: var(--superficie);
   color: var(--tinta);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(42, 33, 27, 0.12);
+  /* El borde dice cuál está elegido sin depender del color del texto. */
+  box-shadow: inset 0 0 0 1px var(--borde-campo), 0 1px 2px var(--sombra);
 }
 
-.segmentado.chico button { min-height: 38px; padding: 0 4px; font-size: 13px; }
+.segmentado.chico button { padding: 0 4px; font-size: 13px; }
 
 .estrellas { display: flex; gap: 2px; }
 
@@ -220,21 +278,28 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 .estrellas button.llena { color: var(--acento); }
 .estrellas button.llena svg { fill: currentColor; }
 
-/* Avisos breves abajo de la pantalla */
+/* Avisos breves abajo de la pantalla. La zona está siempre (es la región role=status)
+   y no ataja toques; el aviso, adentro, entra y sale. */
 
-.aviso {
+.zona-aviso {
   position: fixed;
   left: 50%;
   bottom: calc(96px + env(safe-area-inset-bottom));
   z-index: 10;
   width: calc(100% - 2 * var(--margen));
   max-width: 520px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.aviso {
   padding: 12px 16px;
   border-radius: 14px;
   background: var(--tinta);
   color: var(--superficie);
   font-size: 14px;
-  transform: translateX(-50%);
+  box-shadow: 0 4px 16px var(--sombra);
+  pointer-events: auto;
 }
 
 /* Biblioteca */
@@ -257,13 +322,12 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   color: var(--acento);
 }
 
-.marca i { font-style: italic; }
-
 .titulo-pantalla {
   font: 500 32px/1.1 var(--serif);
 }
 
-.estado-sync:empty { display: none; }
+/* Vacío no ocupa lugar, pero sigue en la página: así el lector de pantalla lee cuando cambia. */
+.estado-sync:empty { position: absolute; }
 .estado-sync { font-size: 13px; color: var(--tinta-2); }
 .estado-sync.error { color: var(--alerta); font-weight: 500; }
 
@@ -273,13 +337,13 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   gap: 10px;
   height: 48px;
   padding: 0 14px;
-  border: 1px solid var(--borde);
+  border: 1px solid var(--borde-campo);
   border-radius: 14px;
   background: var(--superficie);
   color: var(--tinta-2);
 }
 
-.buscador:focus-within { border-color: var(--acento); }
+.buscador:focus-within { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
 
 .buscador input {
   flex: 1;
@@ -292,13 +356,12 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   outline: none;
 }
 
-.buscador input::placeholder { color: var(--tinta-2); }
-
+/* 4 px arriba y abajo: entran el área tocable de 44 px y el anillo de foco (el scroll los recortaría). */
 .chips {
   display: flex;
   gap: 8px;
-  margin: 0 calc(-1 * var(--margen));
-  padding: 2px var(--margen);
+  margin: -2px calc(-1 * var(--margen));
+  padding: 4px var(--margen);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -446,7 +509,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 32px;
+  min-height: 44px;
   font-weight: 600;
 }
 
@@ -509,7 +572,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   padding: 1px 7px;
   border: 1px solid var(--borde-control);
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   vertical-align: 1px;
 }
@@ -614,7 +677,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   right: 0;
   bottom: 0;
   padding: 12px var(--margen) calc(16px + env(safe-area-inset-bottom));
-  background: linear-gradient(to bottom, rgba(245, 238, 227, 0), var(--fondo) 30%);
+  background: linear-gradient(to bottom, transparent, var(--fondo) 30%);
 }
 
 .barra-acciones .boton-principal {
@@ -661,7 +724,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   background: var(--borde);
 }
 
-.progreso span.hecho { background: var(--acento); }
+.progreso span.hecho { background: var(--acento); transform-origin: left center; }
 
 .timers {
   display: flex;
@@ -711,6 +774,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--acento);
 }
 
@@ -843,7 +907,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 
 .editor-seccion-elegir { display: flex; align-items: center; gap: 10px; }
 
-.editor-seccion-elegir select { flex: 1; min-height: 40px; padding: 6px 10px; font-size: 15px; }
+.editor-seccion-elegir select { flex: 1; min-height: 44px; padding: 6px 10px; font-size: 15px; }
 
 .campo-seccion { display: flex; align-items: center; gap: 8px; }
 
@@ -851,7 +915,7 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 
 /* Bienvenida */
 
-.bienvenida {
+.bienvenida, .centrada {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -873,9 +937,6 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 
 .bienvenida .error { color: var(--alerta); font-weight: 500; }
 
-@media (prefers-reduced-motion: no-preference) {
-  .chip, .boton-principal, .boton-secundario { transition: background-color 0.15s, color 0.15s; }
-}
 
 /* Navegación inferior (Recetas · Compras · Bandeja) */
 
@@ -910,7 +971,17 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
 
 .nav-item[aria-current="page"] { color: var(--acento); font-weight: 600; }
 
-.nav-icono { position: relative; display: inline-flex; }
+.nav-icono { position: relative; display: inline-flex; isolation: isolate; }
+
+/* La pestaña activa también se distingue por la forma: una pastilla detrás del ícono. */
+.nav-item[aria-current="page"] .nav-icono::before {
+  content: '';
+  position: absolute;
+  inset: -3px -14px;
+  z-index: -1;
+  border-radius: 14px;
+  background: var(--superficie-2);
+}
 
 .nav-cuenta {
   position: absolute;
@@ -919,13 +990,13 @@ textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-c
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
+  min-width: 20px;
+  height: 20px;
   padding: 0 5px;
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--acento);
   color: var(--superficie);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -943,7 +1014,7 @@ input[type="checkbox"] {
   width: 24px;
   height: 24px;
   margin: 0;
-  border: 2px solid var(--borde-control);
+  border: 2px solid var(--borde-campo);
   border-radius: 7px;
   background: var(--superficie);
   cursor: pointer;
@@ -1083,7 +1154,7 @@ input[type="checkbox"]:checked::after {
 
 .hoja[open] { display: flex; flex-direction: column; gap: 16px; }
 
-.hoja::backdrop { background: rgba(42, 33, 27, 0.45); }
+.hoja::backdrop { background: var(--velo); }
 
 .hoja h2 { font: 500 22px/1.2 var(--serif); }
 
@@ -1161,7 +1232,7 @@ label.boton-principal:focus-within { outline: 2px solid var(--acento); outline-o
   color: var(--tinta);
 }
 
-.mini-foto { flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 12px; }
+.mini-foto { position: relative; flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 12px; }
 
 .mini-foto img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -1188,7 +1259,7 @@ label.boton-principal:focus-within { outline: 2px solid var(--acento); outline-o
 
 .barra-acciones.sobre-navegacion { bottom: calc(61px + env(safe-area-inset-bottom)); padding-bottom: 12px; }
 
-body:has(.sobre-navegacion) .aviso { bottom: calc(150px + env(safe-area-inset-bottom)); }
+body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-inset-bottom)); }
 
 .en-compras {
   display: flex;
@@ -1221,3 +1292,107 @@ body:has(.sobre-navegacion) .aviso { bottom: calc(150px + env(safe-area-inset-bo
 }
 
 .tarjeta-reciente > .icono { color: var(--tinta-2); }
+
+/* Estados vacíos y primera carga */
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--tinta-2);
+}
+
+.vacio > .icono { margin-bottom: 4px; color: var(--acento); }
+
+.vacio-titulo { font: 500 20px/1.25 var(--serif); color: var(--tinta); }
+
+.centrada .vacio-titulo { font-size: 26px; }
+
+.vacio-texto { max-width: 34ch; font-size: 14px; }
+
+.vacio-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
+
+.cargando {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--tinta-2);
+}
+
+.cargando-logo { border-radius: 18px; }
+
+.listo-todo { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--ok); font-weight: 500; }
+
+/* Foto que falta o no carga: el color de relleno con una olla tenue en el medio. */
+
+.foto-vacia {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--sobre-foto);
+}
+
+.foto-vacia svg { width: 36px; height: 36px; }
+.ficha-foto .foto-vacia svg { width: 52px; height: 52px; }
+.mini-foto .foto-vacia svg { width: 22px; height: 22px; }
+
+.tarjeta-foto img, .ficha-foto img, .mini-foto img { position: relative; }
+
+/* Microanimaciones: sutiles, y ninguna si el sistema pide reducir el movimiento. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Entre pantallas (View Transitions, app.js): un fundido corto; la navegación queda quieta. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
+  .navegacion { view-transition-name: navegacion; }
+
+  .boton-principal, .boton-secundario, .boton-redondo, .chip, .opcion-lugar, .segmentado button, .tarjeta-foto {
+    transition: transform var(--rapido) var(--curva), background-color var(--rapido), color var(--rapido), box-shadow var(--rapido);
+  }
+
+  .boton-principal:active, .boton-secundario:active, .chip:active, .opcion-lugar:active, .segmentado button:active {
+    transform: scale(0.97);
+  }
+
+  .boton-redondo:active { transform: scale(0.92); }
+  .tarjeta:active .tarjeta-foto { transform: scale(0.98); }
+
+  .aviso { animation: aviso-entra var(--medio) var(--curva); }
+  .aviso.saliendo { animation: aviso-sale var(--rapido) ease-in forwards; }
+
+  .cargando-logo { animation: respira 1.6s ease-in-out infinite; }
+
+  .form-nota:not([hidden]), .campo-seccion { animation: aparece var(--rapido) ease-out; }
+
+  .estrellas button.rebota svg { animation: rebote var(--medio) var(--curva); }
+
+  .compra.recien input:checked::after { animation: tilde var(--medio) var(--curva); }
+  .compra.recien.hecha .compra-texto, .compra.recien.hecha .cantidad { animation: tachar var(--medio) ease-out; }
+
+  .cocina-paso.desde-derecha { animation: paso-derecha var(--medio) var(--curva); }
+  .cocina-paso.desde-izquierda { animation: paso-izquierda var(--medio) var(--curva); }
+  .progreso span.recien { animation: llenar var(--medio) var(--curva); }
+  .timer-chip.sono { animation: latido 1.2s ease-in-out 5; }
+
+  .hoja[open] { animation: hoja-sube var(--medio) var(--curva); }
+  .hoja[open]::backdrop { animation: aparece var(--medio) ease-out; }
+}
+
+@keyframes aviso-entra { from { opacity: 0; transform: translateY(12px); } }
+@keyframes aviso-sale { to { opacity: 0; transform: translateY(8px); } }
+@keyframes respira { 50% { opacity: 0.8; transform: scale(0.94); } }
+@keyframes aparece { from { opacity: 0; } }
+@keyframes rebote { 50% { transform: scale(1.25); } }
+@keyframes tilde { from { transform: translate(0, -1px) rotate(45deg) scale(0.4); } }
+@keyframes tachar { from { color: var(--tinta); text-decoration-color: transparent; } }
+@keyframes paso-derecha { from { opacity: 0; transform: translateX(24px); } }
+@keyframes paso-izquierda { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes llenar { from { transform: scaleX(0); } }
+@keyframes latido { 50% { transform: scale(1.04); } }
+@keyframes hoja-sube { from { transform: translateY(100%); } }
