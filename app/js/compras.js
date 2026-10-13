@@ -3,14 +3,14 @@
 // WhatsApp. Puro, sin DOM.
 
 import { capitalizar, formatearCantidad, formatearNumero } from './formato.js';
-import { normalizar } from './datos.js';
+import { alfabetico, normalizar } from './datos.js';
 import { escalar, porcionesBase, rolDe } from './ingredientes.js';
 
 // Los lugares, en el orden en que aparecen en la lista (igual que ENUMS.lugar en la API).
 export const LUGARES = ['supermercado', 'verdulería', 'carnicería', 'panadería', 'almacenata', 'dietética', 'feria'];
 // Pseudo-lugar: «Revisá si tenés». Ahí van los condimentos y los utensilios, salvo que los muevan.
 export const REVISAR = 'revisar';
-// Los tipos de producto (la góndola de cada ingrediente), en el orden en que se recorren.
+// Los tipos de producto (la góndola de cada ingrediente), en el orden de «Dónde compramos cada cosa».
 export const TIPOS = ['verdulería', 'almacén', 'lácteos y huevos', 'carnicería', 'panadería', 'congelados', 'otros'];
 const POR_DEFECTO = 'supermercado';
 const A_REVISAR = ['condimento', 'utensilio'];
@@ -151,14 +151,12 @@ function desglose(items) {
     : formatearCantidad(i.cantidad, i.unidad))).join(' + ') + ')';
 }
 
-const ordenTipo = g => (TIPOS.includes(g) ? TIPOS.indexOf(g) : TIPOS.length);
-
 /**
  * La lista para mostrar: [{ lugar, nombre, filas }], con los lugares en el orden de
  * LUGARES y «Revisá si tenés» al final. Cada fila junta los ítems con el mismo
  * nombre en ese lugar: { clave, nombre, cantidad, desglose, ids, hecho, opcional, items }.
  * Lo de «Revisá si tenés» que ya está para comprar se suma a esa fila. Dentro de
- * cada lugar, las filas van por tipo de producto y nombre (lo marcado no se mueve).
+ * cada lugar, las filas van en orden alfabético (lo marcado no se mueve).
  */
 export function armarLista(compras, lugares) {
   const conLugar = (compras || []).map(c => ({ c, lugar: lugarDe(c, lugares) }));
@@ -180,7 +178,6 @@ export function armarLista(compras, lugares) {
     lugar: l,
     nombre: nombreLugar(l),
     filas: grupos.get(l).map(f => {
-      const gondola = (f.items.find(i => i.gondola) || {}).gondola || '';
       const cantidad = sumarCantidades(f.items);
       const partes = desglose(f.items);
       return {
@@ -192,10 +189,9 @@ export function armarLista(compras, lugares) {
         ids: f.items.map(i => i.id),
         hecho: f.items.every(i => i.hecho === true || i.hecho === 'true'),
         opcional: f.items.every(i => i.rol === 'opcional'),
-        gondola,
         items: f.items,
       };
-    }).sort((a, b) => ordenTipo(a.gondola) - ordenTipo(b.gondola) || a.nombre.localeCompare(b.nombre, 'es')),
+    }).sort((a, b) => alfabetico(a.nombre, b.nombre)),
   }));
 }
 

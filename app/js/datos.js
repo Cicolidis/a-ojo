@@ -71,6 +71,11 @@ export function trajoCambios(datos, resp) {
     (resp.lugares !== undefined && JSON.stringify(resp.lugares) !== JSON.stringify(datos.lugares));
 }
 
+/** Para ordenar textos: alfabético en castellano, sin distinguir tildes ni mayúsculas, y «Paso 2» antes que «Paso 10». */
+export function alfabetico(a, b) {
+  return String(a ?? '').localeCompare(String(b ?? ''), 'es', { sensitivity: 'base', numeric: true });
+}
+
 /** Sin tildes y en minúsculas: «Limón» → «limon». */
 export function normalizar(texto) {
   return String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -85,7 +90,7 @@ const porOrden = (a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0);
 /**
  * Arma las recetas listas para mostrar: cada una con sus ingredientes y pasos
  * en orden, sus notas (la más nueva primero) y el texto en el que se busca.
- * Devuelve { lista, porId }; la lista va de la receta más nueva a la más vieja.
+ * Devuelve { lista, porId }; la lista va en orden alfabético por título.
  */
 export function indexar(datos) {
   const agrupar = filas => {
@@ -110,7 +115,7 @@ export function indexar(datos) {
       notas: (notas.get(r.id) || []).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))),
       busqueda: normalizar([r.titulo, ...ings.map(i => i.nombre), ...etiquetas].join(' ')),
     });
-  }).sort((a, b) => String(b.creado).localeCompare(String(a.creado)));
+  }).sort((a, b) => alfabetico(a.titulo, b.titulo));
 
   return { lista, porId: new Map(lista.map(r => [r.id, r])) };
 }

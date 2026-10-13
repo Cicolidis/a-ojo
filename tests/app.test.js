@@ -63,12 +63,16 @@ test('trajoCambios y necesitaCompleta', async () => {
     'un snapshot de una versión anterior de la app se pide entero');
 });
 
-test('indexar ordena ingredientes, pasos y notas, y la lista va de la más nueva a la más vieja', async () => {
-  const { aplicarDelta, indexar } = await cargar('datos.js');
+test('indexar ordena ingredientes, pasos y notas, y la lista va en orden alfabético', async () => {
+  const { aplicarDelta, indexar, alfabetico } = await cargar('datos.js');
   const todo = fixture();
   todo.ingredientes.reverse();
+  todo.recetas.reverse();
   const { lista, porId } = indexar(aplicarDelta(null, todo));
-  assert.equal(lista[0].id, 'r_brown');
+  assert.deepEqual(lista.map(r => r.titulo), ['Brownie húmedo con nueces', 'Galletitas de garbanzos', 'Licuado descartado',
+    'Pollo marroquí', 'Sopa crema de zapallo', 'Torta vasca', 'Tortilla de banana']);
+  assert.deepEqual(['ñoquis', 'Nueces', 'oliva', 'Ají molido', 'Paso 10', 'paso 2'].sort(alfabetico),
+    ['Ají molido', 'Nueces', 'ñoquis', 'oliva', 'paso 2', 'Paso 10'], 'sin distinguir tildes ni mayúsculas, la ñ después de la n');
   const brownie = porId.get('r_brown');
   assert.deepEqual(brownie.ingredientes.map(i => i.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.deepEqual(brownie.etiquetasLista, ['chocolate', 'para invitados']);
@@ -471,17 +475,17 @@ test('armarLista: por lugar, sumando entre recetas con el desglose, y «Revisá 
   assert.deepEqual(lista.map(g => g.nombre), ['Supermercado', 'Verdulería', 'Almacenata', 'Dietética', 'Revisá si tenés']);
   const filas = (l, de = lista) => de.find(g => g.lugar === l).filas.map(f => [f.nombre, f.cantidad, f.desglose]);
   assert.deepEqual(filas('supermercado'), [
+    ['Crema de leche', '350 ml', '(250 + 100)'],
     ['Harina 0000', '200 g + 1 cda', ''],
     ['Nueces', '200 g', ''],
-    ['Crema de leche', '350 ml', '(250 + 100)'],
     ['Servilletas', '', ''],
-  ], 'por tipo de producto y nombre');
+  ], 'en orden alfabético');
   assert.deepEqual(filas('verdulería'), [['Zapallo', '1,3 kg', '(1 kg + 300 g)']]);
   assert.deepEqual(filas('almacenata'), [['Huevos', '10', '(6 + 4)']]);
   assert.deepEqual(filas('dietética'), [['Caldo de verduras', '1 l', '']]);
-  assert.deepEqual(filas('revisar'), [['Nuez moscada', '', ''], ['Sal', '', ''], ['Papel manteca', '', '']]);
-  assert.equal(lista[0].filas[1].opcional, true);
-  assert.equal(lista[0].filas[2].opcional, false, 'la crema solo es opcional en una');
+  assert.deepEqual(filas('revisar'), [['Nuez moscada', '', ''], ['Papel manteca', '', ''], ['Sal', '', '']]);
+  assert.equal(lista[0].filas[2].opcional, true);
+  assert.equal(lista[0].filas[0].opcional, false, 'la crema solo es opcional en una');
   assert.deepEqual(lista.find(g => g.lugar === 'almacenata').filas[0].ids, ['c_1', 'c_5']);
   assert.equal(c.cuantasPorComprar(lista), 7);
 
@@ -497,7 +501,7 @@ test('armarLista: por lugar, sumando entre recetas con el desglose, y «Revisá 
   assert.equal(hechas.find(g => g.lugar === 'almacenata').filas[0].hecho, true);
   assert.equal(c.cuantasPorComprar(hechas), 6);
   assert.equal(c.textoWhatsApp(hechas), [
-    '*Supermercado*', '- Harina 0000: 200 g + 1 cda', '- Nueces: 200 g', '- Crema de leche: 350 ml', '- Servilletas', '',
+    '*Supermercado*', '- Crema de leche: 350 ml', '- Harina 0000: 200 g + 1 cda', '- Nueces: 200 g', '- Servilletas', '',
     '*Verdulería*', '- Zapallo: 1,3 kg', '',
     '*Dietética*', '- Caldo de verduras: 1 l', '',
     '*Revisá si tenés*', '- Nuez moscada', '- Papel manteca',
