@@ -414,6 +414,127 @@ class TestCapturas(unittest.TestCase):
         self.assertEqual(json.loads(out.getvalue())['error'], 'sin_archivo')
 
 
+INFO_COMENTARIOS = {
+    'id': '3m8wnoPpR-M', 'title': 'Mantequilla de ajo', 'description': '', 'formats': [{'url': 'x'}],
+    'comments': [
+        {'text': 'Delicioso', 'author_is_uploader': False, 'is_pinned': False},
+        {'text': 'MANTEQUILLA DE AJO\n\n- 50 dientes de ajo\n', 'author_is_uploader': True, 'is_pinned': False},
+        {'text': 'Receta completa abajo 👇', 'author_is_uploader': True, 'is_pinned': True},
+        {'text': 'Fijado por el autor, de otra persona', 'author_is_uploader': False, 'is_pinned': True},
+        {'text': '   ', 'author_is_uploader': True},
+    ],
+}
+
+
+def correr_fetch(*argv):
+    """Corre `fetch <argv>` y devuelve (JSON impreso, código de salida)."""
+    codigo = 0
+    with contextlib.redirect_stdout(io.StringIO()) as out:
+        try:
+            fetch.main(list(argv))
+        except SystemExit as e:
+            codigo = e.code
+    return json.loads(out.getvalue()), codigo
+
+
+class TestComentarios(unittest.TestCase):
+    URL = 'https://www.youtube.com/shorts/3m8wnoPpR-M'
+
+    def test_solo_los_del_autor_o_fijados(self):
+        r = Resultado(0, stdout=json.dumps(INFO_COMENTARIOS))
+        with mock.patch.object(comun, 'correr_ytdlp', return_value=r) as correr:
+            datos, codigo = correr_fetch('comentarios', 'b_com01', self.URL)
+        self.assertEqual(codigo, 0)
+        self.assertEqual(datos['revisados'], 5)
+        self.assertEqual([(c['texto'], c['fijado'], c['del_autor']) for c in datos['comentarios']], [
+            ('Receta completa abajo 👇', True, True),
+            ('Fijado por el autor, de otra persona', True, False),
+            ('MANTEQUILLA DE AJO\n\n- 50 dientes de ajo', False, True),
+        ])
+        self.assertNotIn('formats', json.dumps(datos), 'sin el info.json entero')
+        guardado = comun.leer_json(comun.dir_trabajo('b_com01') / 'comentarios.json')
+        self.assertEqual(guardado, datos['comentarios'])
+        self.assertFalse((comun.dir_trabajo('b_com01') / 'info.json').exists(), 'no pisa el de fetch meta')
+
+        args, plataforma, _ = correr.call_args[0]
+        self.assertEqual(plataforma, 'youtube')
+        self.assertIn('--write-comments', args)
+        self.assertIn('--skip-download', args)
+        self.assertEqual(args[args.index('--extractor-args') + 1], 'youtube:max_comments=30,all,0,0;comment_sort=top')
+        self.assertEqual(args[-1], self.URL)
+
+    def test_sin_comentarios(self):
+        r = Resultado(0, stdout=json.dumps({'id': 'x', 'comments': None}))
+        with mock.patch.object(comun, 'correr_ytdlp', return_value=r):
+            datos, codigo = correr_fetch('comentarios', 'b_com02', self.URL)
+        self.assertEqual((codigo, datos['comentarios'], datos['revisados']), (0, [], 0))
+
+    def test_errores_clasificados_como_en_meta(self):
+        error = comun.clasificar_error('ERROR: [youtube] 3m8wnoPpR-M: Video unavailable', 'youtube')
+        with mock.patch.object(comun, 'correr_ytdlp', side_effect=error):
+            datos, codigo = correr_fetch('comentarios', 'b_com03', self.URL)
+        self.assertEqual(codigo, 1)
+        self.assertEqual((datos['ok'], datos['error'], datos['id']), (False, 'no_disponible', 'b_com03'))
+        self.assertEqual(datos['motivo'], 'El video ya no está disponible.')
+
+    def test_solo_youtube(self):
+        with mock.patch.object(comun, 'correr_ytdlp') as correr:
+            datos, codigo = correr_fetch('comentarios', 'b_com04', 'https://www.instagram.com/reel/x/')
+        self.assertEqual((codigo, datos['error']), (1, 'no_youtube'))
+        correr.assert_not_called()
+
+
+def foto_del_post(n):
+    return {'id': f'foto{n}', 'title': 'Video by nutricionsgf', 'description': 'TARTA DE ZANAHORIA',
+            'channel': 'nutricionsgf', 'uploader': 'Lic. Sofia', 'extractor_key': 'Instagram',
+            'formats': [], 'thumbnail': f'https://cdn.example/foto{n}.jpg'}
+
+
+# Así llega un post de varias fotos con --ignore-no-formats-error: el caption arriba y una entrada por foto.
+INFO_POST_FOTOS = {
+    '_type': 'playlist', 'id': 'DdH7W31kem0', 'title': 'Post by nutricionsgf',
+    'description': 'TARTA DE ZANAHORIA\n\n150 grs de harina integral', 'channel': 'nutricionsgf',
+    'uploader_id': '7779783639', 'uploader': 'Lic. Sofia', 'extractor_key': 'Instagram',
+    'webpage_url': 'https://www.instagram.com/p/DdH7W31kem0/',
+    'entries': [foto_del_post(1), foto_del_post(2)],
+}
+
+
+class TestMetaInstagram(unittest.TestCase):
+    def correr_meta(self, bandeja_id, url, info):
+        r = Resultado(0, stdout=json.dumps(info))
+        with mock.patch.object(comun, 'args_cookies', return_value=['--cookies', 'c.txt']), \
+                mock.patch.object(comun, 'correr_ytdlp', return_value=r) as correr:
+            datos, codigo = correr_fetch('meta', bandeja_id, url)
+        self.assertEqual(codigo, 0)
+        return datos, correr.call_args[0][0]
+
+    def test_post_de_fotos_trae_caption_autor_y_miniatura(self):
+        datos, args = self.correr_meta('b_post1', 'https://www.instagram.com/p/DdH7W31kem0/', INFO_POST_FOTOS)
+        self.assertIn('--ignore-no-formats-error', args)
+        self.assertEqual(datos['descripcion'], 'TARTA DE ZANAHORIA\n\n150 grs de harina integral')
+        self.assertEqual(datos['titulo'], 'Post by nutricionsgf')
+        self.assertEqual(datos['autor'], {'nombre': 'Lic. Sofia', 'cuenta': '@nutricionsgf'})
+        self.assertEqual(datos['miniatura'], 'https://cdn.example/foto1.jpg')
+        self.assertTrue(datos['sin_video'])
+        # fetch foto lee la miniatura de info.json.
+        d = comun.dir_trabajo('b_post1')
+        self.assertEqual(fetch.candidatos_foto(d), [('https://cdn.example/foto1.jpg', 'miniatura')])
+
+    def test_reel_sigue_igual(self):
+        reel = {**foto_del_post(1), 'title': 'Video by paulinacocina', 'formats': [{'url': 'x'}], 'duration': 41}
+        datos, args = self.correr_meta('b_post2', 'https://www.instagram.com/reel/DbT7v9Hh6Or/', reel)
+        self.assertIn('--ignore-no-formats-error', args)
+        self.assertEqual((datos['titulo'], datos['duracion_s'], datos['sin_video']), ('Video by paulinacocina', 41, False))
+
+    def test_youtube_no_ignora_la_falta_de_formatos(self):
+        video = {'id': 'abc', 'title': 'Budín', 'description': '', 'formats': [{'url': 'x'}], 'extractor_key': 'Youtube'}
+        with mock.patch.object(fetch, 'bajar_subtitulos', return_value=None):
+            datos, args = self.correr_meta('b_post3', 'https://www.youtube.com/watch?v=abc', video)
+        self.assertNotIn('--ignore-no-formats-error', args)
+        self.assertFalse(datos['sin_video'])
+
+
 class TestVarios(unittest.TestCase):
     def test_cargar_env_con_comillas_sin_pisar(self):
         ruta = Path(tempfile.mkdtemp()) / '.env'

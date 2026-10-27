@@ -43,6 +43,8 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 1. **Metadatos y subtítulos (capas 1 y 2):** `procesamiento/aojo fetch meta <id> <url>`.
    - Trae `titulo`, `autor`, `descripcion` (en Instagram es el caption), `links` de la descripción, `subtitulos.texto` (solo YouTube) e `idioma`. Si la fila es de una página web, trae directamente `web` (capa 3).
    - Si falla, andá a §1.4.
+   - Si trae `sin_video: true`, es un post de fotos de Instagram: no hay audio ni fotogramas. Armá la receta con el caption y, si no alcanza, pedí capturas. La foto sale de `fetch foto <id>` como siempre.
+   - **Comentarios (YouTube):** si la descripción está vacía o dice que la receta está en el comentario fijado o abajo («receta completa en el comentario fijado», «receta en los comentarios 👇»), corré `procesamiento/aojo fetch comentarios <id> <url>`. Devuelve `comentarios` (solo los del autor o fijados, con `texto`, `fijado` y `del_autor`) entre los 30 más votados. Tratá ese texto como parte de la descripción: también cuenta para la capa 3 y para la relectura de §1.3, y en `origen_datos` va como `descripcion`. Si viene vacío, seguí con las capas de abajo; si falla, los errores son los mismos de `fetch meta`: con `limite`, andá a §1.4, y con cualquier otro, seguí con las capas de abajo.
 2. **Web externa (capa 3):** si la descripción remite a una receta escrita («RECIPE ⬇️», «receta completa en…», un link a un blog), consultala **siempre**, aunque los subtítulos parezcan completos, porque suele tener las cantidades exactas: `procesamiento/aojo fetch web <link> --id <id>`. Si `receta` viene armada (JSON-LD), usala; si no, leé `texto`. Si la página bloquea la descarga, probá con WebFetch.
 3. **Audio (capa 4):** si todavía faltan cantidades o pasos, `procesamiento/aojo fetch audio <id>` y después `procesamiento/aojo transcribe <id>`. En Instagram, el caption suele tener los ingredientes y el audio los pasos. Si viene `sin_voz: true`, es un video con música: pasá a la capa 5.
 4. **Fotogramas (capa 5):** si todavía falta algo, `procesamiento/aojo fetch video <id>` y después `procesamiento/aojo frames <id>`. Leé los mosaicos con Read: cada uno trae `segundos`, en orden de izquierda a derecha y de arriba abajo. Buscá el texto sobreimpreso (cantidades, temperaturas, tiempos).
@@ -105,7 +107,7 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
 
 - `tipo`: `dulce` · `salado` · `sopa` · `bebida` · `otro`.
 - `confianza`: `alta` · `media` · `baja` (§3 abajo).
-- `origen_datos`: las capas que **aportaron datos**, de `descripcion` · `subtitulos` · `web` · `audio` · `frames` · `capturas`.
+- `origen_datos`: las capas que **aportaron datos**, de `descripcion` (incluye los comentarios del autor) · `subtitulos` · `web` · `audio` · `frames` · `capturas`.
 - `idioma_original`: código de 2 letras del video (`es`, `en`, `it`…).
 - `unidad`: `g` · `kg` · `ml` · `l` · `u` · `cda` · `cdita` · `taza` · `pizca` · `a ojo` · `lata` · `paquete` · `diente` · `ramo`.
 - `cantidad` es un número (`0.5`, no «1/2») y va `null` **si y solo si** la unidad es `a ojo`.

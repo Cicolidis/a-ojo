@@ -5,6 +5,7 @@ Uso (por medio de procesamiento/aojo):
   fetch cookies                          exporta las cookies de la cuenta secundaria (correr en la Terminal)
   fetch meta <bandeja_id> <url> [--sin-cookies]
                                          capa 1 (metadatos) y capa 2 (subtítulos de YouTube)
+  fetch comentarios <bandeja_id> <url>   comentarios del autor o fijados (YouTube)
   fetch web <url> [--id <bandeja_id>]    capa 3: receta de una página web
   fetch audio <bandeja_id>               baja el audio (para transcribe)
   fetch video <bandeja_id>               baja el video en 720p o menos (para frames)
@@ -110,8 +111,10 @@ def cmd_meta(args):
 
     try:
         cookies = comun.args_cookies(plataforma, args.sin_cookies)
-        r = comun.correr_ytdlp(['-J', *cookies, args.url], plataforma, args.bandeja_id)
-        info = json.loads(r.stdout)
+        # Un post de fotos no tiene video: sin esto, yt-dlp falla y se pierde el caption.
+        sin_formatos = ['--ignore-no-formats-error'] if plataforma == 'instagram' else []
+        r = comun.correr_ytdlp(['-J', *sin_formatos, *cookies, args.url], plataforma, args.bandeja_id)
+        info = info_de_post(json.loads(r.stdout))
         comun.escribir_json(d / 'info.json', info)
         comun.escribir_json(d / 'fuente.json', {'url': args.url, 'plataforma': plataforma, 'sin_cookies': args.sin_cookies})
 
@@ -137,9 +140,24 @@ def cmd_meta(args):
         'links': links_de(descripcion),
         'subtitulos': subtitulos,
         'miniatura': info.get('thumbnail'),
+        'sin_video': not tiene_video(info),
     }
-    log(args.bandeja_id, 'meta', f'ok: «{info.get("title")}», subtítulos: {bool(subtitulos)}')
+    log(args.bandeja_id, 'meta', f'ok: «{info.get("title")}», subtítulos: {bool(subtitulos)}, sin video: {resumen["sin_video"]}')
     salida(resumen)
+
+
+def info_de_post(info):
+    """Un post de Instagram con varias fotos llega como playlist: el caption y el autor están arriba
+    y la miniatura, en cada foto. Lo aplana para que meta y foto lo lean como un video más."""
+    if info.get('_type') != 'playlist':
+        return info
+    entradas = [e for e in info.get('entries') or [] if e]
+    primera = next((e for e in entradas if e.get('thumbnail')), entradas[0] if entradas else {})
+    return {**primera, **{k: v for k, v in info.items() if v not in (None, '', [])}}
+
+
+def tiene_video(info):
+    return any(e.get('formats') for e in [info, *(info.get('entries') or [])] if e)
 
 
 def autor_de(info):
@@ -240,6 +258,44 @@ def vtt_a_texto(vtt):
         emitidas.append(texto)
         salida_lineas.append(f'[{inicio // 60:02d}:{inicio % 60:02d}] {texto}')
     return '\n'.join(salida_lineas)
+
+
+# ---------------------------------------------------------------- comentarios
+
+# Los 30 más votados, sin respuestas: el comentario del autor con la receta suele estar entre ellos.
+ARGS_COMENTARIOS = ['--skip-download', '--write-comments',
+                    '--extractor-args', 'youtube:max_comments=30,all,0,0;comment_sort=top']
+
+
+def cmd_comentarios(args):
+    """En muchos Shorts la receta completa está en un comentario del autor, no en la descripción."""
+    d = comun.dir_trabajo(args.bandeja_id)
+    plataforma = comun.plataforma_de(args.url)
+    if plataforma != 'youtube':
+        fallar('no_youtube', 'Los comentarios solo se leen en YouTube.', id=args.bandeja_id)
+    log(args.bandeja_id, 'comentarios', args.url)
+    try:
+        cookies = comun.args_cookies(plataforma)
+        r = comun.correr_ytdlp([*ARGS_COMENTARIOS, '-J', *cookies, args.url], plataforma, args.bandeja_id)
+        info = json.loads(r.stdout)
+    except ErrorDescarga as e:
+        log(args.bandeja_id, 'comentarios', f'error {e.codigo}: {e.motivo}')
+        salida({**e.como_dict(), 'id': args.bandeja_id})
+        sys.exit(1)
+
+    todos = info.get('comments') or []
+    comentarios = comentarios_del_autor(todos)
+    comun.escribir_json(d / 'comentarios.json', comentarios)
+    log(args.bandeja_id, 'comentarios', f'ok: {len(comentarios)} del autor o fijados de {len(todos)}')
+    salida({'ok': True, 'id': args.bandeja_id, 'revisados': len(todos), 'comentarios': comentarios})
+
+
+def comentarios_del_autor(comentarios):
+    """Solo los del autor o fijados, con los fijados primero; el resto se descarta."""
+    elegidos = [{'texto': (c.get('text') or '').strip(), 'fijado': bool(c.get('is_pinned')),
+                 'del_autor': bool(c.get('author_is_uploader'))}
+                for c in comentarios if c.get('is_pinned') or c.get('author_is_uploader')]
+    return sorted((c for c in elegidos if c['texto']), key=lambda c: not c['fijado'])
 
 
 # ---------------------------------------------------------------- web (capa 3)
@@ -541,6 +597,11 @@ def main(argv=None):
     m.add_argument('url')
     m.add_argument('--sin-cookies', action='store_true', help='probar Instagram sin la cuenta secundaria')
     m.set_defaults(fn=cmd_meta)
+
+    c = sub.add_parser('comentarios')
+    c.add_argument('bandeja_id')
+    c.add_argument('url')
+    c.set_defaults(fn=cmd_comentarios)
 
     w = sub.add_parser('web')
     w.add_argument('url')
