@@ -81,7 +81,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 
 - [ ] Compartir directo a A ojo: `share_target` y «Pegar un link» en la Bandeja (implementado y revisado; falta la prueba en Android, que incluye compartir y volver enseguida a Instagram para ver si el link llega igual a la Sheet)
 - [ ] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción (implementado; falta desplegar la API 0.7.0 y la demo. Orden: `npm run deploy`, `setup()` en el editor y recién después el push a `main`, así ningún pedido traba la cola)
-- [ ] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
+- [x] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
 - [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`)
 - [ ] «Cómo se armó» en la ficha: `notas_proceso`, plegado
 - [ ] Compartir una receta por WhatsApp
@@ -101,7 +101,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [ ] Hay al menos un backup semanal en Drive
 - [ ] Un Reel compartido desde Instagram a la app instalada aparece en la Bandeja
 - [ ] Un pedido de «Algo está mal» se resuelve corriendo `/recetas`
-- [ ] Las notas muestran quién las escribió («Laura», «Camilo»)
+- [x] Las notas muestran quién las escribió («Laura», «Camilo»)
 - [ ] Laura corre `/recetas` en su computadora y la receta llega a la app
 - [ ] Dos corridas a la vez no toman la misma fila
 - [ ] La SPEC describe lo que hace el código

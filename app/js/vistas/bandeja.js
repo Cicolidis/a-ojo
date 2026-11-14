@@ -4,7 +4,7 @@
 // capturas, que pesan, se mandan directo y piden conexión.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
-import { fechaHora } from '../formato.js';
+import { fechaHora, nombreDe } from '../formato.js';
 import { agruparBandeja, cuantasCapturas, descripcionLink } from '../bandeja.js';
 import { idAzar, nuevaCorreccion, nuevaEdicion } from '../ediciones.js';
 import { llamarApi } from '../api.js';
@@ -133,12 +133,15 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
   const botonCancelarPedido = (fila, clase) => h('button', { type: 'button', class: clase,
     'aria-label': 'Cancelar el pedido: ' + describir(fila), onclick: () => cancelarPedido(fila) }, 'Cancelar el pedido');
 
+  // «Guardado por Laura · hoy 16:23» (si no se sabe quién, «Guardado hoy 16:23»).
+  const guardado = fila => (nombreDe(fila.quien) ? 'Guardado por ' + nombreDe(fila.quien) + ' · ' : 'Guardado ') + fechaHora(fila.creado);
+
   function cabeza(fila) {
     const url = urlSegura(fila.url);
     return h('div', { class: 'link-cabeza' },
       h('div', null,
         h('strong', null, describir(fila)),
-        h('span', { class: 'secundario' }, conPedido(fila) ? 'Pedido ' + fechaHora(fila.actualizado) : 'Guardado ' + fechaHora(fila.creado))),
+        h('span', { class: 'secundario' }, conPedido(fila) ? 'Pedido ' + fechaHora(fila.actualizado) : guardado(fila))),
       url ? h('a', { class: 'boton-redondo', href: url, target: '_blank', rel: 'noopener noreferrer',
         'aria-label': 'Abrir el original: ' + describir(fila) }, icono('externo', 18)) : null);
   }

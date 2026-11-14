@@ -868,3 +868,23 @@ test('receta.corregir: el pedido va a la fila de la receta, se suma sin repetirs
   assert.deepEqual([fila.local, fila.id, fila.url, fila.estado], [true, e.id, indexar(datos).porId.get('r_brown').fuente_url, 'pendiente']);
   assert.equal(aplicarEdicion(sinFila, nuevaCorreccion('r_nohay', 'algo')), sinFila, 'una receta que no está no cambia nada');
 });
+
+test('nombreDe: Camilo y Laura (pareja es el valor interno), y nada si no se sabe', async () => {
+  const { nombreDe, NOMBRES } = await cargar('formato.js');
+  assert.equal(nombreDe('camilo'), 'Camilo');
+  assert.equal(nombreDe('pareja'), 'Laura');
+  assert.equal(nombreDe(' Pareja '), 'Laura');
+  assert.equal(nombreDe(''), '');
+  assert.equal(nombreDe(undefined), '');
+  assert.equal(nombreDe('toString'), '', 'solo las claves del mapa');
+  assert.deepEqual(Object.keys(NOMBRES).sort(), ['camilo', 'pareja']);
+});
+
+test('ningún texto de las vistas nombra a Laura como «pareja»', () => {
+  const dir = path.join(APP, 'js', 'vistas');
+  for (const archivo of fs.readdirSync(dir)) {
+    const codigo = fs.readFileSync(path.join(dir, archivo), 'utf8');
+    const textos = codigo.match(/'[^'\n]*'|"[^"\n]*"|`[^`]*`/g) || [];
+    assert.deepEqual(textos.filter(t => /pareja/i.test(t)), [], archivo);
+  }
+});

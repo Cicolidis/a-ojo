@@ -4,7 +4,7 @@
 // Al sincronizar se repinta en el lugar: la nota que se está escribiendo no se pierde.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
-import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, textoTraduccion } from '../formato.js';
+import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, nombreDe, textoTraduccion } from '../formato.js';
 import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
@@ -316,7 +316,8 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     tituloNotas.textContent = r.notas.length > 1 ? 'Nuestras notas' : r.notas.length ? 'Nuestra nota' : 'Notas';
     rellenar(listaNotas, r.notas.length
       ? r.notas.map(n => h('div', { class: 'nota' },
-        h('strong', null, 'Nuestra nota · ' + fechaCorta(n.fecha)),
+        // Quién la escribió («Laura · 12/10»); una nota sin `quien` queda como «Nuestra nota».
+        h('strong', null, (nombreDe(n.quien) || 'Nuestra nota') + ' · ' + fechaCorta(n.fecha)),
         h('p', null, n.texto)))
       : h('p', { class: 'secundario' }, 'Todavía no hay notas. Cuando la cocinen, cuenten cómo salió.'));
   }

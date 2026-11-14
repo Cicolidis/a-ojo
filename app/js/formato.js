@@ -83,6 +83,16 @@ export function fechaHora(iso, ahora = new Date()) {
   return fechaCorta(iso, ahora) + ' ' + hora;
 }
 
+// Cómo se muestra cada valor de `quien` (Bandeja y Notas). `pareja` es el valor interno de Laura:
+// en la interfaz siempre se la nombra «Laura».
+export const NOMBRES = { camilo: 'Camilo', pareja: 'Laura' };
+
+/** El nombre para mostrar de `quien` («Laura», «Camilo»), o '' si viene vacío o no se conoce. */
+export function nombreDe(quien) {
+  const clave = String(quien ?? '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(NOMBRES, clave) ? NOMBRES[clave] : '';
+}
+
 /** Primera letra en mayúscula: «chocolate semiamargo» → «Chocolate semiamargo». */
 export function capitalizar(texto) {
   const s = String(texto ?? '');
