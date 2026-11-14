@@ -7,7 +7,9 @@ Uso (por medio de procesamiento/aojo):
   api fila <bandeja_id>                  una fila cualquiera de la bandeja
   api capturar <url> [--quien camilo]
   api actualizar <bandeja_id> <estado> [--motivo "…"] [--dry-run]
-  api upsert <bandeja_id> [--dry-run]    manda trabajo/<id>/receta.json (y foto.jpg si existe)
+  api upsert <bandeja_id> [--dry-run] [--sin-foto]
+                                         manda trabajo/<id>/receta.json (y foto.jpg si existe, salvo con --sin-foto)
+  api receta <bandeja_id>                la receta guardada de la fila, como trabajo/<id>/receta.json (pedidos de corrección)
   api capturas <bandeja_id>              baja las capturas que subieron desde la app a trabajo/<id>/capturas/
   api sin-clasificar                     recetas con ingredientes sin rol (para /recetas --clasificar)
   api ingredientes <receta_id>           la receta guardada: ingredientes con id, pasos y notas
@@ -86,7 +88,7 @@ def dry_run(args):
 ROLES = ('principal', 'condimento', 'opcional', 'utensilio')
 
 RESUMEN_FILA = ('id', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'creado', 'actualizado',
-                'capturas')
+                'capturas', 'pedido')
 EXTENSIONES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
 
 
@@ -181,7 +183,7 @@ def cmd_upsert(args):
         fallar('receta_no_json', f'receta.json no es JSON válido: {e}')
     datos = {'receta': receta, 'bandeja_id': args.bandeja_id}
     foto = d / 'foto.jpg'
-    if foto.exists():
+    if foto.exists() and not args.sin_foto:
         datos['foto'] = {'base64': base64.b64encode(foto.read_bytes()).decode('ascii'), 'mime': 'image/jpeg'}
     if dry_run(args):
         datos['validar'] = True
@@ -189,6 +191,54 @@ def cmd_upsert(args):
     log(args.bandeja_id, 'upsert', ('(dry-run) válida' if dry_run(args) else f'{r.get("id")} '
                                     f'({"nueva" if r.get("nueva") else "actualizada"})'))
     salida({'ok': True, 'dry_run': dry_run(args), **r})
+
+
+def lista_texto(valor):
+    """«rápida, freezable» → ['rápida', 'freezable'] (la Sheet guarda las listas separadas por coma)."""
+    if isinstance(valor, list):
+        return valor
+    return [x.strip() for x in str(valor or '').split(',') if x.strip()]
+
+
+def receta_guardada(todo, bandeja_id):
+    """La receta de la fila, en el formato de receta.json (§2 de recetas.md), más la fila."""
+    fila = next((b for b in todo['bandeja'] if b.get('id') == bandeja_id), None)
+    if not fila:
+        fallar('no_encontrada', f'No encontré la fila «{bandeja_id}» en la bandeja.')
+    receta_id = fila.get('receta_id')
+    receta = next((r for r in todo['recetas'] if r.get('id') == receta_id), None) if receta_id else None
+    if not receta:
+        fallar('sin_receta', f'La fila «{bandeja_id}» todavía no tiene una receta guardada.')
+
+    def en_orden(filas):
+        return sorted((f for f in filas if f.get('receta_id') == receta_id), key=lambda f: f.get('orden') or 0)
+    campos = ('titulo', 'tipo', 'porciones', 'tiempo_min', 'molde', 'autor', 'fuente_url', 'confianza',
+              'idioma_original', 'notas_proceso')
+    datos = {k: receta.get(k) for k in campos}
+    datos['etiquetas'] = lista_texto(receta.get('etiquetas'))
+    datos['origen_datos'] = lista_texto(receta.get('origen_datos'))
+    # seccion y rol: los de /recetas. Lo que cambiaron ellos en la app (*_usuario) lo conserva la API.
+    datos['ingredientes'] = [{'seccion': i.get('seccion') or '', 'rol': i.get('rol') or 'principal',
+                              'cantidad': i.get('cantidad'), 'unidad': i.get('unidad'), 'nombre': i.get('nombre'),
+                              'nota': i.get('nota') or '', 'gondola': i.get('gondola')}
+                             for i in en_orden(todo['ingredientes'])]
+    datos['pasos'] = [{'texto': p.get('texto'), 'timer_min': p.get('timer_min'), 'tip': p.get('tip') or ''}
+                      for p in en_orden(todo['pasos'])]
+    return fila, datos
+
+
+def cmd_receta(args):
+    """Deja la receta guardada en trabajo/<id>/receta.json, para corregirla (pedidos de «Algo está mal»)."""
+    fila, receta = receta_guardada(llamar('GET', 'todo'), args.bandeja_id)
+    d = comun.dir_trabajo(args.bandeja_id)
+    archivo = d / 'receta.json'
+    # La de una corrida anterior no se pierde.
+    if archivo.exists():
+        archivo.replace(d / 'receta.anterior.json')
+    comun.escribir_json(archivo, receta)
+    log(args.bandeja_id, 'receta', f'{fila.get("receta_id")} bajada para corregir')
+    salida({'ok': True, 'id': args.bandeja_id, 'receta_id': fila.get('receta_id'), 'pedido': fila.get('pedido') or '',
+            'archivo': str(archivo), 'receta': receta})
 
 
 def cmd_capturas(args):
@@ -302,7 +352,12 @@ def main(argv=None):
     s = sub.add_parser('upsert')
     s.add_argument('bandeja_id')
     s.add_argument('--dry-run', action='store_true')
+    s.add_argument('--sin-foto', action='store_true')
     s.set_defaults(fn=cmd_upsert)
+
+    s = sub.add_parser('receta')
+    s.add_argument('bandeja_id')
+    s.set_defaults(fn=cmd_receta)
 
     s = sub.add_parser('capturas')
     s.add_argument('bandeja_id')

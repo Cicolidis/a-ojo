@@ -78,7 +78,7 @@ const datos = () => (datosFalsos ||= Object.assign(
 let cortadaHasta = 0;
 let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
-  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar'];
+  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -154,8 +154,23 @@ async function editarFalsa(pedido, ahora) {
       return { ok: false, error: 'estado_cambio', mensaje: 'Ese link ya está «' + fila.estado + '»: no lo cambié.', status: 409 };
     }
   }
-  datosFalsos = aplicarEdicion(todo, { accion: action, datos: cuerpo });
+  if (action === 'receta.corregir') {
+    const suya = todo.bandeja.filter(b => b.receta_id === recetaId).sort((a, b) => String(b.creado).localeCompare(String(a.creado)))[0];
+    if (suya && suya.estado === 'procesando') {
+      return { ok: false, error: 'procesando', mensaje: 'Esa receta se está procesando justo ahora. Probá de nuevo en un rato.', status: 409 };
+    }
+  }
+  // Las filas nuevas (las de receta.corregir) llevan el id de la edición: acá se les pone uno de la Sheet.
+  const nuevaId = 'b_' + String(todo.bandeja.length + 90000);
+  datosFalsos = aplicarEdicion(todo, { id: nuevaId, accion: action, datos: cuerpo, creada: ahora });
   const tocar = (lista, id, campos) => lista.map(x => (x.id === id ? Object.assign({}, x, campos) : x));
+  if (action === 'receta.corregir') {
+    const antes = new Map(todo.bandeja.map(b => [b.id, b]));
+    datosFalsos.bandeja = datosFalsos.bandeja.map(b => (antes.get(b.id) === b ? b : Object.assign({}, b, { local: undefined, actualizado: ahora })));
+    const fila = datosFalsos.bandeja.filter(b => b.receta_id === recetaId).sort((a, b) => String(b.creado).localeCompare(String(a.creado)))[0];
+    console.log('API falsa: receta.corregir ' + recetaId + ' → ' + (fila ? fila.id + ' ' + fila.estado + ' «' + (fila.pedido || '') + '»' : 'sin fila'));
+    return { ok: true, data: { id: fila ? fila.id : null, receta_id: recetaId, estado: fila ? fila.estado : null, pedido: fila ? fila.pedido || '' : '' } };
+  }
   if (action === 'nota.agregar') {
     datosFalsos.notas = datosFalsos.notas.map(n => (n.id === cuerpo.id && !n.creado ? Object.assign({}, n, { creado: ahora }) : n));
   } else if (action.startsWith('receta.')) {

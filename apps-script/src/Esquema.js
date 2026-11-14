@@ -62,6 +62,9 @@ const ESQUEMA = {
       col_('actualizado', 'fecha'),
       // Ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma.
       col_('capturas'),
+      // «Algo está mal en esta receta»: lo que pidieron corregir desde la app (receta.corregir).
+      // /recetas lo lee como instrucción; se vacía cuando la fila vuelve a quedar `lista`.
+      col_('pedido'),
     ],
   },
   Recetas: {

@@ -6,7 +6,7 @@
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { fechaHora } from '../formato.js';
 import { agruparBandeja, cuantasCapturas, descripcionLink } from '../bandeja.js';
-import { idAzar, nuevaEdicion } from '../ediciones.js';
+import { idAzar, nuevaCorreccion, nuevaEdicion } from '../ediciones.js';
 import { llamarApi } from '../api.js';
 import { achicarImagen } from '../imagenes.js';
 import { cargando, navegacion, vacio } from './controles.js';
@@ -115,20 +115,40 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
     avisar(aviso);
   }
 
+  // Una fila con pedido es una receta que pidieron corregir («Algo está mal en esta receta»).
+  const conPedido = fila => !!String(fila.pedido || '').trim();
+  const describir = fila => {
+    if (!conPedido(fila)) return descripcionLink(fila);
+    const receta = app.indice.porId.get(fila.receta_id);
+    return 'Corregir: ' + (receta ? receta.titulo : descripcionLink(fila));
+  };
+
+  function cancelarPedido(fila) {
+    editar(nuevaCorreccion(fila.receta_id, '', app.config.quien));
+    pintar();
+    titulo.focus();
+    avisar('Pedido cancelado. La receta queda como estaba.');
+  }
+
+  const botonCancelarPedido = (fila, clase) => h('button', { type: 'button', class: clase,
+    'aria-label': 'Cancelar el pedido: ' + describir(fila), onclick: () => cancelarPedido(fila) }, 'Cancelar el pedido');
+
   function cabeza(fila) {
     const url = urlSegura(fila.url);
     return h('div', { class: 'link-cabeza' },
       h('div', null,
-        h('strong', null, descripcionLink(fila)),
-        h('span', { class: 'secundario' }, 'Guardado ' + fechaHora(fila.creado))),
+        h('strong', null, describir(fila)),
+        h('span', { class: 'secundario' }, conPedido(fila) ? 'Pedido ' + fechaHora(fila.actualizado) : 'Guardado ' + fechaHora(fila.creado))),
       url ? h('a', { class: 'boton-redondo', href: url, target: '_blank', rel: 'noopener noreferrer',
-        'aria-label': 'Abrir el original: ' + descripcionLink(fila) }, icono('externo', 18)) : null);
+        'aria-label': 'Abrir el original: ' + describir(fila) }, icono('externo', 18)) : null);
   }
+
+  const textoPedido = fila => (conPedido(fila) ? h('p', { class: 'pedido-texto' }, fila.pedido) : null);
 
   function tarjetaAyuda(fila) {
     const s = subidas.get(fila.id);
     let acciones;
-    const desc = descripcionLink(fila);
+    const desc = describir(fila);
     if (s && s.estado === 'mandadas') {
       acciones = h('p', { class: 'ok-texto', tabindex: '-1', 'data-foco': 'ok:' + fila.id },
         icono('check', 18), 'Capturas mandadas. Esperando a la Mac…');
@@ -152,8 +172,9 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
         onchange: e => elegir(fila, [...e.target.files]) });
       acciones = [
         h('div', { class: 'form-botones' },
-          h('button', { type: 'button', class: 'boton-secundario', 'aria-label': 'Descartar ' + desc,
-            onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar'),
+          conPedido(fila) ? botonCancelarPedido(fila, 'boton-secundario')
+            : h('button', { type: 'button', class: 'boton-secundario', 'aria-label': 'Descartar ' + desc,
+              onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar'),
           h('label', { class: 'boton-principal' }, entrada, icono('imagen', 20), 'Subir capturas')),
         h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Probar de nuevo sin capturas: ' + desc,
           onclick: () => cambiarEstado(fila, 'pendiente', 'Lo vuelve a intentar la próxima vez que corra la Mac.') }, 'Probar de nuevo sin capturas'),
@@ -161,6 +182,7 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
     }
     return h('li', { class: 'tarjeta-link' },
       cabeza(fila),
+      textoPedido(fila),
       fila.motivo ? h('p', { class: 'motivo' }, icono('aviso', 18), fila.motivo) : null,
       acciones);
   }
@@ -173,9 +195,11 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
       : (n ? (n === 1 ? 'Con 1 captura · ' : 'Con ' + n + ' capturas · ') : '') + 'Esperando a la Mac';
     return h('li', { class: 'tarjeta-link' },
       cabeza(fila),
+      textoPedido(fila),
       h('div', { class: 'link-pie' },
         h('span', { class: 'secundario' }, estado),
-        fila.estado === 'pendiente' && !fila.local ? h('button', { type: 'button', class: 'boton-texto alerta-texto',
+        conPedido(fila) && fila.estado === 'pendiente' ? botonCancelarPedido(fila, 'boton-texto alerta-texto')
+        : fila.estado === 'pendiente' && !fila.local ? h('button', { type: 'button', class: 'boton-texto alerta-texto',
           'aria-label': 'Descartar ' + descripcionLink(fila),
           onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar') : null));
   }

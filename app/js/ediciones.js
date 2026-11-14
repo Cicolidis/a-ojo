@@ -6,7 +6,7 @@
 
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
 import { claveIngrediente } from './compras.js';
-import { extraerLink, mismoLink, plataformaDe } from './bandeja.js';
+import { extraerLink, mismoLink, plataformaDe, unirPedido } from './bandeja.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -33,6 +33,11 @@ export function nuevaNota(recetaId, quien, texto, ahora = new Date()) {
   }, ahora);
 }
 
+/** Un texto en una sola línea: cada pedido de corrección es una línea (como unaLinea_ de la API). */
+function unaLinea(v) {
+  return String(v ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
+}
+
 /**
  * Edición para guardar un link en la bandeja (compartido con la app o pegado), o
  * null si el texto no tiene ningún link. Se manda solo el link: la API lo normaliza
@@ -41,6 +46,14 @@ export function nuevaNota(recetaId, quien, texto, ahora = new Date()) {
 export function nuevaCaptura(texto, quien, ahora = new Date()) {
   const url = extraerLink(texto);
   return url ? nuevaEdicion('capturar', { url, quien }, ahora) : null;
+}
+
+/**
+ * Edición para pedir que /recetas corrija una receta («Algo está mal en esta receta»).
+ * Con el texto vacío, cancela el pedido.
+ */
+export function nuevaCorreccion(recetaId, texto, quien, ahora = new Date()) {
+  return nuevaEdicion('receta.corregir', { id: recetaId, texto: unaLinea(texto), quien }, ahora);
 }
 
 /** Aplica una edición a los datos locales, como lo haría la API. Devuelve datos nuevos; aplicarla dos veces da lo mismo. */
@@ -117,7 +130,7 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
             estado: d.estado,
             motivo: d.estado === 'ayuda' ? d.motivo || '' : '',
             intentos: reinicia ? 0 : b.intentos,
-          });
+          }, d.estado === 'lista' ? { pedido: '' } : {});
         }),
       });
     case 'capturar': {
@@ -138,6 +151,38 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
           quien: d.quien, estado: 'pendiente', motivo: '', receta_id: '', intentos: 0, capturas: '',
         }),
       });
+    }
+    case 'receta.corregir': {
+      // Como la API: la fila más nueva de la receta recibe el pedido (o se crea una provisoria).
+      const bandeja = datos.bandeja || [];
+      const texto = unaLinea(d.texto);
+      const receta = (datos.recetas || []).find(r => r.id === d.id);
+      let suyas = bandeja.filter(b => b.receta_id === d.id);
+      if (!suyas.length && receta) suyas = bandeja.filter(b => mismoLink(b.url, receta.fuente_url));
+      const fila = suyas
+        .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
+      const cambiar = cambios => Object.assign({}, datos, {
+        bandeja: bandeja.map(b => (b === fila ? Object.assign({}, b, cambios) : b)),
+      });
+      // Si la está procesando la Mac, la API la rechaza: no se toca.
+      if (fila && fila.estado === 'procesando') return datos;
+      if (!texto) {
+        if (!fila || !fila.pedido) return datos;
+        const vuelve = fila.estado === 'pendiente' || fila.estado === 'ayuda';
+        return cambiar(Object.assign({ pedido: '', motivo: '', actualizado: creada }, vuelve ? { estado: 'lista', intentos: 0 } : {}));
+      }
+      if (!fila) {
+        if (!receta) return datos;
+        return Object.assign({}, datos, {
+          bandeja: bandeja.concat({
+            id, local: true, creado: creada, actualizado: creada, url: receta.fuente_url, plataforma: plataformaDe(receta.fuente_url),
+            quien: d.quien || '', estado: 'pendiente', motivo: '', receta_id: d.id, intentos: 0, capturas: '', pedido: texto,
+          }),
+        });
+      }
+      const pedido = unirPedido(fila.pedido, texto);
+      if (pedido === fila.pedido && fila.estado === 'pendiente') return datos;
+      return cambiar({ pedido, estado: 'pendiente', motivo: '', intentos: 0, receta_id: d.id, actualizado: creada });
     }
     case 'nota.agregar':
       if (datos.notas.some(n => n.id === d.id)) return datos;

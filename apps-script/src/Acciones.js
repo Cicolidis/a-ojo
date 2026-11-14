@@ -57,6 +57,8 @@ function accionCapturar_(req) {
       receta_id: '',
       intentos: 0,
       actualizado: ahora,
+      capturas: '',
+      pedido: '',
     });
     return { id: id, estado: 'pendiente', mensaje: '✓ Guardada' };
   });
@@ -238,6 +240,7 @@ function accionBandejaActualizar_(req) {
     if (estado === 'pendiente' && (datos.estado === 'ayuda' || datos.estado === 'descartada')) datos.intentos = 0;
     datos.estado = estado;
     datos.motivo = estado === 'ayuda' ? String(req.motivo || '') : '';
+    if (estado === 'lista') datos.pedido = '';
     if (req.receta_id !== undefined && req.receta_id !== null) datos.receta_id = String(req.receta_id);
     if (estado === 'procesando') datos.intentos = (Number(datos.intentos) || 0) + 1;
     datos.actualizado = ahoraIso_();
@@ -304,7 +307,8 @@ function accionRecetaUpsert_(req) {
     let capturasPapelera = 0;
     if (bandeja) {
       const capturas = listaCapturas_(bandeja.datos.capturas);
-      Object.assign(bandeja.datos, { estado: 'lista', motivo: '', receta_id: id, actualizado: ahora });
+      // Si era un pedido de corrección («Algo está mal»), ya está resuelto.
+      Object.assign(bandeja.datos, { estado: 'lista', motivo: '', receta_id: id, pedido: '', actualizado: ahora });
       if (capturas.length) bandeja.datos.capturas = '';
       escribirFila_('Bandeja', bandeja.fila, bandeja.datos);
       // Ya cumplieron: quedan 30 días en la papelera, por si hay que reprocesar.
@@ -524,6 +528,85 @@ function accionRecetaEstado_(req) {
     escribirFila_('Recetas', receta.fila, receta.datos);
     return { id: receta.datos.id, estado: receta.datos.estado, valoracion: receta.datos.valoracion };
   });
+}
+
+const MAX_PEDIDO_ = 1000;
+
+/**
+ * POST receta.corregir { id, texto, quien? } («Algo está mal en esta receta», desde la app)
+ * Deja en la bandeja un pedido de corrección para /recetas: busca la fila de la
+ * receta (la más nueva con ese receta_id; si no hay, la crea con su fuente_url),
+ * suma el texto a `pedido` (si ya estaba, no lo repite) y la pasa a `pendiente`
+ * con los intentos en 0. Sin `texto`, cancela: vacía `pedido` y, si la fila
+ * esperaba o necesitaba ayuda, vuelve a `lista`. Idempotente. Si otra corrida la
+ * está procesando, 409 sin tocarla.
+ */
+function accionRecetaCorregir_(req) {
+  // Cada pedido, en una sola línea: así un reintento lo reconoce y «una línea, un pedido» vale para /recetas.
+  const texto = unaLinea_(req.texto);
+  if (texto.length > MAX_PEDIDO_) throw errorApi_('pedido_largo', 400, 'El pedido puede tener hasta ' + MAX_PEDIDO_ + ' caracteres.');
+  const quien = String(req.quien || '').trim().toLowerCase();
+  if (quien && ENUMS.quien.indexOf(quien) === -1) {
+    throw errorApi_('quien_invalido', 400, '«quien» tiene que ser ' + ENUMS.quien.join(' o ') + '.');
+  }
+
+  return conLock_(() => {
+    exigirColumnas_('Bandeja', ['pedido']);
+    const receta = filaReceta_(req.id).datos;
+    const filas = leerFilas_('Bandeja');
+    let suyas = filas.filter(f => f.datos.receta_id === receta.id);
+    // Una receta guardada sin bandeja_id: puede haber una fila con su link que no la tiene anotada.
+    if (!suyas.length) suyas = filas.filter(f => claveDe_(f.datos.url) === claveDe_(receta.fuente_url));
+    suyas.sort((a, b) => porCreado_(b.datos, a.datos));
+    const fila = suyas[0] || null;
+    const ahora = ahoraIso_();
+
+    if (fila && fila.datos.estado === 'procesando' && !trabada_(fila.datos)) {
+      throw errorApi_('procesando', 409, 'Esa receta se está procesando justo ahora. Probá de nuevo en un rato.');
+    }
+    if (!texto) {
+      if (!fila) return { id: null, receta_id: receta.id, estado: null, pedido: '' };
+      const d = fila.datos;
+      // Solo se cancela un pedido: una fila que espera por otra cosa (un reprocesado) no se toca.
+      // `intentos` en 0 marca que la dejó en `lista` la app y no la Mac (la Bandeja no la cuenta como recién llegada).
+      if (d.pedido) {
+        const vuelve = d.estado === 'pendiente' || d.estado === 'ayuda' || d.estado === 'procesando';
+        Object.assign(d, { pedido: '', motivo: '', actualizado: ahora }, vuelve ? { estado: 'lista', intentos: 0 } : {});
+        escribirFila_('Bandeja', fila.fila, d);
+      }
+      return { id: d.id, receta_id: receta.id, estado: d.estado, pedido: '' };
+    }
+
+    if (!fila) {
+      const norm = normalizarUrl(receta.fuente_url);
+      if (!norm) throw errorApi_('sin_fuente', 400, 'La receta no tiene un link de origen para reprocesarla.');
+      const id = nuevoId_(ESQUEMA.Bandeja.prefijo, filas.map(f => f.datos.id));
+      const datos = { id: id, creado: ahora, url: norm.url, plataforma: norm.plataforma, quien: quien || 'camilo',
+        estado: 'pendiente', motivo: '', receta_id: receta.id, intentos: 0, actualizado: ahora, capturas: '', pedido: texto };
+      agregarFila_('Bandeja', datos);
+      return { id: id, receta_id: receta.id, estado: 'pendiente', pedido: texto };
+    }
+
+    const d = fila.datos;
+    const pedido = unirPedido_(d.pedido, texto);
+    if (pedido !== d.pedido || d.estado !== 'pendiente') {
+      Object.assign(d, { pedido: pedido, estado: 'pendiente', motivo: '', intentos: 0, receta_id: receta.id, actualizado: ahora });
+      escribirFila_('Bandeja', fila.fila, d);
+    }
+    return { id: d.id, receta_id: receta.id, estado: d.estado, pedido: d.pedido };
+  });
+}
+
+/** Un texto en una sola línea, sin espacios de más alrededor de los saltos. */
+function unaLinea_(v) {
+  return String(v === undefined || v === null ? '' : v).replace(/\s*[\r\n]+\s*/g, ' ').trim();
+}
+
+/** Suma un pedido nuevo a los que ya había, en otra línea, salvo que ya esté (un reintento). */
+function unirPedido_(anterior, texto) {
+  const lineas = String(anterior || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (lineas.indexOf(texto) === -1) lineas.push(texto);
+  return lineas.join('\n');
 }
 
 /** Cuántas vistas de porciones se guardan por receta, como máximo. */

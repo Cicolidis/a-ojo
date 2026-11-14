@@ -4,7 +4,10 @@
 const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_RECIENTES = 10;
 // Los estados que solo escribe /recetas: su `actualizado` dice cuándo corrió la Mac.
+// Salvo una fila `lista` con los intentos en 0: la dejó así la app al cancelar un pedido de corrección
+// (la Mac siempre suma un intento al tomarla).
 const DE_LA_MAC = ['procesando', 'lista', 'ayuda'];
+const deLaMac = b => DE_LA_MAC.includes(b.estado) && !(b.estado === 'lista' && Number(b.intentos) === 0);
 
 const porFecha = campo => (a, b) => String(a[campo]).localeCompare(String(b[campo]));
 
@@ -26,11 +29,11 @@ export function agruparBandeja(bandeja, porId, ahoraMs = Date.now()) {
   const esperando = filas.filter(b => b.estado === 'pendiente' || b.estado === 'procesando')
     .sort((a, b) => (b.estado === 'procesando') - (a.estado === 'procesando') || porFecha('creado')(a, b));
   const recientes = filas
-    .filter(b => b.estado === 'lista' && porId.has(b.receta_id) && ahoraMs - Date.parse(b.actualizado) <= SIETE_DIAS_MS)
+    .filter(b => b.estado === 'lista' && deLaMac(b) && porId.has(b.receta_id) && ahoraMs - Date.parse(b.actualizado) <= SIETE_DIAS_MS)
     .sort(porFecha('actualizado')).reverse()
     .slice(0, MAX_RECIENTES)
     .map(fila => ({ fila, receta: porId.get(fila.receta_id) }));
-  const ultimaCorrida = filas.filter(b => DE_LA_MAC.includes(b.estado))
+  const ultimaCorrida = filas.filter(deLaMac)
     .map(b => String(b.actualizado || ''))
     .reduce((a, b) => (b > a ? b : a), '');
   return { ayuda, esperando, recientes, ultimaCorrida };
@@ -140,4 +143,21 @@ export function mismoLink(a, b) {
 /** La fila de la bandeja que ya tiene ese link (a grandes rasgos, ver mismoLink), o undefined. */
 export function filaDelLink(bandeja, url) {
   return (bandeja || []).find(b => mismoLink(b.url, url));
+}
+
+/**
+ * La fila con un pedido de corrección («Algo está mal en esta receta») de esa
+ * receta, o null. Si hubiera varias filas de la receta, cuenta la más nueva, como en la API.
+ */
+export function pedidoDe(bandeja, recetaId) {
+  const fila = (bandeja || []).filter(b => b.receta_id === recetaId)
+    .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
+  return fila && String(fila.pedido || '').trim() ? fila : null;
+}
+
+/** Suma un pedido nuevo a los que ya había, en otra línea, salvo que ya esté (un reintento). Como unirPedido_ de la API. */
+export function unirPedido(anterior, texto) {
+  const lineas = String(anterior || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lineas.includes(texto)) lineas.push(texto);
+  return lineas.join('\n');
 }

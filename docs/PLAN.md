@@ -80,7 +80,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 ### 6.3 Funciones nuevas
 
 - [ ] Compartir directo a A ojo: `share_target` y «Pegar un link» en la Bandeja (implementado y revisado; falta la prueba en Android, que incluye compartir y volver enseguida a Instagram para ver si el link llega igual a la Sheet)
-- [ ] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción
+- [ ] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción (implementado; falta desplegar la API 0.7.0 y la demo. Orden: `npm run deploy`, `setup()` en el editor y recién después el push a `main`, así ningún pedido traba la cola)
 - [ ] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
 - [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`)
 - [ ] «Cómo se armó» en la ficha: `notas_proceso`, plegado

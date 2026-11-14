@@ -36,7 +36,8 @@ Procesá las filas **de a una**. Después de cada una, contá en una línea cóm
 - Si `filas` viene vacía, no queda nada (o lo tomó otra corrida): terminá y andá a §4.
 - Si responde `procesando` (con un id), la tiene otra corrida: decilo y terminá.
 - Si trae `aviso`, la API todavía no tiene `bandeja.tomar`: seguí igual y mencionalo al final (hay que desplegarla).
-- La fila trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» y tomá la próxima.
+- La fila trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» (si trae `pedido`: «Intenté corregirla 3 veces y no pude. Cancelá el pedido y escribilo de nuevo.») y tomá la próxima.
+- Si la fila trae `pedido`, es un **pedido de corrección** que hicieron desde la ficha («Algo está mal en esta receta»): seguí §1.5 en lugar de §1.2 y §1.3.
 
 Cuando termines una fila, volvé a §1.1 hasta procesar N (sin número, 10).
 
@@ -79,6 +80,24 @@ Si el video **no es una receta** o, después de todas las capas, no se puede sab
 Si ya tenía capturas y no alcanzan, el motivo dice qué falta: «Las capturas no muestran los ingredientes. Mandá una de la lista.» (las capturas nuevas se suman a las anteriores).
 
 Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y diciendo qué hacer.
+
+### 1.5 Pedidos de corrección
+
+La fila ya es una receta y ellos pidieron corregirla: `pedido` dice qué está mal («la harina son 300 g, no 200»; si hay varias líneas, son varios pedidos). **Se parte de la receta guardada y se cambia solo lo que pide el pedido.** No se reprocesa entera salvo que el pedido lo diga («rehacela desde el video»).
+
+1. **Bajarla:** `procesamiento/aojo api receta <id>`. Deja la receta guardada en `<dir>/receta.json` (`~/.a-ojo/trabajo/<id>`), en el formato de §2, y devuelve el `pedido`. Si ya había un `receta.json` de otra corrida, queda como `receta.anterior.json`.
+2. **Capturas:** si la fila trae `capturas` (las subieron desde la app para este pedido), bajalas con `api capturas <id>` y leelas: son parte del pedido («la cantidad está en esta captura»).
+3. **Verificar contra la fuente:** buscá en la fuente el dato que piden cambiar. Primero lo que ya esté en `<dir>` (lo que dejó la primera corrida: `subtitulos.txt`, `transcripcion.txt`, `web.json`, `comentarios.json`; nunca `info.json` entero). La descripción o el caption salen de `fetch meta`. Si no hay nada (por ejemplo, la primera vez se procesó en la otra computadora), corré solo las capas que hagan falta para chequear ese dato (§1.2), empezando por `fetch meta`. Si la fuente no se puede leer (`login`, `privado`, `no_disponible`), **aplicá el pedido igual** y anotá en `notas_proceso` que no se pudo verificar; no la mandes a `ayuda` por eso. Con `limite` o `red`, §1.4 como siempre.
+4. **Corregir:** editá `receta.json` con Write y cambiá **solo** lo que pide el pedido, con las reglas de §3. Cuidá lo que depende del cambio: si cambia un ingrediente, revisá los pasos que lo nombran (y al revés).
+   - Cada línea de `pedido` es un pedido; las últimas aclaran o corrigen a las anteriores. Aplicá lo que se entienda y contá en `notas_proceso` lo que no.
+   - **Si el pedido contradice la fuente, gana el pedido** (ellos la cocinaron). En el paso donde se usa ese dato, agregá al final de su `tip` (o como `tip`, si no tiene) lo que decía el original: «El video dice 200 g de harina.»
+   - Si la receta guardada ya dice lo que pide el pedido (por ejemplo, llegó dos veces), no cambies nada ni sumes notas: mandá el upsert igual para cerrarlo.
+   - Si el pedido completa un dato que faltaba, subí la `confianza` si corresponde (§3). Si no, dejala como estaba.
+   - Al final de `notas_proceso`, una línea: «Corrección pedida (AAAA-MM-DD): «<pedido>». <Qué cambiaste>. <Qué dice la fuente, si contradice>.»
+5. **Guardar:** `procesamiento/aojo api upsert <id> --sin-foto` (así no cambia la foto). Solo si el pedido es sobre la foto, elegí una nueva como en §1.3 y mandala sin `--sin-foto`. La API deja la fila en `lista` y vacía el pedido; lo que cambiaron ellos en la app (roles y secciones) se conserva.
+6. **Si no se entiende nada o no se puede aplicar** (habla de otra receta, pide algo que no está en ninguna parte y no se puede deducir): no cambies nada y `api actualizar <id> ayuda --motivo "No entendí el pedido: <por qué, en una línea>. Cancelalo y escribilo de nuevo desde la receta."`
+
+En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va qué cambió, en pocas palabras.
 
 ## 2. Formato de `receta.json`
 
@@ -196,7 +215,7 @@ Los motivos de `ayuda` los leen ellos en la app: en rioplatense, cortos y dicien
 
 ## 4. Al terminar
 
-Mostrá una tabla con: fila, plato (o el link si no salió), resultado (`lista` / `ayuda` / `pendiente`), confianza, capas usadas y, si corresponde, el motivo. Después, en una línea: cuántas siguen pendientes en la bandeja y que el detalle está en `~/.a-ojo/log/<fecha de hoy>.log`. Si fue `--dry-run`, aclaralo: no se escribió nada en la Sheet.
+Mostrá una tabla con: fila, plato (o el link si no salió), resultado (`lista` / `corregida` / `ayuda` / `pendiente`), confianza, capas usadas y, si corresponde, el motivo. Después, en una línea: cuántas siguen pendientes en la bandeja y que el detalle está en `~/.a-ojo/log/<fecha de hoy>.log`. Si fue `--dry-run`, aclaralo: no se escribió nada en la Sheet.
 
 ## 5. `--clasificar`: recetas ya guardadas
 

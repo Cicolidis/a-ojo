@@ -405,6 +405,62 @@ class TestClasificar(unittest.TestCase):
         self.assertIn('infaltable', r['motivo'])
 
 
+TODO_CORREGIR = {
+    'recetas': [{'id': 'r_brown', 'titulo': 'Brownie', 'tipo': 'dulce', 'etiquetas': 'rápida, para invitados', 'porciones': 12,
+                 'tiempo_min': 45, 'molde': '20×20 cm', 'autor': '@alguien', 'fuente_url': 'https://www.youtube.com/shorts/a',
+                 'confianza': 'media', 'origen_datos': 'descripcion,subtitulos', 'idioma_original': 'es',
+                 'notas_proceso': 'Porciones estimadas.', 'estado': 'favorita', 'foto_url': 'https://x'}],
+    'ingredientes': [
+        {'id': 'i_2', 'receta_id': 'r_brown', 'orden': 2, 'nombre': 'sal', 'unidad': 'a ojo', 'cantidad': None, 'nota': '',
+         'gondola': 'almacén', 'seccion': '', 'rol': 'condimento', 'rol_usuario': 'opcional'},
+        {'id': 'i_1', 'receta_id': 'r_brown', 'orden': 1, 'nombre': 'harina', 'unidad': 'g', 'cantidad': 200, 'nota': '',
+         'gondola': 'almacén', 'seccion': '', 'rol': 'principal'},
+    ],
+    'pasos': [{'receta_id': 'r_brown', 'orden': 1, 'texto': 'Mezclá todo.', 'timer_min': None, 'tip': ''}],
+    'bandeja': [{'id': 'b_brown', 'receta_id': 'r_brown', 'estado': 'procesando', 'pedido': 'La harina son 300 g.'},
+                {'id': 'b_sin', 'receta_id': '', 'estado': 'procesando'}],
+}
+
+
+class TestCorregir(unittest.TestCase):
+    def test_receta_baja_la_guardada_como_receta_json(self):
+        d = comun.dir_trabajo('b_brown')
+        comun.escribir_json(d / 'receta.json', {'titulo': 'de la primera corrida'})
+        with mock.patch.object(api, 'llamar', return_value=TODO_CORREGIR) as llamar:
+            r, codigo = correr_api('receta', 'b_brown')
+        llamar.assert_called_once_with('GET', 'todo')
+        self.assertEqual((codigo, r['receta_id'], r['pedido']), (0, 'r_brown', 'La harina son 300 g.'))
+        receta = comun.leer_json(d / 'receta.json')
+        self.assertEqual(receta, r['receta'])
+        self.assertEqual(receta['etiquetas'], ['rápida', 'para invitados'])
+        self.assertEqual(receta['origen_datos'], ['descripcion', 'subtitulos'])
+        self.assertEqual([i['nombre'] for i in receta['ingredientes']], ['harina', 'sal'])
+        self.assertEqual(receta['ingredientes'][1]['rol'], 'condimento', 'el rol de /recetas, no el de ellos')
+        self.assertNotIn('estado', receta)
+        self.assertNotIn('id', receta['ingredientes'][0])
+        self.assertEqual(comun.leer_json(d / 'receta.anterior.json'), {'titulo': 'de la primera corrida'})
+
+        with mock.patch.object(api, 'llamar', return_value=TODO_CORREGIR):
+            r, codigo = correr_api('receta', 'b_sin')
+        self.assertEqual((r['error'], codigo), ('sin_receta', 1))
+
+    def test_upsert_sin_foto_no_la_manda(self):
+        d = comun.dir_trabajo('b_foto')
+        comun.escribir_json(d / 'receta.json', {'titulo': 'Brownie'})
+        (d / 'foto.jpg').write_bytes(b'foto')
+        with mock.patch.object(api, 'llamar', return_value={'id': 'r_1'}) as llamar:
+            correr_api('upsert', 'b_foto', '--sin-foto')
+            self.assertNotIn('foto', llamar.call_args[0][2])
+            correr_api('upsert', 'b_foto')
+            self.assertIn('foto', llamar.call_args[0][2])
+
+    def test_tomar_muestra_el_pedido(self):
+        fila = {'id': 'b_brown', 'estado': 'procesando', 'intentos': 1, 'pedido': 'La harina son 300 g.'}
+        with mock.patch.object(api, 'llamar', return_value={'filas': [fila], 'quedan': 0}):
+            r, _ = correr_api('tomar')
+        self.assertEqual(r['filas'][0]['pedido'], 'La harina son 300 g.')
+
+
 class TestCapturas(unittest.TestCase):
     def test_baja_las_capturas_a_la_carpeta_de_trabajo(self):
         imagenes = [

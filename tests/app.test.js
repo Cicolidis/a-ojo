@@ -819,3 +819,52 @@ test('manifest: el share_target abre la app con los parámetros que lee leerComp
   const { leerCompartido } = await cargar('bandeja.js');
   assert.equal(leerCompartido('?' + new URLSearchParams({ [st.params.text]: 'https://youtu.be/a' })), 'https://youtu.be/a');
 });
+
+test('receta.corregir: el pedido va a la fila de la receta, se suma sin repetirse y se cancela, como la API', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const { aplicarEdicion, aplicarCola, nuevaCorreccion } = await cargar('ediciones.js');
+  const { pedidoDe, unirPedido } = await cargar('bandeja.js');
+  const datos = aplicarDelta(null, fixture());
+  const ahora = new Date('2026-11-14T15:00:00.000Z');
+  const conBrownie = datos.bandeja.find(b => b.receta_id === 'r_brown');
+  assert.ok(conBrownie && conBrownie.estado === 'lista', 'el brownie tiene su fila en lista');
+
+  const e = nuevaCorreccion('r_brown', '  La harina son 300 g.  ', 'pareja', ahora);
+  assert.deepEqual([e.accion, e.datos], ['receta.corregir', { id: 'r_brown', texto: 'La harina son 300 g.', quien: 'pareja' }]);
+  let d = aplicarCola(datos, [e, e]);
+  let fila = pedidoDe(d.bandeja, 'r_brown');
+  assert.deepEqual([fila.id, fila.estado, fila.pedido, fila.intentos], [conBrownie.id, 'pendiente', 'La harina son 300 g.', 0]);
+  d = aplicarEdicion(d, nuevaCorreccion('r_brown', 'Falta el horno.', 'camilo', ahora));
+  assert.equal(pedidoDe(d.bandeja, 'r_brown').pedido, 'La harina son 300 g.\nFalta el horno.');
+  assert.equal(unirPedido('a\nb', 'b'), 'a\nb');
+
+  // Cancelar: vuelve a lista sin pedido; dos veces da lo mismo.
+  const cancelar = nuevaCorreccion('r_brown', '', 'camilo', ahora);
+  d = aplicarCola(d, [cancelar, cancelar]);
+  assert.equal(pedidoDe(d.bandeja, 'r_brown'), null);
+  assert.equal(d.bandeja.find(b => b.id === conBrownie.id).estado, 'lista');
+
+  // Cancelado, no cuenta como recién llegada ni como corrida de la Mac (la dejó en lista la app, con los intentos en 0).
+  const { agruparBandeja } = await cargar('bandeja.js');
+  const g = agruparBandeja(d.bandeja, indexar(d).porId, Date.parse('2026-11-14T16:00:00.000Z'));
+  assert.ok(!g.recientes.some(x => x.fila.id === conBrownie.id));
+  assert.notEqual(g.ultimaCorrida, '2026-11-14T15:00:00.000Z');
+
+  // Con saltos de línea queda en una sola: un reintento no lo duplica.
+  const largo = nuevaCorreccion('r_brown', 'La harina son 300 g.\n Y el horno a 180.', 'camilo', ahora);
+  assert.equal(largo.datos.texto, 'La harina son 300 g. Y el horno a 180.');
+  assert.equal(pedidoDe(aplicarCola(datos, [largo, largo]).bandeja, 'r_brown').pedido, 'La harina son 300 g. Y el horno a 180.');
+  const crudo = Object.assign({}, largo, { datos: Object.assign({}, largo.datos, { texto: 'Uno.\nDos.' }) });
+  assert.equal(pedidoDe(aplicarCola(datos, [crudo, crudo]).bandeja, 'r_brown').pedido, 'Uno. Dos.', 'aunque venga crudo en la edición');
+
+  // Mientras la procesa la Mac, no se toca.
+  const procesando = Object.assign({}, datos, { bandeja: datos.bandeja.map(b => (b.id === conBrownie.id ? Object.assign({}, b, { estado: 'procesando' }) : b)) });
+  assert.deepEqual(aplicarEdicion(procesando, e).bandeja, procesando.bandeja);
+
+  // Una receta sin fila en el celular: una provisoria, que aplicarDelta saca cuando llega la de verdad.
+  const sinFila = Object.assign({}, datos, { bandeja: datos.bandeja.filter(b => b.receta_id !== 'r_brown') });
+  d = aplicarEdicion(sinFila, e);
+  fila = pedidoDe(d.bandeja, 'r_brown');
+  assert.deepEqual([fila.local, fila.id, fila.url, fila.estado], [true, e.id, indexar(datos).porId.get('r_brown').fuente_url, 'pendiente']);
+  assert.equal(aplicarEdicion(sinFila, nuevaCorreccion('r_nohay', 'algo')), sinFila, 'una receta que no está no cambia nada');
+});

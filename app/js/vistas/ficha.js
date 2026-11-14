@@ -8,7 +8,8 @@ import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatear
 import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
-import { nuevaEdicion, nuevaNota } from '../ediciones.js';
+import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
+import { pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
 import { estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
@@ -19,7 +20,7 @@ const ESTADOS = [
 ];
 const MAX_PORCIONES = 99;
 
-export function montar(contenedor, { app, volver, editar }, id) {
+export function montar(contenedor, { app, volver, editar, avisar }, id) {
   let r = app.indice.porId.get(id);
   if (!r) {
     contenedor.append(sinReceta(app, id));
@@ -95,6 +96,53 @@ export function montar(contenedor, { app, volver, editar }, id) {
     } }, 'Cancelar'),
     h('button', { type: 'submit', class: 'boton-principal' }, 'Guardar nota')));
 
+  // «Algo está mal en esta receta»: un pedido para que /recetas la corrija (va a la bandeja).
+  // Como las notas, el formulario no se repinta. El recuadro de arriba muestra el pedido en curso.
+  const zonaPedido = h('div');
+  const textoPedido = h('textarea', {
+    rows: '3', maxlength: '1000', 'aria-label': '¿Qué está mal?',
+    placeholder: 'Ej.: la harina son 300 g, no 200.',
+  });
+  const abrirPedido = h('button', { type: 'button', class: 'boton-texto',
+    onclick: () => {
+      abrirPedido.hidden = true;
+      formPedido.hidden = false;
+      textoPedido.focus();
+    } });
+  const cerrarPedido = () => {
+    textoPedido.value = '';
+    formPedido.hidden = true;
+    abrirPedido.hidden = false;
+  };
+  const formPedido = h('form', {
+    class: 'form-nota',
+    hidden: true,
+    onsubmit: e => {
+      e.preventDefault();
+      if (!textoPedido.value.trim()) return textoPedido.focus();
+      editar(nuevaCorreccion(id, textoPedido.value, app.config.quien));
+      cerrarPedido();
+      pintar();
+      abrirPedido.focus();
+      avisar('✓ Pedido. Se corrige la próxima vez que corra la Mac.');
+    },
+  },
+  h('p', { class: 'secundario' }, 'Contá qué está mal y la Mac la corrige la próxima vez que corra.'),
+  textoPedido,
+  h('div', { class: 'form-botones' },
+    h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
+      cerrarPedido();
+      abrirPedido.focus();
+    } }, 'Cancelar'),
+    h('button', { type: 'submit', class: 'boton-principal' }, 'Pedir la corrección')));
+  const cancelarPedido = () => {
+    editar(nuevaCorreccion(id, '', app.config.quien));
+    pintar();
+    // El recuadro (con este botón) desaparece: el foco va al botón de pedir.
+    abrirPedido.focus();
+    avisar('Pedido cancelado. La receta queda como estaba.');
+  };
+
   const descartar = h('button', { type: 'button', class: 'boton-texto alerta-texto',
     onclick: () => {
       cambiarEstado('descartada');
@@ -119,11 +167,12 @@ export function montar(contenedor, { app, volver, editar }, id) {
     h('div', { class: 'ficha-cuerpo' },
       titulo,
       zonaMeta,
+      zonaPedido,
       h('div', { class: 'ficha-estado' }, selector, valorar, descartada),
       zonaIngredientes,
       zonaPasos,
       h('section', { class: 'seccion' }, tituloNotas, listaNotas, abrirNota, formNota),
-      descartar,
+      h('div', { class: 'ficha-pie' }, abrirPedido, formPedido, descartar),
     ),
     barraCocinar,
   ), nav);
@@ -240,6 +289,29 @@ export function montar(contenedor, { app, volver, editar }, id) {
     );
   }
 
+  function pintarPedido() {
+    const fila = pedidoDe(app.datos?.bandeja, id);
+    abrirPedido.textContent = fila ? 'Sumar algo al pedido' : 'Algo está mal en esta receta';
+    // Mientras la Mac la corrige, la API no acepta pedidos: el botón no se ofrece (si tenía el foco, pasa al título).
+    const corrigiendo = !!fila && fila.estado === 'procesando';
+    if (corrigiendo && document.activeElement === abrirPedido) titulo.focus({ preventScroll: true });
+    abrirPedido.hidden = corrigiendo || !formPedido.hidden;
+    if (!fila) return rellenar(zonaPedido);
+    const cancelar = h('button', { type: 'button', class: 'boton-secundario', onclick: cancelarPedido }, 'Cancelar el pedido');
+    const texto = h('p', { class: 'pedido-texto' }, fila.pedido);
+    if (fila.estado === 'procesando') {
+      return rellenar(zonaPedido, h('div', { class: 'aviso-pedido' },
+        h('p', null, h('strong', null, 'Corrigiéndose…'), ' La Mac la está procesando ahora.'), texto));
+    }
+    if (fila.estado === 'ayuda') {
+      return rellenar(zonaPedido, h('div', { class: 'aviso-pedido' },
+        h('p', { class: 'motivo' }, icono('aviso', 18), fila.motivo || 'No se pudo corregir.'), texto,
+        h('div', { class: 'form-botones' }, cancelar, h('a', { class: 'boton-secundario', href: '#/bandeja' }, 'Ver en la Bandeja'))));
+    }
+    rellenar(zonaPedido, h('div', { class: 'aviso-pedido' },
+      h('p', null, h('strong', null, 'Hay una corrección pedida.'), ' Se hace la próxima vez que corra la Mac.'), texto, cancelar));
+  }
+
   function pintarNotas() {
     tituloNotas.textContent = r.notas.length > 1 ? 'Nuestras notas' : r.notas.length ? 'Nuestra nota' : 'Notas';
     rellenar(listaNotas, r.notas.length
@@ -260,6 +332,7 @@ export function montar(contenedor, { app, volver, editar }, id) {
     conFoco(zonaIngredientes, pintarIngredientes);
     pintarPasos();
     pintarNotas();
+    pintarPedido();
     nav.actualizar();
   }
 
@@ -267,7 +340,7 @@ export function montar(contenedor, { app, volver, editar }, id) {
   return {
     actualizar: pintar,
     // Una nota a medio escribir: una versión nueva de la app espera para recargar.
-    ocupada: () => !formNota.hidden && textoNota.value.trim() !== '',
+    ocupada: () => (!formNota.hidden && textoNota.value.trim() !== '') || (!formPedido.hidden && textoPedido.value.trim() !== ''),
   };
 }
 

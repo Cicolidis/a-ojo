@@ -149,8 +149,8 @@ test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   p.ctx.setup();
   assert.equal(p.propiedades.get('TOKEN'), token, 'no cambia el token');
   const bandeja = p.planilla.getSheetByName('Bandeja');
-  assert.equal(bandeja.getLastColumn(), 12);
-  assert.equal(bandeja.getRange(1, 12).getValues()[0][0], 'apodo');
+  assert.equal(bandeja.getLastColumn(), 13);
+  assert.equal(bandeja.getRange(1, 13).getValues()[0][0], 'apodo');
   assert.equal(p.filas('Bandeja').length, 1);
 });
 
@@ -985,4 +985,72 @@ test('urlImagen_: thumbnail por defecto y la alternativa lh3 preparada', () => {
   assert.equal(p.ctx.urlImagen_('abc_123', 'lh3'), 'https://lh3.googleusercontent.com/d/abc_123=w1200');
   const csp = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
   assert.match(csp, /img-src[^;]*https:\/\/\*\.googleusercontent\.com/, 'la CSP de la app permite lh3');
+});
+
+test('receta.corregir deja el pedido en la fila de la receta, lo suma sin repetirlo y se cancela con el texto vacío', async () => {
+  const p = proyecto();
+  const bandejaId = p.capturar('https://youtube.com/shorts/a2qRJHVeJwk').data.id;
+  const id = p.upsert(receta(), { bandeja_id: bandejaId }).data.id;
+  const corregir = (texto, extra = {}) => p.postJson(Object.assign({ action: 'receta.corregir', t: p.token, id, texto }, extra));
+  const fila = () => p.filas('Bandeja').find(b => b.id === bandejaId);
+  p.editar('Bandeja', bandejaId, { intentos: 2 });
+
+  let r = corregir('  La harina son 300 g, no 200.  ');
+  assert.deepEqual(r.data, { id: bandejaId, receta_id: id, estado: 'pendiente', pedido: 'La harina son 300 g, no 200.' });
+  assert.deepEqual([fila().estado, fila().intentos, fila().pedido], ['pendiente', 0, 'La harina son 300 g, no 200.']);
+  const antes = fila().actualizado;
+  await new Promise(res => setTimeout(res, 5));
+  corregir('La harina son 300 g, no 200.');
+  assert.equal(fila().actualizado, antes, 'un reintento no escribe');
+  corregir('Falta el horno: 180 °C.');
+  assert.equal(fila().pedido, 'La harina son 300 g, no 200.\nFalta el horno: 180 °C.');
+  assert.deepEqual(p.get({ action: 'bandeja.fila', t: p.token, id: bandejaId }).data.fila.pedido, fila().pedido);
+
+  // Mientras la procesa una corrida, no se toca.
+  p.postJson({ action: 'bandeja.tomar', t: p.token, id: bandejaId });
+  r = corregir('Otra cosa');
+  assert.deepEqual([r.status, r.error], [409, 'procesando']);
+
+  // /recetas la resuelve: upsert la deja lista y vacía el pedido.
+  p.upsert(receta(), { bandeja_id: bandejaId });
+  assert.deepEqual([fila().estado, fila().pedido], ['lista', '']);
+
+  // Cancelar: vacía el pedido y la fila vuelve a lista; una fila sin pedido no se toca.
+  corregir('Sacale el azúcar');
+  r = corregir('');
+  assert.deepEqual(r.data, { id: bandejaId, receta_id: id, estado: 'lista', pedido: '' });
+  assert.deepEqual([fila().estado, fila().pedido], ['lista', '']);
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id: bandejaId, estado: 'pendiente' });
+  corregir('');
+  assert.equal(fila().estado, 'pendiente', 'un reprocesado que espera no se cancela');
+
+  // Un pedido con saltos de línea queda en una sola: un reintento lo reconoce. Y bandeja.actualizar a lista también lo vacía.
+  corregir('La harina son 300 g.\n  Y el horno a 180.');
+  corregir('La harina son 300 g.\r\nY el horno a 180.');
+  assert.equal(fila().pedido, 'La harina son 300 g. Y el horno a 180.');
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id: bandejaId, estado: 'lista' });
+  assert.equal(fila().pedido, '');
+  // Cancelar deja los intentos en 0: la marca de que la dejó en lista la app, no la Mac.
+  corregir('Algo');
+  corregir('');
+  assert.deepEqual([fila().estado, fila().intentos], ['lista', 0]);
+
+  assert.equal(corregir('x'.repeat(1001)).error, 'pedido_largo');
+  assert.equal(p.postJson({ action: 'receta.corregir', t: p.token, id: 'r_nohay', texto: 'algo' }).error, 'no_encontrada');
+  assert.equal(corregir('algo', { quien: 'otro' }).error, 'quien_invalido');
+});
+
+test('receta.corregir crea la fila si la receta no tiene una, y pide setup() si falta la columna', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const r = p.postJson({ action: 'receta.corregir', t: p.token, id, texto: 'Son 12 porciones', quien: 'pareja' });
+  const fila = p.filas('Bandeja').find(b => b.id === r.data.id);
+  assert.deepEqual([fila.url, fila.plataforma, fila.quien, fila.estado, fila.receta_id, fila.pedido],
+    ['https://www.youtube.com/shorts/a2qRJHVeJwk', 'youtube', 'pareja', 'pendiente', id, 'Son 12 porciones']);
+  assert.equal(p.capturar('https://youtu.be/a2qRJHVeJwk').data.duplicada, true, 'capturar la encuentra');
+
+  const sh = p.planilla.getSheetByName('Bandeja');
+  const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  sh.getRange(1, enc.indexOf('pedido') + 1).setValues([['']]);
+  assert.equal(p.postJson({ action: 'receta.corregir', t: p.token, id, texto: 'otra' }).error, 'falta_columna');
 });

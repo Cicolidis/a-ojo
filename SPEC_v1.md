@@ -82,6 +82,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | intentos | número | |
 | actualizado | fecha-hora ISO | |
 | capturas | texto | ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma. Cuando la fila queda `lista`, van a la papelera de Drive (30 días) y la columna se vacía |
+| pedido | texto | «Algo está mal en esta receta»: lo que pidieron corregir desde la ficha (`receta.corregir`), una línea por pedido. `/recetas` lo lee como instrucción; se vacía cuando la fila vuelve a quedar `lista`. Cada pedido es una línea (los saltos de línea del texto se juntan). Cancelarlo deja la fila en `lista` con `intentos` en 0: así la Bandeja sabe que no la procesó la Mac (no cuenta como «Recién llegada» ni como su última corrida) |
 
 **Deduplicación:** si la URL normalizada ya existe, no se crea una fila nueva y la API responde `duplicada`.
 
@@ -161,8 +162,9 @@ Dónde se compra cada cosa, compartido por los dos:
 | GET o POST | `ping` | — | `{version, ahora, hojas_faltantes, mensaje}` (prueba la conexión y el token: lo usan `setup.sh` y `npm run smoke`) |
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
 | GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
-| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista` y manda sus capturas a la papelera: `capturas_papelera`) |
+| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista`, vacía su `pedido` y manda sus capturas a la papelera: `capturas_papelera`) |
 | POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
+| POST | `receta.corregir` | `{id, texto, quien?}` | `{id, receta_id, estado, pedido}`: suma `texto` al `pedido` de la fila de la receta (la más nueva; si no tiene, la crea con su `fuente_url`) y la deja en `pendiente` con los intentos en 0. Sin `texto`, cancela: vacía el pedido y la fila vuelve a `lista`. `409 procesando` si la tiene una corrida |
 | POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
 | POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
 | POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (`/recetas --clasificar`: todos los ingredientes) |
@@ -224,6 +226,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 6. **Capa 5: fotogramas.** Si todavía faltan datos, se extrae 1 cuadro cada 3 segundos con `ffmpeg`, se arman mosaicos y Claude lee el texto sobreimpreso.
 7. **Capa 6: capturas.** Si la fila tiene capturas subidas desde la app, se bajan (`capturas.bajar`) y se leen primero. Si Instagram pide iniciar sesión pero las capturas alcanzan, la receta se arma con ellas.
 8. Claude **estructura la receta** (§6.2), elige la foto, **copia la miniatura a Drive**, hace `receta.upsert` y deja la bandeja en `lista`.
+   - **Pedidos de corrección** (la fila trae `pedido`): se parte de la receta guardada (`api receta <id>` la deja como `receta.json`) y se cambia solo lo que pide el pedido, verificándolo contra la fuente. Si la contradice, gana el pedido y un `tip` del paso dice qué decía el original («El video dice 200 g»). Se anota en `notas_proceso` y se guarda con `api upsert --sin-foto` (no cambia la foto). Si no se entiende, `ayuda` con «No entendí el pedido…».
 9. Si nada alcanza, la fila pasa a `ayuda` con un motivo legible (ej.: "Instagram pide iniciar sesión. Mandá 2 o 3 capturas").
 
 ### 6.2 Reglas de estructuración
@@ -294,13 +297,14 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
+   - **"Algo está mal en esta receta"** (abajo, antes de "Descartar receta"): un texto para que `/recetas` la corrija ("Ej.: la harina son 300 g, no 200"); va por la cola. Mientras espera, un recuadro arriba muestra el pedido ("Pediste una corrección", "Corrigiéndose…" o el motivo si necesita ayuda) con "Cancelar el pedido", y el botón pasa a "Sumar algo al pedido".
    - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí). Desde la ficha, guardar vuelve a la receta con el aviso "✓ Agregada a compras" y su botón "Ver la lista"; desde Compras, vuelve a la lista.
 3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (con las cantidades de la vista de porciones), el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
 4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Agregar una receta" (un buscador de recetas, en orden alfabético, que marca las que ya están y lleva al paso para elegir), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final y, dentro de cada lugar, en orden alfabético. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
    - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
    - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
    - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
-5. **Bandeja:** la hora del último procesamiento, «Pegar un link» (un campo y «Guardar»; si el texto no tiene link, lo dice abajo del campo) y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
+5. **Bandeja:** la hora del último procesamiento, «Pegar un link» (un campo y «Guardar»; si el texto no tiene link, lo dice abajo del campo) y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza). Un pedido de corrección se ve como "Corregir: <título>", con el pedido y "Cancelar el pedido" en lugar de "Descartar".
 
 **Estados vacíos y primera carga.**
 - Cada pantalla sin datos lleva un ícono, un título corto, una explicación y, si sirve, una acción: «Borrar la búsqueda», «Ver todas», «Ver las descartadas», «Probá de nuevo», «Volver a la receta».
@@ -453,6 +457,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 1. **Compartir directo a A ojo.** `share_target` en el manifest: en Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Además, un campo «Pegar un link» en la Bandeja (para iPhone, iPad o una computadora sin la extensión). `capturar` ya deduplica, así que puede ir por la cola.
    - *Hecho (14/11):* §5.3. Sin cambios en la API. Falta la prueba en Android: Chrome actualiza el manifest de la app instalada solo, pero puede tardar; si «A ojo» no aparece en Compartir, reinstalarla.
 2. **«Algo está mal en esta receta».** Desde la ficha se pide reprocesarla con un texto («la harina son 300 g»). Queda en la bandeja y `/recetas` lo lee como instrucción.
+   - *Hecho (14/11):* columna `pedido` en `Bandeja`, `receta.corregir` (API 0.7.0), `api receta` y `--sin-foto` en `procesamiento/api.py`, §1.5 de `recetas.md`. Decidido: se parte de la receta guardada y, si el pedido contradice la fuente, gana el pedido con un tip que lo avisa. Falta la demo con la API desplegada.
 3. **Quién escribió cada nota.** Un mapa de nombres para mostrar en el código (`camilo` → Camilo, `pareja` → Laura), que usan las notas y cualquier otro texto que nombre a alguien.
 4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesDelPaso()` (`cocina.js`) queda como respaldo para las recetas viejas.
 5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
