@@ -4,7 +4,7 @@
 // Al sincronizar se repinta en el lugar: la nota que se está escribiendo no se pierde.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
-import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, nombreDe, textoTraduccion } from '../formato.js';
+import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
 import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
@@ -55,6 +55,10 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
 
   const zonaIngredientes = h('section', { class: 'seccion', 'aria-labelledby': 'titulo-ingredientes' });
   const zonaPasos = h('section', { class: 'seccion' });
+  // «Cómo se armó»: lo que anotó /recetas (de dónde salió cada dato, qué estimó o corrigió), plegado.
+  // El <details> no se repinta: así una sincronización no lo cierra.
+  const cuerpoArmado = h('div', { class: 'como-se-armo-cuerpo' });
+  const comoSeArmo = h('details', { class: 'como-se-armo' }, h('summary', null, 'Cómo se armó', icono('derecha', 18)), cuerpoArmado);
   // Lo que cambia sin mover el foco (las porciones), para el lector de pantalla.
   const anuncio = h('p', { class: 'solo-lector', role: 'status' });
 
@@ -171,6 +175,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       h('div', { class: 'ficha-estado' }, selector, valorar, descartada),
       zonaIngredientes,
       zonaPasos,
+      comoSeArmo,
       h('section', { class: 'seccion' }, tituloNotas, listaNotas, abrirNota, formNota),
       h('div', { class: 'ficha-pie' }, abrirPedido, formPedido, descartar),
     ),
@@ -312,6 +317,22 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       h('p', null, h('strong', null, 'Hay una corrección pedida.'), ' Se hace la próxima vez que corra la Mac.'), texto, cancelar));
   }
 
+  const CONFIANZA = {
+    alta: 'Los datos están completos: salieron del texto, los subtítulos o un audio claro.',
+    media: 'Hubo que estimar algunos pasos o completar algo por contexto.',
+    baja: 'Faltan cantidades importantes: mirá el video antes de empezar.',
+  };
+
+  function pintarArmado() {
+    const origen = textoOrigen(r.origen_datos);
+    const notas = String(r.notas_proceso || '').trim();
+    comoSeArmo.hidden = !origen && !notas;
+    rellenar(cuerpoArmado,
+      origen ? h('p', null, 'Salió de ' + origen + '.') : null,
+      CONFIANZA[r.confianza] ? h('p', null, CONFIANZA[r.confianza]) : null,
+      notas ? h('p', { class: 'notas-proceso' }, notas) : null);
+  }
+
   function pintarNotas() {
     tituloNotas.textContent = r.notas.length > 1 ? 'Nuestras notas' : r.notas.length ? 'Nuestra nota' : 'Notas';
     rellenar(listaNotas, r.notas.length
@@ -332,6 +353,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     pintarEstado();
     conFoco(zonaIngredientes, pintarIngredientes);
     pintarPasos();
+    pintarArmado();
     pintarNotas();
     pintarPedido();
     nav.actualizar();

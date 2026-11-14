@@ -116,3 +116,20 @@ export function textoTraduccion(idioma) {
   if (i === 'es') return '';
   return IDIOMAS[i] ? 'Traducida del ' + IDIOMAS[i] : 'Traducida (original: ' + i + ')';
 }
+
+// De dónde salió cada dato (Recetas.origen_datos, las capas de /recetas), para «Cómo se armó».
+const CAPAS = {
+  descripcion: 'la descripción del video',
+  subtitulos: 'los subtítulos',
+  web: 'la receta de la web',
+  audio: 'lo que se dice en el audio',
+  frames: 'el texto que aparece en el video',
+  capturas: 'las capturas que mandaron',
+};
+
+/** «la descripción del video y los subtítulos», a partir de `origen_datos` («descripcion,subtitulos»); '' si no hay. */
+export function textoOrigen(origen) {
+  const partes = String(origen ?? '').split(',').map(s => s.trim()).filter(Boolean).map(c => CAPAS[c] || c);
+  if (partes.length <= 1) return partes.join('');
+  return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
+}

@@ -574,6 +574,31 @@ textarea:focus, input[type="text"]:focus, select:focus {
 
 .aviso-pedido .form-botones { justify-content: flex-start; flex-wrap: wrap; }
 
+.como-se-armo { margin-top: 8px; border-top: 1px solid var(--borde); padding-top: 4px; }
+
+.como-se-armo summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.como-se-armo summary { list-style: none; }
+
+.como-se-armo summary::-webkit-details-marker { display: none; }
+
+.como-se-armo summary .icono { margin-left: auto; color: var(--tinta-2); }
+
+.como-se-armo[open] summary .icono { transform: rotate(90deg); }
+
+.como-se-armo summary:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 8px; }
+
+.como-se-armo-cuerpo { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; color: var(--tinta-2); font-size: 14px; line-height: 1.5; }
+
+.notas-proceso { white-space: pre-line; }
+
 .pedido-texto { white-space: pre-line; color: var(--tinta-2); font-style: italic; }
 
 .ficha-pie { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 16px; }
@@ -1399,6 +1424,8 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 /* Microanimaciones: sutiles, y ninguna si el sistema pide reducir el movimiento. */
 
 @media (prefers-reduced-motion: no-preference) {
+  .como-se-armo summary .icono { transition: transform var(--rapido) var(--curva); }
+
   /* Entre pantallas (View Transitions, app.js): un fundido corto; la navegación queda quieta. */
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
   .navegacion { view-transition-name: navegacion; }

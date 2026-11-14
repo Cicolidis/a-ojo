@@ -82,8 +82,8 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [ ] Compartir directo a A ojo: `share_target` y «Pegar un link» en la Bandeja (implementado y revisado; falta la prueba en Android, que incluye compartir y volver enseguida a Instagram para ver si el link llega igual a la Sheet)
 - [ ] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción (desplegado con la API 0.7.0; falta la demo)
 - [x] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
-- [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (implementado; falta desplegar la API 0.8.0 y correr `setup()`, antes de la próxima corrida de `/recetas`, y la prueba con una receta nueva)
-- [ ] «Cómo se armó» en la ficha: `notas_proceso`, plegado
+- [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (desplegado con la API 0.8.0; falta la prueba con una receta nueva)
+- [x] «Cómo se armó» en la ficha: `notas_proceso`, plegado
 - [ ] Compartir una receta por WhatsApp
 - [ ] Editar y borrar notas
 - [ ] Volver a agregar una receta a compras sin perder lo marcado

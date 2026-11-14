@@ -909,3 +909,12 @@ test('ingredientesDePaso: los que guardó /recetas en el paso; en las recetas vi
   const { ingredientesPorNombre } = await cargar('cocina.js');
   assert.deepEqual(ingredientesDePaso(paso, vieja), ingredientesPorNombre(paso.texto, vieja.ingredientes));
 });
+
+test('textoOrigen: de dónde salió la receta, en castellano', async () => {
+  const { textoOrigen } = await cargar('formato.js');
+  assert.equal(textoOrigen('descripcion'), 'la descripción del video');
+  assert.equal(textoOrigen('descripcion,subtitulos'), 'la descripción del video y los subtítulos');
+  assert.equal(textoOrigen('web, audio,frames'), 'la receta de la web, lo que se dice en el audio y el texto que aparece en el video');
+  assert.equal(textoOrigen(''), '');
+  assert.equal(textoOrigen(null), '');
+});

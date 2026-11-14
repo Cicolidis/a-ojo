@@ -120,7 +120,7 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
   "confianza": "alta",
   "origen_datos": ["descripcion", "subtitulos"],
   "idioma_original": "es",
-  "notas_proceso": "Subtítulos: «harina 4» → harina 0000. Porciones estimadas por el molde.",
+  "notas_proceso": "Los subtítulos decían «harina 4»: es harina 0000. Las porciones se estimaron por el tamaño de la budinera.",
   "ingredientes": [
     { "seccion": "", "rol": "principal", "cantidad": 3, "unidad": "u", "nombre": "huevos", "nota": "", "gondola": "lácteos y huevos" },
     { "seccion": "", "rol": "principal", "cantidad": 200, "unidad": "g", "nombre": "azúcar", "nota": "", "gondola": "almacén" },
@@ -146,6 +146,7 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
 - `gondola`: `verdulería` · `almacén` · `lácteos y huevos` · `carnicería` · `panadería` · `congelados` · `otros`.
 - `rol`: `principal` · `condimento` · `opcional` · `utensilio` (obligatorio; ver «Secciones y roles» en §3).
 - `seccion`: texto corto, o `""` si la receta tiene una sola parte.
+- `notas_proceso`: **la leen ellos** en la ficha, en «Cómo se armó» (plegado). Escribila para ellos, en rioplatense y en frases cortas: qué se corrigió de la transcripción, qué se estimó o se dedujo, qué conversiones se hicieron y de dónde salió un dato dudoso. Sin nombres de campos ni jerga (no «`tiempo_min` estimado», sí «El tiempo es estimado, sin contar el enfriado»). La app ya dice de qué capas salió y la confianza: no hace falta repetirlo.
 - `ingredientes` de cada paso: las **posiciones** (desde 1) en la lista `ingredientes` de arriba de los que se usan en ese paso. Un paso que no usa ninguno (precalentar, hornear, dejar reposar) va sin `ingredientes`. Ver «Pasos» en §3.
 - `porciones` y `tiempo_min` pueden ser `null`. `molde`, `nota` y `seccion` pueden quedar vacíos.
 

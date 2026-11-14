@@ -106,7 +106,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | origen_datos | texto | capas usadas: `descripcion,subtitulos,audio,web,frames,capturas` |
 | idioma_original | `es` · `en` · … | si no es `es`, la receta se tradujo |
 | creado · actualizado | fecha-hora ISO | |
-| notas_proceso | texto | nota interna de `/recetas` (§6.2): correcciones de transcripción, supuestos y de dónde salió cada dato. No se muestra en la app |
+| notas_proceso | texto | nota de `/recetas` (§6.2): correcciones de transcripción, supuestos y de dónde salió cada dato dudoso. La ven en la ficha, plegada, en «Cómo se armó»; por eso va en rioplatense y sin jerga |
 | porciones_vistas | texto | vistas de porciones: con cuántas la cocinaron (`12,3,6`), la última primero; hasta 6 |
 
 ### `Ingredientes`
@@ -299,6 +299,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
+   - **"Cómo se armó"** (plegado, después de los pasos): de qué capas salió ("Salió de la descripción del video y los subtítulos"), qué quiere decir su confianza y `notas_proceso`. No aparece si la receta no tiene ni capas ni notas.
    - **"Algo está mal en esta receta"** (abajo, antes de "Descartar receta"): un texto para que `/recetas` la corrija ("Ej.: la harina son 300 g, no 200"); va por la cola. Mientras espera, un recuadro arriba muestra el pedido ("Pediste una corrección", "Corrigiéndose…" o el motivo si necesita ayuda) con "Cancelar el pedido", y el botón pasa a "Sumar algo al pedido".
    - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí). Desde la ficha, guardar vuelve a la receta con el aviso "✓ Agregada a compras" y su botón "Ver la lista"; desde Compras, vuelve a la lista.
 3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (los que guardó `/recetas`; en las recetas de antes, los que nombra el texto), con las cantidades de la vista de porciones, el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
@@ -465,6 +466,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesPorNombre()` (`cocina.js`) queda como respaldo para las recetas viejas.
    - *Hecho (14/11):* columna `ingredientes` en `Pasos` (posiciones, «1,3»), validada en `receta.upsert` (API 0.8.0); `ingredientesDePaso()` en `cocina.js`. Las recetas viejas siguen con el respaldo (o se completan si pasan por un pedido de corrección); un `/recetas --pasos` para completarlas queda como idea.
 5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
+   - *Hecho (14/11):* un `<details>` en la ficha con el origen (`textoOrigen()`, `formato.js`), la confianza y `notas_proceso`. `/recetas` las escribe desde ahora para ellos, sin jerga; las de antes quedan como están.
 6. **Compartir una receta** por WhatsApp, como la lista de compras.
 7. **Editar y borrar notas.**
 8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
