@@ -664,7 +664,8 @@
       "orden": 1,
       "texto": "Precalentá el horno a 170 °C.",
       "timer_min": null,
-      "tip": ""
+      "tip": "",
+      "ingredientes": ""
     },
     {
       "id": "p_00011",
@@ -672,7 +673,8 @@
       "orden": 2,
       "texto": "Derretí el chocolate con la manteca a baño María, a fuego mínimo.",
       "timer_min": 5,
-      "tip": ""
+      "tip": "",
+      "ingredientes": "1,2"
     },
     {
       "id": "p_00012",
@@ -680,7 +682,8 @@
       "orden": 3,
       "texto": "En otro bowl, batí el azúcar con los huevos hasta que se disuelvan los cristales.",
       "timer_min": null,
-      "tip": "Es la clave para que el centro quede húmedo."
+      "tip": "Es la clave para que el centro quede húmedo.",
+      "ingredientes": "3,4"
     },
     {
       "id": "p_00013",
@@ -688,7 +691,8 @@
       "orden": 4,
       "texto": "Sumá la vainilla, una pizca de sal y una de pimienta. Uní todo con el chocolate derretido.",
       "timer_min": null,
-      "tip": "La pimienta realza el chocolate: no se siente picante."
+      "tip": "La pimienta realza el chocolate: no se siente picante.",
+      "ingredientes": "6,7,8"
     },
     {
       "id": "p_00014",
@@ -696,7 +700,8 @@
       "orden": 5,
       "texto": "Incorporá la harina tamizada y las nueces con movimientos envolventes.",
       "timer_min": null,
-      "tip": ""
+      "tip": "",
+      "ingredientes": "5,9"
     },
     {
       "id": "p_00015",
@@ -704,7 +709,8 @@
       "orden": 6,
       "texto": "Volcá la mezcla en el molde enmantecado y horneá 23 minutos.",
       "timer_min": 23,
-      "tip": "Tiene que salir con el centro todavía blando."
+      "tip": "Tiene que salir con el centro todavía blando.",
+      "ingredientes": "2"
     },
     {
       "id": "p_00016",
@@ -712,7 +718,8 @@
       "orden": 7,
       "texto": "Dejá enfriar en el molde antes de cortar.",
       "timer_min": 30,
-      "tip": ""
+      "tip": "",
+      "ingredientes": ""
     },
     {
       "id": "p_00022",

@@ -416,7 +416,8 @@ TODO_CORREGIR = {
         {'id': 'i_1', 'receta_id': 'r_brown', 'orden': 1, 'nombre': 'harina', 'unidad': 'g', 'cantidad': 200, 'nota': '',
          'gondola': 'almacén', 'seccion': '', 'rol': 'principal'},
     ],
-    'pasos': [{'receta_id': 'r_brown', 'orden': 1, 'texto': 'Mezclá todo.', 'timer_min': None, 'tip': ''}],
+    'pasos': [{'receta_id': 'r_brown', 'orden': 1, 'texto': 'Mezclá todo.', 'timer_min': None, 'tip': '', 'ingredientes': '1,2'},
+              {'receta_id': 'r_brown', 'orden': 2, 'texto': 'Horneá.', 'timer_min': 20, 'tip': '', 'ingredientes': ''}],
     'bandeja': [{'id': 'b_brown', 'receta_id': 'r_brown', 'estado': 'procesando', 'pedido': 'La harina son 300 g.'},
                 {'id': 'b_sin', 'receta_id': '', 'estado': 'procesando'}],
 }
@@ -436,6 +437,8 @@ class TestCorregir(unittest.TestCase):
         self.assertEqual(receta['origen_datos'], ['descripcion', 'subtitulos'])
         self.assertEqual([i['nombre'] for i in receta['ingredientes']], ['harina', 'sal'])
         self.assertEqual(receta['ingredientes'][1]['rol'], 'condimento', 'el rol de /recetas, no el de ellos')
+        self.assertEqual(receta['pasos'][0]['ingredientes'], [1, 2], 'los ingredientes del paso, como posiciones')
+        self.assertNotIn('ingredientes', receta['pasos'][1], 'un paso sin ingredientes va sin la clave')
         self.assertNotIn('estado', receta)
         self.assertNotIn('id', receta['ingredientes'][0])
         self.assertEqual(comun.leer_json(d / 'receta.anterior.json'), {'titulo': 'de la primera corrida'})
@@ -453,6 +456,16 @@ class TestCorregir(unittest.TestCase):
             self.assertNotIn('foto', llamar.call_args[0][2])
             correr_api('upsert', 'b_foto')
             self.assertIn('foto', llamar.call_args[0][2])
+
+    def test_upsert_avisa_si_la_api_no_guarda_los_ingredientes_de_los_pasos(self):
+        d = comun.dir_trabajo('b_pasos')
+        comun.escribir_json(d / 'receta.json', {'titulo': 'Brownie', 'pasos': [{'texto': 'Mezclá.', 'ingredientes': [1]}, 'Horneá.']})
+        with mock.patch.object(api, 'llamar', return_value={'id': 'r_1'}):
+            r, _ = correr_api('upsert', 'b_pasos', '--sin-foto')
+        self.assertIn('desplegarla', r['aviso'])
+        with mock.patch.object(api, 'llamar', return_value={'id': 'r_1', 'pasos_con_ingredientes': 1}):
+            r, _ = correr_api('upsert', 'b_pasos', '--sin-foto')
+        self.assertNotIn('aviso', r)
 
     def test_tomar_muestra_el_pedido(self):
         fila = {'id': 'b_brown', 'estado': 'procesando', 'intentos': 1, 'pedido': 'La harina son 300 g.'}

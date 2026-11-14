@@ -270,6 +270,8 @@ function accionRecetaUpsert_(req) {
   const validar = req.validar === true || req.validar === 'true';
 
   return conLock_(() => {
+    // Sin la columna, los ingredientes de los pasos se perderían en silencio.
+    if (v.pasos.some(p => p.ingredientes)) exigirColumnas_('Pasos', ['ingredientes']);
     const recetas = leerFilas_('Recetas');
     const porId = id => recetas.filter(f => f.datos.id === id)[0] || null;
     let bandeja = null;
@@ -285,7 +287,8 @@ function accionRecetaUpsert_(req) {
     if (!existente && bandeja && bandeja.datos.receta_id) existente = porId(bandeja.datos.receta_id);
     if (!existente) existente = recetas.filter(f => claveDe_(f.datos.fuente_url) === v.clave)[0] || null;
 
-    const resumen = { nueva: !existente, ingredientes: v.ingredientes.length, pasos: v.pasos.length };
+    const resumen = Object.assign({ nueva: !existente, ingredientes: v.ingredientes.length, pasos: v.pasos.length },
+      ecoPasos_(v));
     if (validar) {
       return Object.assign({ validar: true, id: existente ? existente.datos.id : null, mensaje: 'La receta es válida' }, resumen);
     }
@@ -460,7 +463,8 @@ function validarReceta_(r) {
     p = p || {};
     const t = texto(p.texto);
     if (!t) errores.push(donde + ': falta el texto');
-    return { texto: t, timer_min: numero(p.timer_min, donde + ': timer_min'), tip: texto(p.tip) };
+    return { texto: t, timer_min: numero(p.timer_min, donde + ': timer_min'), tip: texto(p.tip),
+      ingredientes: posicionesPaso_(p.ingredientes, ings.length, donde, errores) };
   });
 
   const campos = {
@@ -486,6 +490,47 @@ function validarReceta_(r) {
     throw err;
   }
   return { id: texto(r.id), clave: norm.clave, campos: campos, ingredientes: ings, pasos: ps };
+}
+
+/**
+ * Para que /recetas vea si las posiciones quedaron bien: los nombres de los ingredientes de
+ * cada paso («2: chocolate, manteca») y los que no están en ningún paso (salvo los utensilios).
+ * Solo si la receta trae ingredientes por paso. No bloquea nada.
+ */
+function ecoPasos_(v) {
+  if (!v.pasos.some(p => p.ingredientes)) return {};
+  const usadas = {};
+  const pasos = v.pasos.map((p, i) => {
+    const nums = p.ingredientes ? p.ingredientes.split(',').map(Number) : [];
+    nums.forEach(n => { usadas[n] = true; });
+    return (i + 1) + ': ' + (nums.length ? nums.map(n => v.ingredientes[n - 1].nombre).join(', ') : '—');
+  });
+  const sinPaso = v.ingredientes.filter((ing, i) => !usadas[i + 1] && ing.rol !== 'utensilio').map(ing => ing.nombre);
+  return Object.assign({ pasos_con_ingredientes: v.pasos.filter(p => p.ingredientes).length, ingredientes_por_paso: pasos },
+    sinPaso.length ? { sin_paso: sinPaso } : {});
+}
+
+/**
+ * Los ingredientes de un paso: posiciones (desde 1) en la lista de ingredientes de la receta,
+ * como lista ([1, 3]) o texto («1,3»). Devuelve «1,3» o '' si no vino nada; anota los errores.
+ */
+function posicionesPaso_(valor, cuantos, donde, errores) {
+  if (valor === undefined || valor === null || valor === '') return '';
+  const crudas = Array.isArray(valor) ? valor : String(valor).split(',').map(s => s.trim()).filter(Boolean);
+  const vistas = [];
+  crudas.forEach(x => {
+    const n = Number(x);
+    if (!Number.isInteger(n) || n < 1) {
+      errores.push(donde + ': «' + x + '» no es la posición de un ingrediente (números desde 1)');
+    } else if (n > cuantos) {
+      errores.push(donde + ': el ingrediente ' + n + ' no existe (hay ' + cuantos + ')');
+    } else if (vistas.indexOf(n) !== -1) {
+      errores.push(donde + ': el ingrediente ' + n + ' está repetido');
+    } else {
+      vistas.push(n);
+    }
+  });
+  return vistas.join(',');
 }
 
 // Ediciones desde la app (§7.2) y desde /recetas --clasificar.

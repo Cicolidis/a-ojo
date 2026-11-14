@@ -1054,3 +1054,42 @@ test('receta.corregir crea la fila si la receta no tiene una, y pide setup() si 
   sh.getRange(1, enc.indexOf('pedido') + 1).setValues([['']]);
   assert.equal(p.postJson({ action: 'receta.corregir', t: p.token, id, texto: 'otra' }).error, 'falta_columna');
 });
+
+test('receta.upsert guarda los ingredientes de cada paso (posiciones) y los valida', () => {
+  const p = proyecto();
+  const conPasos = receta({ pasos: [
+    { texto: 'Derretí el chocolate con la manteca.', ingredientes: [1, 2] },
+    { texto: 'Sumá los huevos y la sal, y batí.', ingredientes: '3, 4' },
+    { texto: 'Horneá a 180 °C.', timer_min: 25 },
+    { texto: 'Serví con más sal.', ingredientes: [4] },
+  ] });
+  const r = p.upsert(conPasos).data;
+  const id = r.id;
+  assert.deepEqual([r.pasos, r.pasos_con_ingredientes, r.ingredientes_por_paso], [4, 3,
+    ['1: chocolate semiamargo, manteca', '2: huevos, sal', '3: —', '4: sal']], 'el eco para revisar las posiciones');
+  assert.equal(r.sin_paso, undefined);
+  const pasos = p.filas('Pasos').filter(x => x.receta_id === id).sort((a, b) => a.orden - b.orden);
+  assert.deepEqual(pasos.map(x => x.ingredientes), ['1,2', '3,4', '', '4']);
+  const todo = p.get({ action: 'todo', t: p.token });
+  assert.deepEqual(todo.data.pasos.filter(x => x.receta_id === id).map(x => x.ingredientes), ['1,2', '3,4', '', '4'],
+    'llegan como texto, también una sola posición');
+  assert.deepEqual(p.upsert(receta({ pasos: [{ texto: 'Mezclá.', ingredientes: [1] }] })).data.sin_paso,
+    ['manteca', 'huevos', 'sal'], 'avisa los que no están en ningún paso');
+  assert.equal(p.upsert(receta()).data.pasos_con_ingredientes, undefined, 'sin ingredientes por paso, sin eco');
+
+  const mala = p.upsert(receta({ pasos: [{ texto: 'Mezclá.', ingredientes: [1, 9, 0, 1, 'x'] }] }));
+  assert.equal(mala.error, 'receta_invalida');
+  assert.deepEqual(mala.detalles, [
+    'paso 1: el ingrediente 9 no existe (hay 4)',
+    'paso 1: «0» no es la posición de un ingrediente (números desde 1)',
+    'paso 1: el ingrediente 1 está repetido',
+    'paso 1: «x» no es la posición de un ingrediente (números desde 1)',
+  ]);
+
+  // Sin la columna (nadie corrió setup()), no se pierden en silencio; sin ingredientes en los pasos, anda igual.
+  const sh = p.planilla.getSheetByName('Pasos');
+  const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  sh.getRange(1, enc.indexOf('ingredientes') + 1).setValues([['']]);
+  assert.equal(p.upsert(conPasos).error, 'falta_columna');
+  assert.equal(p.upsert(receta()).ok, true);
+});

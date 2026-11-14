@@ -121,8 +121,10 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 - `seccion_usuario` y `rol_usuario`: lo que cambiaron ellos en la app. Se guarda aparte para que reprocesar no lo pise: al reprocesar, la API lo pasa al ingrediente con la misma sección y el mismo nombre. Vacío = lo del pipeline; `seccion_usuario = "-"` = sin sección.
 
 ### `Pasos`
-| id | receta_id | orden | texto | timer_min (opcional) | tip (opcional) |
-|---|---|---|---|---|---|
+| id | receta_id | orden | texto | timer_min (opcional) | tip (opcional) | ingredientes |
+|---|---|---|---|---|---|---|
+
+- `ingredientes`: los que usa el paso, como posiciones (`orden`) en la receta, «1,3». Los guarda `/recetas` (en `receta.json`, `"ingredientes": [1, 3]`); no se usan ids porque cambian al reprocesar. Si algún paso de la receta los tiene, un paso vacío no usa ninguno; si ninguno los tiene (las recetas de antes), la app los busca por nombre en el texto.
 
 ### `Notas`
 | id | receta_id | fecha | quien | texto | creado |
@@ -162,7 +164,7 @@ Dónde se compra cada cosa, compartido por los dos:
 | GET o POST | `ping` | — | `{version, ahora, hojas_faltantes, mensaje}` (prueba la conexión y el token: lo usan `setup.sh` y `npm run smoke`) |
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
 | GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
-| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista`, vacía su `pedido` y manda sus capturas a la papelera: `capturas_papelera`) |
+| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista`, vacía su `pedido` y manda sus capturas a la papelera: `capturas_papelera`; si los pasos traen ingredientes, devuelve `ingredientes_por_paso` con sus nombres y `sin_paso` con los que no están en ninguno, para que `/recetas` revise las posiciones) |
 | POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
 | POST | `receta.corregir` | `{id, texto, quien?}` | `{id, receta_id, estado, pedido}`: suma `texto` al `pedido` de la fila de la receta (la más nueva; si no tiene, la crea con su `fuente_url`) y la deja en `pendiente` con los intentos en 0. Sin `texto`, cancela: vacía el pedido y la fila vuelve a `lista`. `409 procesando` si la tiene una corrida |
 | POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
@@ -237,7 +239,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - **Corregir errores de transcripción por contexto** ("harina 4" → "harina 0000"; "polo para hornear" → "polvo de hornear") y **registrarlo** en una nota interna.
 - Ignorar el relleno del video: saludos, pedidos de suscripción, publicidad, menciones de marca innecesarias.
 - Si una cantidad no aparece: `cantidad` vacía y `unidad = "a ojo"`. **Nunca inventar cantidades.**
-- Pasos: frases cortas, un verbo principal por paso; temperatura y tiempo explícitos; `timer_min` cuando corresponda.
+- Pasos: frases cortas, un verbo principal por paso; temperatura y tiempo explícitos; `timer_min` cuando corresponda. Cada paso lleva sus `ingredientes`: todos los que se usan ahí, también los que el texto no nombra uno por uno («Sumá los secos»).
 - Asignar `tipo`, `etiquetas`, `gondola` y `tiempo_min` (estimado).
 - Asignar a cada ingrediente su `seccion` y su `rol` (§3). Los ingredientes van agrupados por sección y, dentro de cada una, en orden de uso.
 
@@ -299,7 +301,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
    - **"Algo está mal en esta receta"** (abajo, antes de "Descartar receta"): un texto para que `/recetas` la corrija ("Ej.: la harina son 300 g, no 200"); va por la cola. Mientras espera, un recuadro arriba muestra el pedido ("Pediste una corrección", "Corrigiéndose…" o el motivo si necesita ayuda) con "Cancelar el pedido", y el botón pasa a "Sumar algo al pedido".
    - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, guardar la reemplaza ("Quitar de la lista" también está ahí). Desde la ficha, guardar vuelve a la receta con el aviso "✓ Agregada a compras" y su botón "Ver la lista"; desde Compras, vuelve a la lista.
-3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (con las cantidades de la vista de porciones), el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
+3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (los que guardó `/recetas`; en las recetas de antes, los que nombra el texto), con las cantidades de la vista de porciones, el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
 4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Agregar una receta" (un buscador de recetas, en orden alfabético, que marca las que ya están y lleva al paso para elegir), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final y, dentro de cada lugar, en orden alfabético. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
    - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
    - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
@@ -460,7 +462,8 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
    - *Hecho (14/11):* columna `pedido` en `Bandeja`, `receta.corregir` (API 0.7.0), `api receta` y `--sin-foto` en `procesamiento/api.py`, §1.5 de `recetas.md`. Decidido: se parte de la receta guardada y, si el pedido contradice la fuente, gana el pedido con un tip que lo avisa. Falta la demo con la API desplegada.
 3. **Quién escribió cada nota.** Un mapa de nombres para mostrar en el código (`camilo` → Camilo, `pareja` → Laura), que usan las notas y cualquier otro texto que nombre a alguien.
    - *Hecho (14/11):* `NOMBRES` y `nombreDe()` en `formato.js`; los usan las notas de la ficha y las tarjetas de la Bandeja. Un test revisa que ningún texto de las vistas diga «pareja».
-4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesDelPaso()` (`cocina.js`) queda como respaldo para las recetas viejas.
+4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesPorNombre()` (`cocina.js`) queda como respaldo para las recetas viejas.
+   - *Hecho (14/11):* columna `ingredientes` en `Pasos` (posiciones, «1,3»), validada en `receta.upsert` (API 0.8.0); `ingredientesDePaso()` en `cocina.js`. Las recetas viejas siguen con el respaldo (o se completan si pasan por un pedido de corrección); un `/recetas --pasos` para completarlas queda como idea.
 5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
 6. **Compartir una receta** por WhatsApp, como la lista de compras.
 7. **Editar y borrar notas.**

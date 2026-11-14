@@ -147,11 +147,11 @@ test('fechaHora: hoy, ayer o la fecha, con la hora', async () => {
   assert.equal(f.fechaHora('nada', ahora), '');
 });
 
-test('ingredientesDelPaso: busca los ingredientes nombrados en el paso', async () => {
-  const { ingredientesDelPaso } = await cargar('cocina.js');
+test('ingredientesPorNombre: busca los ingredientes nombrados en el paso', async () => {
+  const { ingredientesPorNombre } = await cargar('cocina.js');
   const todo = fixture();
   const de = id => todo.ingredientes.filter(i => i.receta_id === id).sort((a, b) => a.orden - b.orden);
-  const nombres = (texto, id) => ingredientesDelPaso(texto, de(id)).map(i => i.nombre);
+  const nombres = (texto, id) => ingredientesPorNombre(texto, de(id)).map(i => i.nombre);
 
   const brownie = todo.pasos.filter(p => p.receta_id === 'r_brown').map(p => p.texto);
   assert.deepEqual(nombres(brownie[0], 'r_brown'), []);
@@ -172,13 +172,13 @@ test('ingredientesDelPaso: busca los ingredientes nombrados en el paso', async (
   assert.deepEqual(nombres('Salá y salpimentá la salsa.', 'r_galle'), [], 'palabras enteras: «sal» no está en «salsa»');
 
   const pollo = [{ nombre: 'pechugas de pollo' }, { nombre: 'queso reggianito' }, { nombre: 'queso cremoso' }, { nombre: 'polvo de hornear' }];
-  const dePollo = texto => ingredientesDelPaso(texto, pollo).map(i => i.nombre);
+  const dePollo = texto => ingredientesPorNombre(texto, pollo).map(i => i.nombre);
   assert.deepEqual(dePollo('Sumá el pollo y doralo.'), ['pechugas de pollo'], 'una palabra propia del ingrediente alcanza');
   assert.deepEqual(dePollo('Terminá con reggianito rallado.'), ['queso reggianito']);
   assert.deepEqual(dePollo('Mezclá hasta que quede cremoso, antes de hornear.'), [], 'los adjetivos y «hornear» no cuentan');
 
   const leches = [{ nombre: 'leche' }, { nombre: 'leche condensada' }, { nombre: 'dulce de leche' }];
-  const de3 = texto => ingredientesDelPaso(texto, leches).map(i => i.nombre);
+  const de3 = texto => ingredientesPorNombre(texto, leches).map(i => i.nombre);
   assert.deepEqual(de3('Calentá la leche.'), ['leche']);
   assert.deepEqual(de3('Sumá la leche condensada.'), ['leche condensada']);
   assert.deepEqual(de3('Untá con el dulce de leche.'), ['dulce de leche']);
@@ -887,4 +887,25 @@ test('ningún texto de las vistas nombra a Laura como «pareja»', () => {
     const textos = codigo.match(/'[^'\n]*'|"[^"\n]*"|`[^`]*`/g) || [];
     assert.deepEqual(textos.filter(t => /pareja/i.test(t)), [], archivo);
   }
+});
+
+test('ingredientesDePaso: los que guardó /recetas en el paso; en las recetas viejas, la búsqueda por nombre', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const { ingredientesDePaso, tieneIngredientesPorPaso } = await cargar('cocina.js');
+  const { porId } = indexar(aplicarDelta(null, fixture()));
+  const brownie = porId.get('r_brown');
+  const nombres = (paso, r) => ingredientesDePaso(paso, r).map(i => i.nombre);
+  assert.equal(tieneIngredientesPorPaso(brownie), true);
+  assert.deepEqual(nombres(brownie.pasos[0], brownie), [], 'precalentar no usa ninguno');
+  assert.deepEqual(nombres(brownie.pasos[3], brownie), ['esencia de vainilla', 'sal', 'pimienta'],
+    'solo los guardados, aunque el texto nombre el chocolate');
+  assert.deepEqual(nombres(brownie.pasos[5], brownie), ['manteca'], '«enmantecado» no la nombra, pero está guardada');
+  assert.deepEqual(nombres({ ingredientes: '9, 2, 40, x' }, brownie), ['manteca', 'nueces'], 'en el orden de la receta, sin las que no existen');
+
+  const vieja = porId.get('r_vasca');
+  assert.equal(tieneIngredientesPorPaso(vieja), false);
+  const paso = vieja.pasos.find(p => nombres(p, vieja).length);
+  assert.ok(paso, 'la receta vieja encuentra ingredientes por nombre');
+  const { ingredientesPorNombre } = await cargar('cocina.js');
+  assert.deepEqual(ingredientesDePaso(paso, vieja), ingredientesPorNombre(paso.texto, vieja.ingredientes));
 });

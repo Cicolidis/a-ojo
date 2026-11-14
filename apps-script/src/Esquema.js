@@ -122,6 +122,9 @@ const ESQUEMA = {
       col_('texto'),
       col_('timer_min', 'numero'),
       col_('tip'),
+      // Los ingredientes que usa el paso: sus posiciones (orden) en la receta, «1,3». Los guarda /recetas;
+      // en las recetas de antes, vacía (la app los busca por nombre en el texto).
+      col_('ingredientes'),
     ],
   },
   Notas: {

@@ -1,6 +1,7 @@
-// Qué ingredientes usa cada paso. /recetas escribe los pasos nombrando los
-// ingredientes (ver .claude/commands/recetas.md), así que alcanza con buscar
-// el nombre de cada ingrediente en el texto del paso. Puro, sin DOM.
+// Qué ingredientes usa cada paso. Desde la Fase 6.3, /recetas los guarda en el
+// paso (`ingredientes`: sus posiciones en la receta, «1,3»). En las recetas de
+// antes, se buscan los nombres en el texto del paso, que /recetas escribe
+// nombrando los ingredientes. Puro, sin DOM.
 
 import { normalizar } from './datos.js';
 
@@ -56,7 +57,7 @@ const ADJETIVOS = new Set(['hornear',
  * tienen más de sus otras palabras en el paso; si ninguno tiene, el de nombre
  * más corto.
  */
-export function ingredientesDelPaso(textoPaso, ingredientes) {
+export function ingredientesPorNombre(textoPaso, ingredientes) {
   const enPaso = new Set(palabras(textoPaso));
   const esta = p => [...variantes(p)].some(v => enPaso.has(v));
 
@@ -97,4 +98,26 @@ export function ingredientesDelPaso(textoPaso, ingredientes) {
   elegidos = elegidos.filter(c => c.puntaje > 0 ||
     !completos.some(o => o !== c && o.resto.some(p => variantes(p).has(c.clave))));
   return elegidos.sort((a, b) => a.indice - b.indice).map(c => c.ing);
+}
+
+/** Las posiciones de un paso («1,3» o [1, 3]) como números. */
+function posiciones(valor) {
+  const lista = Array.isArray(valor) ? valor : String(valor ?? '').split(',');
+  return lista.map(x => Number(String(x).trim())).filter(n => Number.isInteger(n) && n > 0);
+}
+
+/** ¿/recetas guardó los ingredientes de cada paso? Basta con que un paso los tenga. */
+export function tieneIngredientesPorPaso(receta) {
+  return (receta.pasos || []).some(p => posiciones(p.ingredientes).length > 0);
+}
+
+/**
+ * Los ingredientes de un paso, en el orden de la receta. Si /recetas los guardó,
+ * son esos (un paso sin ninguno no usa ingredientes); si no, la búsqueda por
+ * nombre de ingredientesPorNombre(). Las posiciones que no existen se ignoran.
+ */
+export function ingredientesDePaso(paso, receta) {
+  if (!tieneIngredientesPorPaso(receta)) return ingredientesPorNombre(paso.texto, receta.ingredientes);
+  const elegidas = new Set(posiciones(paso.ingredientes));
+  return (receta.ingredientes || []).filter(i => elegidas.has(Number(i.orden)));
 }

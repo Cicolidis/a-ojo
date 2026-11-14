@@ -188,6 +188,10 @@ def cmd_upsert(args):
     if dry_run(args):
         datos['validar'] = True
     r = llamar('POST', 'receta.upsert', datos)
+    # Una API de antes de la 0.8.0 descarta los ingredientes de cada paso sin avisar.
+    mandados = sum(1 for p in receta.get('pasos') or [] if isinstance(p, dict) and p.get('ingredientes'))
+    if mandados and r.get('pasos_con_ingredientes') != mandados:
+        r['aviso'] = 'La API todavía no guarda los ingredientes de cada paso: hay que desplegarla.'
     log(args.bandeja_id, 'upsert', ('(dry-run) válida' if dry_run(args) else f'{r.get("id")} '
                                     f'({"nueva" if r.get("nueva") else "actualizada"})'))
     salida({'ok': True, 'dry_run': dry_run(args), **r})
@@ -198,6 +202,13 @@ def lista_texto(valor):
     if isinstance(valor, list):
         return valor
     return [x.strip() for x in str(valor or '').split(',') if x.strip()]
+
+
+def posiciones(valor):
+    """Los ingredientes de un paso, como los guarda la Sheet («1,3»), en lista: [1, 3]."""
+    if isinstance(valor, list):
+        return [int(x) for x in valor]
+    return [int(x) for x in str(valor or '').split(',') if x.strip().isdigit()]
 
 
 def receta_guardada(todo, bandeja_id):
@@ -222,7 +233,8 @@ def receta_guardada(todo, bandeja_id):
                               'cantidad': i.get('cantidad'), 'unidad': i.get('unidad'), 'nombre': i.get('nombre'),
                               'nota': i.get('nota') or '', 'gondola': i.get('gondola')}
                              for i in en_orden(todo['ingredientes'])]
-    datos['pasos'] = [{'texto': p.get('texto'), 'timer_min': p.get('timer_min'), 'tip': p.get('tip') or ''}
+    datos['pasos'] = [{'texto': p.get('texto'), 'timer_min': p.get('timer_min'), 'tip': p.get('tip') or '',
+                       **({'ingredientes': posiciones(p.get('ingredientes'))} if posiciones(p.get('ingredientes')) else {})}
                       for p in en_orden(todo['pasos'])]
     return fila, datos
 

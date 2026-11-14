@@ -62,7 +62,11 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 1. **Foto:** `procesamiento/aojo fetch foto <id>` (en un Short usa la miniatura vertical). Miralá con Read. Si no se ve el plato (una cara, una placa con texto, algo crudo), elegí un cuadro del plato terminado con `procesamiento/aojo fetch foto <id> --segundo N` (necesita el video; los segundos salen de los mosaicos), si vino de la web `--url <receta.imagen>` o, si una captura muestra el plato, `--archivo <dir>/capturas/N.jpg`. Si no hay ninguna imagen del plato, guardala sin foto (no mandes una captura de texto).
 2. **Receta:** escribí `<dir>/receta.json` con Write. `dir` es el que devolvió `fetch meta` (`~/.a-ojo/trabajo/<id>`). El formato está en §2.
 3. **Relectura antes de guardar:** volvé a leer la descripción entera (y la receta de la web, si hubo) **línea por línea**. Por cada dato, comprobá que esté en `receta.json`: cantidades, técnicas, advertencias, variantes, rinde, conservación (freezer, heladera, cuántos días) y sugerencias para servir. Hacé lo mismo con lo que se dice en el audio o en los subtítulos. Si falta algo, sumalo antes de mandar.
-4. **Guardar:** `procesamiento/aojo api upsert <id>`. Manda la receta y la foto, y deja la fila en `lista` (si tenía capturas, la API las manda a la papelera de Drive: ya las tenés en `<dir>/capturas/`). Si responde `receta_invalida`, los `detalles` dicen qué corregir: arreglá `receta.json` y volvé a mandar.
+4. **Ingredientes de cada paso**, con la lista ya final: comprobá que cada ingrediente (salvo lo que es solo para servir o acompañar y no aparece en ningún paso) esté en el `ingredientes` de al menos un paso, y que las posiciones correspondan a la lista final (si en la relectura sumaste o reordenaste ingredientes, renumerá).
+5. **Guardar:** `procesamiento/aojo api upsert <id>`. Manda la receta y la foto, y deja la fila en `lista` (si tenía capturas, la API las manda a la papelera de Drive: ya las tenés en `<dir>/capturas/`). Si responde `receta_invalida`, los `detalles` dicen qué corregir: arreglá `receta.json` y volvé a mandar.
+   - La respuesta trae `ingredientes_por_paso`: los nombres de los ingredientes que quedaron en cada paso («2: chocolate semiamargo, manteca»). Miralos: si alguno no corresponde, las posiciones están corridas; arreglá y volvé a mandar.
+   - Si trae `sin_paso`, son ingredientes que no están en ningún paso: si se usan en alguno, sumalos y volvé a mandar.
+   - Si trae `aviso`, la API todavía no guarda los ingredientes de cada paso: mencionalo al final (hay que desplegarla).
 
 ### 1.4 Cuando algo falla
 
@@ -89,9 +93,11 @@ La fila ya es una receta y ellos pidieron corregirla: `pedido` dice qué está m
 2. **Capturas:** si la fila trae `capturas` (las subieron desde la app para este pedido), bajalas con `api capturas <id>` y leelas: son parte del pedido («la cantidad está en esta captura»).
 3. **Verificar contra la fuente:** buscá en la fuente el dato que piden cambiar. Primero lo que ya esté en `<dir>` (lo que dejó la primera corrida: `subtitulos.txt`, `transcripcion.txt`, `web.json`, `comentarios.json`; nunca `info.json` entero). La descripción o el caption salen de `fetch meta`. Si no hay nada (por ejemplo, la primera vez se procesó en la otra computadora), corré solo las capas que hagan falta para chequear ese dato (§1.2), empezando por `fetch meta`. Si la fuente no se puede leer (`login`, `privado`, `no_disponible`), **aplicá el pedido igual** y anotá en `notas_proceso` que no se pudo verificar; no la mandes a `ayuda` por eso. Con `limite` o `red`, §1.4 como siempre.
 4. **Corregir:** editá `receta.json` con Write y cambiá **solo** lo que pide el pedido, con las reglas de §3. Cuidá lo que depende del cambio: si cambia un ingrediente, revisá los pasos que lo nombran (y al revés).
+   - Si sumás, sacás o reordenás ingredientes, **renumerá** los `ingredientes` de todos los pasos: son posiciones en la lista.
+   - **Excepción a «solo lo que pide»:** si la receta guardada no tiene `ingredientes` en ningún paso (es de antes), agregalos en todos con las reglas de §3, aunque el pedido no hable de eso (también cuando el pedido ya estaba aplicado).
    - Cada línea de `pedido` es un pedido; las últimas aclaran o corrigen a las anteriores. Aplicá lo que se entienda y contá en `notas_proceso` lo que no.
    - **Si el pedido contradice la fuente, gana el pedido** (ellos la cocinaron). En el paso donde se usa ese dato, agregá al final de su `tip` (o como `tip`, si no tiene) lo que decía el original: «El video dice 200 g de harina.»
-   - Si la receta guardada ya dice lo que pide el pedido (por ejemplo, llegó dos veces), no cambies nada ni sumes notas: mandá el upsert igual para cerrarlo.
+   - Si la receta guardada ya dice lo que pide el pedido (por ejemplo, llegó dos veces), no cambies nada ni sumes notas (salvo la excepción de arriba): mandá el upsert igual para cerrarlo.
    - Si el pedido completa un dato que faltaba, subí la `confianza` si corresponde (§3). Si no, dejala como estaba.
    - Al final de `notas_proceso`, una línea: «Corrección pedida (AAAA-MM-DD): «<pedido>». <Qué cambiaste>. <Qué dice la fuente, si contradice>.»
 5. **Guardar:** `procesamiento/aojo api upsert <id> --sin-foto` (así no cambia la foto). Solo si el pedido es sobre la foto, elegí una nueva como en §1.3 y mandala sin `--sin-foto`. La API deja la fila en `lista` y vacía el pedido; lo que cambiaron ellos en la app (roles y secciones) se conserva.
@@ -124,7 +130,8 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
   ],
   "pasos": [
     { "texto": "Precalentá el horno a 180 °C.", "timer_min": null, "tip": "" },
-    { "texto": "Batí los huevos con el azúcar hasta que estén espumosos.", "timer_min": 5, "tip": "Cuanto más aire, más esponjoso queda." },
+    { "texto": "Batí los huevos con el azúcar hasta que estén espumosos.", "timer_min": 5, "tip": "Cuanto más aire, más esponjoso queda.", "ingredientes": [1, 2] },
+    { "texto": "Sumá el limón y la sal, y volcá en la budinera forrada.", "timer_min": null, "tip": "", "ingredientes": [3, 4, 5] },
     { "texto": "Horneá 40 minutos, hasta que un palillo salga seco.", "timer_min": 40, "tip": "" }
   ]
 }
@@ -139,6 +146,7 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
 - `gondola`: `verdulería` · `almacén` · `lácteos y huevos` · `carnicería` · `panadería` · `congelados` · `otros`.
 - `rol`: `principal` · `condimento` · `opcional` · `utensilio` (obligatorio; ver «Secciones y roles» en §3).
 - `seccion`: texto corto, o `""` si la receta tiene una sola parte.
+- `ingredientes` de cada paso: las **posiciones** (desde 1) en la lista `ingredientes` de arriba de los que se usan en ese paso. Un paso que no usa ninguno (precalentar, hornear, dejar reposar) va sin `ingredientes`. Ver «Pasos» en §3.
 - `porciones` y `tiempo_min` pueden ser `null`. `molde`, `nota` y `seccion` pueden quedar vacíos.
 
 ## 3. Reglas de estructuración (§6.2 y §6.3)
@@ -174,7 +182,8 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
 - Ante la duda entre `principal` y `condimento`, preguntate si sin eso igual la harías: si sí, es condimento.
 
 **Pasos**
-- Frases cortas, un verbo principal por paso, nombrando los ingredientes que se usan (el modo cocina los muestra por paso).
+- Frases cortas, un verbo principal por paso, nombrando los ingredientes que se usan.
+- En cada paso, `ingredientes` con **todos** los que se usan ahí, también los que el texto no nombra uno por uno: «Sumá los secos» → harina, cacao y sal; «Volcá en el molde forrado» → el papel manteca (un utensilio de la lista; el molde va en `molde`, no es un ingrediente). El modo cocina muestra exactamente esos, con sus cantidades. Si un ingrediente se usa en dos pasos (la mitad del azúcar en cada uno), va en los dos.
 - Temperatura y tiempo explícitos («Horneá a 180 °C durante 25 minutos»).
 - `timer_min` cuando el paso tiene una espera o una cocción con tiempo.
 

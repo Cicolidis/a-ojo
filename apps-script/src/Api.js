@@ -10,7 +10,7 @@
  * Con `formato=texto` responde solo el mensaje en texto plano (para avisos de Android).
  */
 
-const VERSION_API = '0.7.0';
+const VERSION_API = '0.8.0';
 
 function doGet(e) {
   return manejar_(e, 'GET');

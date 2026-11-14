@@ -7,7 +7,8 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // 2: secciones y roles de ingredientes, vistas de porciones (Fase 4a).
 // 3: lugares, compras con rol y lugar, capturas de la bandeja (Fase 4b).
 // 4: pedidos de corrección en la bandeja (Fase 6.3).
-export const VERSION_DATOS = 4;
+// 5: ingredientes de cada paso (Fase 6.3).
+export const VERSION_DATOS = 5;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.

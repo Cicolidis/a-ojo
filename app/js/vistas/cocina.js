@@ -5,7 +5,7 @@
 // usada). Al terminar pregunta «¿Cómo salió?».
 
 import { h, icono } from '../dom.js';
-import { ingredientesDelPaso } from '../cocina.js';
+import { ingredientesDePaso } from '../cocina.js';
 import { capitalizar, formatearCantidad, formatearReloj, formatearTimer } from '../formato.js';
 import { escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
@@ -202,7 +202,7 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   function pintar(enfocar, desde = null) {
     const p = pasos[actual];
     const ultimo = actual === pasos.length - 1;
-    const ingredientes = ingredientesDelPaso(p.texto, r.ingredientes);
+    const ingredientes = ingredientesDePaso(p, r);
     const cual = 'Paso ' + (actual + 1) + ' de ' + pasos.length;
     const titulo = h('h1', { class: 'paso-n', tabindex: '-1' }, cual);
 
