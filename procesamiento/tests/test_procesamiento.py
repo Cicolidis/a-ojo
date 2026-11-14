@@ -274,6 +274,43 @@ class TestCookies(unittest.TestCase):
             comun.resolver_perfil('chrome', 'A ojo', Path(tempfile.mkdtemp()))
         self.assertEqual(ctx.exception.codigo, 'cookies')
 
+    def firefox(self, contenido):
+        base = Path(tempfile.mkdtemp())
+        (base / 'Profiles' / 'k3x9a0zq.A ojo – procesamiento').mkdir(parents=True)
+        (base / 'profiles.ini').write_text(contenido, encoding='utf-8')
+        return base
+
+    def test_firefox_resuelve_el_nombre_a_la_ruta(self):
+        # Como lo escribe Firefox en Windows (el perfil que lee WSL 2 desde /mnt/c/Users/…).
+        base = self.firefox('[General]\nStartWithLastProfile=1\n\n'
+                            '[Profile1]\nName=default-release\nIsRelative=1\nPath=Profiles/abcd1234.default-release\n\n'
+                            '[Profile0]\nName=A ojo – procesamiento\nIsRelative=1\nPath=Profiles/k3x9a0zq.A ojo – procesamiento\n')
+        ruta = str(base / 'Profiles' / 'k3x9a0zq.A ojo – procesamiento')
+        self.assertEqual(comun.resolver_perfil('firefox', 'A ojo – procesamiento', base), ruta)
+        self.assertEqual(comun.resolver_perfil('firefox', 'a ojo - procesamiento', base), ruta, 'con guion común')
+        self.assertEqual(comun.resolver_perfil('firefox', 'k3x9a0zq.A ojo – procesamiento', base), ruta, 'la carpeta')
+        self.assertEqual(comun.resolver_perfil('firefox', ruta, base), ruta, 'la ruta ya resuelta')
+        with self.assertRaises(comun.ErrorDescarga) as ctx:
+            comun.resolver_perfil('firefox', 'Otro', base)
+        self.assertEqual(ctx.exception.codigo, 'cookies')
+        self.assertIn('default-release', ctx.exception.detalle)
+
+    def test_firefox_ruta_absoluta_y_sin_profiles_ini(self):
+        base = self.firefox('[Profile0]\nName=Procesar\nIsRelative=0\nPath=/otra/parte/perfil\n')
+        self.assertEqual(comun.resolver_perfil('firefox', 'Procesar', base), '/otra/parte/perfil')
+        self.assertEqual(comun.resolver_perfil('firefox', 'algo', Path(tempfile.mkdtemp())), 'algo', 'sin ini: tal cual')
+
+    def test_firefox_busca_en_windows_desde_wsl(self):
+        viejo = os.environ.pop('A_OJO_FIREFOX_DIR', None)
+        try:
+            self.assertIn(Path.home() / '.mozilla' / 'firefox', comun.dirs_firefox())
+            os.environ['A_OJO_FIREFOX_DIR'] = '/mnt/c/Users/Laura/AppData/Roaming/Mozilla/Firefox'
+            self.assertEqual(comun.dirs_firefox(), [Path('/mnt/c/Users/Laura/AppData/Roaming/Mozilla/Firefox')])
+        finally:
+            os.environ.pop('A_OJO_FIREFOX_DIR', None)
+            if viejo is not None:
+                os.environ['A_OJO_FIREFOX_DIR'] = viejo
+
     def test_solo_instagram_usa_cookies(self):
         viejo = dict(os.environ)
         try:
@@ -281,6 +318,7 @@ class TestCookies(unittest.TestCase):
             os.environ['A_OJO_COOKIES_ARCHIVO'] = str(archivo)
             os.environ['A_OJO_COOKIES_NAVEGADOR'] = 'firefox'
             os.environ['A_OJO_COOKIES_PERFIL'] = 'procesamiento'
+            os.environ['A_OJO_FIREFOX_DIR'] = tempfile.mkdtemp()  # sin profiles.ini: pasa tal cual
             self.assertEqual(comun.args_cookies('youtube'), [])
             self.assertEqual(comun.args_cookies('instagram', sin_cookies=True), [])
             self.assertEqual(comun.args_cookies('instagram'), ['--cookies-from-browser', 'firefox:procesamiento'])

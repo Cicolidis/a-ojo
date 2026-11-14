@@ -3,6 +3,7 @@
 Solo usa la biblioteca estándar. Cada script imprime una línea de JSON por
 stdout para que /recetas la lea; los errores salen con {"ok": false, ...}.
 """
+import configparser
 import json
 import os
 import random
@@ -176,13 +177,69 @@ def _comparable(nombre):
     return re.sub(r'\s+', ' ', s).strip()
 
 
+def dirs_firefox():
+    """Dónde puede estar el profiles.ini de Firefox: macOS, Linux (también snap) y, en WSL 2,
+    el Firefox de Windows (/mnt/c/Users/<usuario>/AppData/Roaming/Mozilla/Firefox).
+    A_OJO_FIREFOX_DIR, si está, reemplaza a todas."""
+    propia = os.environ.get('A_OJO_FIREFOX_DIR', '').strip()
+    if propia:
+        return [Path(propia).expanduser()]
+    casa = Path.home()
+    return [
+        casa / 'Library' / 'Application Support' / 'Firefox',
+        casa / '.mozilla' / 'firefox',
+        casa / 'snap' / 'firefox' / 'common' / '.mozilla' / 'firefox',
+        *sorted(Path('/mnt/c/Users').glob('*/AppData/Roaming/Mozilla/Firefox')),
+    ]
+
+
+def resolver_perfil_firefox(perfil, bases=None):
+    """Traduce el nombre de un perfil de Firefox («A ojo – procesamiento») a la ruta de su carpeta.
+
+    yt-dlp acepta una ruta como perfil: así lee el Firefox de Windows desde WSL 2.
+    Si `perfil` ya es la ruta (absoluta) de una carpeta, o no hay ningún profiles.ini, lo devuelve tal cual.
+    """
+    ruta = Path(perfil).expanduser()
+    if ruta.is_absolute() and ruta.is_dir():
+        return str(ruta)
+    nombres = []
+    hubo_ini = False
+    for base in (bases if bases is not None else dirs_firefox()):
+        ini = Path(base) / 'profiles.ini'
+        if not ini.is_file():
+            continue
+        hubo_ini = True
+        config = configparser.ConfigParser(interpolation=None)
+        try:
+            config.read(ini, encoding='utf-8-sig')
+        except (OSError, configparser.Error) as e:
+            raise ErrorDescarga('cookies', motivo_de('cookies', 'instagram'), f'No pude leer {ini}: {e}')
+        for seccion in config.sections():
+            datos = config[seccion]
+            if 'Path' not in datos:
+                continue
+            relativa = datos.get('IsRelative', '1') == '1'
+            carpeta = (Path(base) / datos['Path']) if relativa else Path(datos['Path'])
+            nombre = datos.get('Name', carpeta.name)
+            nombres.append(nombre)
+            if _comparable(nombre) == _comparable(perfil) or carpeta.name == perfil:
+                return str(carpeta)
+    if not hubo_ini:
+        return perfil
+    raise ErrorDescarga('cookies', f'No encontré el perfil «{perfil}» en firefox. Revisá docs/perfil-instagram.md.',
+                        f'Perfiles disponibles: {", ".join(sorted(nombres))}')
+
+
 def resolver_perfil(navegador, perfil, base=None):
     """Traduce el nombre visible de un perfil («A ojo – procesamiento») a su carpeta («Profile 2»).
 
-    yt-dlp espera la carpeta. En navegadores que no son Chromium devuelve `perfil` tal cual.
+    yt-dlp espera la carpeta. En Firefox, la ruta completa (resolver_perfil_firefox).
+    En los demás navegadores devuelve `perfil` tal cual.
     """
     if not perfil:
         return None
+    if navegador == 'firefox':
+        return resolver_perfil_firefox(perfil, [base] if base else None)
     base = Path(base) if base else dir_navegador(navegador)
     if base is None:
         return perfil
