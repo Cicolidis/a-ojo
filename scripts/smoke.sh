@@ -41,7 +41,8 @@ revisar "ping sin token → 401" "$(echo "$R" | campo status)" "401"
 R=$(api_get "action=ping&t=$A_OJO_TOKEN")
 revisar "ping con token" "$(echo "$R" | campo ok)" "true"
 revisar "no faltan hojas" "$(echo "$R" | campo data.hojas_faltantes)" "[]"
-revisar "versión de la API" "$(echo "$R" | campo data.version)" "0.4.0"
+VERSION=$(sed -n "s/^const VERSION_API = '\(.*\)';/\1/p" apps-script/src/Api.js)
+revisar "versión de la API (la de Api.js)" "$(echo "$R" | campo data.version)" "$VERSION"
 
 R=$(api_post "{\"action\":\"capturar\",\"t\":\"$A_OJO_TOKEN\",\"url\":\"$URL_PRUEBA?utm_source=prueba\",\"quien\":\"camilo\"}")
 ID=$(echo "$R" | campo data.id)
@@ -68,6 +69,20 @@ revisar "todo?since trae solo lo cambiado" "$(echo "$R" | campo data.bandeja.len
 
 R=$(api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"descartada\"}")
 revisar "se descarta la fila de prueba" "$(echo "$R" | campo data.estado)" "descartada"
+
+# Fase 6: todo sobre la fila de prueba, sin tocar las de verdad.
+R=$(api_get "action=bandeja.fila&t=$A_OJO_TOKEN&id=$ID")
+revisar "bandeja.fila la lee sola" "$(echo "$R" | campo data.fila.estado)" "descartada"
+R=$(api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"pendiente\",\"desde\":\"ayuda\"}")
+revisar "con desde viejo: 409 y no la toca" "$(echo "$R" | campo error)" "estado_cambio"
+R=$(api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"descartada\",\"desde\":\"ayuda\"}")
+revisar "con desde, si ya está así: ok (reintento)" "$(echo "$R" | campo ok)" "true"
+R=$(api_post "{\"action\":\"bandeja.tomar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\"}")
+revisar "bandeja.tomar con id la reserva" "$(echo "$R" | campo data.filas.0.estado)" "procesando"
+R=$(api_post "{\"action\":\"bandeja.tomar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\"}")
+revisar "…y otra corrida no la puede tomar" "$(echo "$R" | campo error)" "procesando"
+R=$(api_post "{\"action\":\"bandeja.actualizar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"$ID\",\"estado\":\"descartada\"}")
+revisar "la fila de prueba vuelve a descartada" "$(echo "$R" | campo data.estado)" "descartada"
 
 # Como HTTP Shortcuts: form-urlencoded y respuesta en texto plano.
 R=$(curl -sSL --max-time 60 --data-urlencode "url=Mirá esto $URL_PRUEBA" --data-urlencode "quien=pareja" \
