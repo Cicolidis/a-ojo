@@ -92,6 +92,8 @@ npm run deploy
 
 Redeploya sobre el mismo ID, así la URL no cambia nunca. Si creás otro deployment, cambia la URL y hay que reconfigurar la extensión y el celular.
 
+Antes corre `npm test` (si falla, no sube nada) y al final hace un `procesamiento/aojo api ping` que espera la versión de `VERSION_API` (`Api.js`). Si el ping falla, casi seguro falta aceptar un permiso nuevo: corré `setup()` en el editor.
+
 ### 5. Probar la API
 
 ```bash

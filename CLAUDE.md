@@ -20,7 +20,7 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 - Acciones nuevas: una función en `Acciones.js`, registrada en `rutas_()` (`Api.js`), con su test en `tests/api.test.js`. Las que usa la app tienen que ser **idempotentes** (la cola offline reintenta) y, si editan una receta, actualizar su `actualizado` para que el delta llegue al otro celular.
 - Una acción que escribe una columna nueva llama a `exigirColumnas_()`: si no, mientras nadie corra `setup()`, el dato se pierde en silencio.
 - clasp siempre se corre con `npm run clasp -- …`, que usa la cuenta de `A_OJO_CLASP_USER` (Gmail personal; la sesión por defecto de clasp es otra cuenta).
-- Deploy: `npm run deploy` (push + redeploy sobre `A_OJO_DEPLOYMENT_ID`). **Nunca crear un deployment nuevo**: cambiaría la URL `/exec`.
+- Deploy: `npm run deploy` (tests, push, redeploy sobre `A_OJO_DEPLOYMENT_ID` y un `ping` que espera la `VERSION_API` de `Api.js`). **Nunca crear un deployment nuevo**: cambiaría la URL `/exec`. Si cambia la API, subir `VERSION_API`.
 - Si un cambio usa un servicio de Google nuevo (Drive, Gmail…), después del push hay que correr `setup()` en el editor y aceptar el permiso **antes** del deploy. Si no, el web app deja de responder y se corta la captura.
 
 ## Procesamiento (`procesamiento/`, comando `/recetas`)
