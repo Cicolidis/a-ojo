@@ -2,15 +2,17 @@
 # Atajo para los scripts de procesamiento, con el Python del venv:
 #   procesamiento/aojo fetch|transcribe|frames|api <argumentos>
 # Lo usa el comando /recetas (ver .claude/commands/recetas.md).
+# El subcomando se valida antes de buscar el venv: un error de uso es el mismo
+# en cualquier máquina, haya corrido ./setup.sh o no (también en CI).
+script="$1"
+case "$script" in
+  fetch|transcribe|frames|api) shift ;;
+  *) echo "Uso: procesamiento/aojo fetch|transcribe|frames|api <argumentos>" >&2; exit 2 ;;
+esac
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PY="$DIR/.venv/bin/python"
 if [ ! -x "$PY" ]; then
   echo '{"ok": false, "error": "sin_setup", "motivo": "Falta el entorno de Python. Corré ./setup.sh."}'
   exit 1
 fi
-script="$1"
-case "$script" in
-  fetch|transcribe|frames|api) shift ;;
-  *) echo "Uso: procesamiento/aojo fetch|transcribe|frames|api <argumentos>" >&2; exit 2 ;;
-esac
 exec "$PY" "$DIR/$script.py" "$@"

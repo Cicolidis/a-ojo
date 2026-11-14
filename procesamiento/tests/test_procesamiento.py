@@ -565,6 +565,19 @@ class TestVarios(unittest.TestCase):
         r = subprocess.run([str(comun.DIR_PROC / 'aojo'), 'rm'], capture_output=True, text=True)
         self.assertEqual(r.returncode, 2)
 
+    def test_aojo_sin_venv(self):
+        # Una copia de aojo en una carpeta sin .venv: así es una máquina sin ./setup.sh (o CI).
+        dir_copia = Path(tempfile.mkdtemp())
+        copia = dir_copia / 'aojo'
+        copia.write_bytes((comun.DIR_PROC / 'aojo').read_bytes())
+        copia.chmod(0o755)
+        r = subprocess.run([str(copia), 'rm'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('Uso:', r.stderr)
+        r = subprocess.run([str(copia), 'api', 'ping'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(json.loads(r.stdout)['error'], 'sin_setup')
+
 
 if __name__ == '__main__':
     unittest.main()
