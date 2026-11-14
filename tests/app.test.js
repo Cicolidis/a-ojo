@@ -749,7 +749,7 @@ test('estilos.css: los pares de colores que se usan tienen contraste AA en los d
   const fondos = ['fondo', 'superficie', 'superficie-2'];
   const pares = [
     ...['tinta', 'tinta-2', 'tinta-nota', 'acento', 'alerta'].flatMap(t => fondos.map(f => [t, f, 4.5])),
-    ['ok', 'superficie', 4.5], ['ok', 'superficie-2', 4.5], ['atencion', 'superficie-2', 4.5],
+    ['ok', 'superficie', 4.5], ['ok', 'superficie-2', 4.5], ['ok', 'fondo', 4.5], ['atencion', 'superficie-2', 4.5],
     // Texto claro sobre el botón principal, el aviso, el chip elegido y el timer que sonó.
     ['superficie', 'acento', 4.5], ['superficie', 'acento-hover', 4.5], ['superficie', 'tinta', 4.5], ['superficie', 'alerta', 4.5],
     // Botón principal deshabilitado.
@@ -1024,4 +1024,24 @@ test('idsPara y elegidosIniciales: con nombres repetidos cada uno se queda con e
   const conManteca = compras.concat({ id: 'c_mant', receta_id: 'r_x', nombre: 'manteca', cantidad: 50, unidad: 'g', rol: 'principal', porciones: 4 });
   assert.equal(c.recetaCambio(receta, conManteca), true);
   assert.deepEqual([...c.elegidosIniciales(receta, conManteca)].sort(), ['i_1', 'i_2', 'i_3']);
+});
+
+test('queCocino: las recetas que se pueden hacer con lo que hay, de la más cercana a la más lejana', async () => {
+  const { aplicarDelta, indexar, queCocino, leerTengo } = await cargar('datos.js');
+  const { lista } = indexar(aplicarDelta(null, fixture()));
+  assert.deepEqual(leerTengo('Zapallo, huevos y crema de leche; cebollas'), [['zapallo'], ['huevos'], ['crema', 'de', 'leche'], ['cebollas']]);
+  assert.deepEqual(queCocino(lista, { tengo: '  ' }), []);
+
+  const r = queCocino(lista, { tengo: 'zapallo, cebolla, caldo' });
+  assert.equal(r[0].receta.id, 'r_sopa');
+  assert.deepEqual(r[0].faltan, [], 'tiene todo lo principal (la crema es opcional)');
+  const pollo = r.find(x => x.receta.id === 'r_pollo');
+  assert.deepEqual(pollo.faltan, ['muslos de pollo', 'ajo'], '«cebolla» vale para «cebollas»');
+
+  const huevos = queCocino(lista, { tengo: 'huevo, banana' });
+  assert.equal(huevos[0].receta.id, 'r_torti', 'la tortilla: tiene lo principal salvo canela y manteca (sin rol cuentan como principales)');
+  assert.ok(!huevos.some(x => x.receta.id === 'r_desc'), 'sin las descartadas');
+  assert.ok(huevos.findIndex(x => x.receta.id === 'r_brown') > 0);
+  assert.deepEqual(queCocino(lista, { tengo: 'huevos', filtro: 'dulce' }).every(x => x.receta.tipo === 'dulce'), true, 'respeta el filtro');
+  assert.deepEqual(queCocino(lista, { tengo: 'caviar' }), []);
 });

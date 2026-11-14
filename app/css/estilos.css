@@ -462,6 +462,12 @@ textarea:focus, input[type="text"]:focus, select:focus {
 
 .tarjeta-titulo { font: 500 17px/1.2 var(--serif); }
 
+.tarjeta-faltan { font-size: 13px; line-height: 1.35; color: var(--tinta-2); }
+
+.tarjeta-faltan.completa { color: var(--ok); font-weight: 600; }
+
+.modo-biblioteca { margin-bottom: 10px; }
+
 .tarjeta-meta {
   display: flex;
   flex-wrap: wrap;

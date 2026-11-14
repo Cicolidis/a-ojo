@@ -1,6 +1,8 @@
 // Datos locales de la app: cómo se arma el snapshot a partir de `todo` y cómo se busca en él.
 // Todo es puro (sin DOM ni IndexedDB) para poder testearlo en Node.
 
+import { rolDe } from './ingredientes.js';
+
 const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // Subirla cuando la app empiece a usar columnas nuevas: los snapshots guardados con
 // otra versión se piden enteros de nuevo, así no les faltan esas columnas.
@@ -160,6 +162,47 @@ export function buscar(lista, { texto = '', filtro = 'todas' } = {}) {
   const palabras = normalizar(texto).split(/\s+/).filter(Boolean);
   return lista.filter(r => (r.estado !== 'descartada' || filtro === 'descartada') && cumpleFiltro(r, filtro) &&
     palabras.every(p => r.busqueda.includes(p)));
+}
+
+// «¿Qué cocino hoy?»: las recetas que se pueden hacer con lo que hay en casa.
+
+/** La misma palabra en singular o plural: huevo/huevos, limón/limones, nuez/nueces. */
+function mismaPalabra(a, b) {
+  const sin = p => p.replace(/ces$/, 'z').replace(/(es|s)$/, '');
+  return a === b || sin(a) === sin(b);
+}
+
+/** Lo que escribieron en «Tengo…», separado por comas o «y»: «zapallo, huevos y crema» → [[zapallo], [huevos], [crema]]. */
+export function leerTengo(texto) {
+  return normalizar(texto).split(/,|;|\s+y\s+|\n/).map(t => t.split(/[^a-z0-9ñ]+/).filter(p => p.length > 1))
+    .filter(t => t.length);
+}
+
+/** ¿El ingrediente es algo de lo que tienen? Todas las palabras de lo que escribieron están en su nombre. */
+function loTengo(ing, tengo) {
+  const nombre = normalizar(ing.nombre).split(/[^a-z0-9ñ]+/).filter(Boolean);
+  return tengo.some(t => t.every(p => nombre.some(n => mismaPalabra(p, n))));
+}
+
+/**
+ * Las recetas que usan algo de lo que tienen, de las que más se acercan a las que menos:
+ * primero las que tienen menos ingredientes principales por comprar, después las que usan
+ * más de lo que hay. Los condimentos y lo opcional no cuentan (se supone que hay o se saltean).
+ * Respeta el filtro de los chips. Devuelve [{ receta, faltan: [nombres], usa: n }].
+ */
+export function queCocino(lista, { tengo = '', filtro = 'todas' } = {}) {
+  const lo = leerTengo(tengo);
+  if (!lo.length) return [];
+  return lista
+    .filter(r => (r.estado !== 'descartada' || filtro === 'descartada') && cumpleFiltro(r, filtro))
+    .map(r => {
+      const principales = r.ingredientes.filter(i => rolDe(i) === 'principal');
+      const usa = r.ingredientes.filter(i => rolDe(i) !== 'utensilio' && loTengo(i, lo)).length;
+      const faltan = principales.filter(i => !loTengo(i, lo)).map(i => i.nombre);
+      return { receta: r, faltan, usa };
+    })
+    .filter(x => x.usa > 0)
+    .sort((a, b) => a.faltan.length - b.faltan.length || b.usa - a.usa || alfabetico(a.receta.titulo, b.receta.titulo));
 }
 
 /**

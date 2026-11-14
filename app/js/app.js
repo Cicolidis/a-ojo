@@ -33,7 +33,8 @@ const app = {
   ultimaSync: 0,
   // Ediciones que todavía no llegaron a la API (ver ediciones.js).
   cola: [],
-  biblioteca: { texto: '', filtro: 'todas', scroll: 0 },
+  // modo: buscar · tengo («¿Qué cocino hoy?»: lo que hay en casa).
+  biblioteca: { texto: '', filtro: 'todas', scroll: 0, modo: 'buscar', tengo: '' },
   // Porciones elegidas en cada ficha, mientras la app está abierta: id → número.
   porciones: new Map(),
 };

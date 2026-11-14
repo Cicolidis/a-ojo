@@ -289,6 +289,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - Service worker: guarda la interfaz en caché y funciona offline.
 - Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
 - Búsqueda local, sin tildes y sin distinguir mayúsculas, sobre título, ingredientes y etiquetas.
+- «¿Qué cocino hoy?»: el mismo campo, en el modo «Con lo que tengo», lee lo que hay en casa («zapallo, huevos y crema») y ordena las recetas por cuántos ingredientes principales faltan (`queCocino()`, `datos.js`); los condimentos y lo opcional no cuentan.
 - **Wake Lock API** en el modo cocina: la pantalla no se apaga.
 - **Web Share API** para la lista de compras y para compartir una receta (`compartirTexto()`, `vistas/controles.js`). Si no está disponible, se abre `https://wa.me/?text=…`.
 - Las capturas se achican en el celular (JPEG de hasta 1600 px) y se mandan directo, sin pasar por la cola: piden conexión.
@@ -296,7 +297,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - **`share_target`** (§5.3): la app abierta desde Compartir lee los parámetros, limpia la dirección y guarda el link por la cola. Mientras no llega a la API, la Bandeja muestra una fila provisoria (`local`), que se reemplaza por la de verdad cuando baja `todo`. Sin configuración, lo compartido se pierde: se ve la bienvenida, con el aviso «Primero abrí el link de configuración; después volvé a compartirlo».
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
-1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
+1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", un selector "Buscar" / "Con lo que tengo", buscador (en el segundo modo, las tarjetas dicen "Tenés todo lo principal" o "Faltan: crema y queso"), chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
 2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota"), cada una con "Editar" y "Borrar" (pide confirmación; los dos pueden editar o borrar cualquiera) y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
@@ -476,6 +477,8 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
    - *Hecho (14/11):* `idsPara()` (`compras.js`) le da a cada ingrediente el id del ítem que ya tiene en la lista (por nombre, dentro de la receta) y `compras.agregar` actualiza esos ítems (API 0.10.0). El paso para elegir arranca con lo que ya está en la lista. Decidido: lo marcado se desmarca si ahora hace falta más.
 9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.
+   - *Decidido (14/11):* se hacen «¿Qué cocino hoy?» y la exportación a Obsidian; `/recetas` programado, no por ahora (el procesamiento sigue a mano).
+   - *Hecho (14/11):* «¿Qué cocino hoy?», como modo «Con lo que tengo» de la Biblioteca.
 
 #### 6.4 Forma de trabajo
 - Se implementa en Claude Code, un ítem por sesión y por commit, siguiendo `CLAUDE.md`.

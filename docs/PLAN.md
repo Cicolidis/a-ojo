@@ -87,7 +87,9 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [x] Compartir una receta por WhatsApp
 - [x] Editar y borrar notas
 - [x] Volver a agregar una receta a compras sin perder lo marcado
-- [ ] Pendientes de v2: «¿Qué cocino hoy?» simple, exportación a Obsidian y, si se revisa la decisión, `/recetas` programado
+- [x] Pendientes de v2: «¿Qué cocino hoy?» simple
+- [ ] Pendientes de v2: exportación a Obsidian
+- Pendientes de v2: `/recetas` programado: descartado por ahora (el procesamiento sigue a mano)
 
 ### 6.4 Forma de trabajo
 
