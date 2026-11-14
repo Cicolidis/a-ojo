@@ -38,6 +38,13 @@
   --alerta: #8A3A1A;
   --sombra: rgba(42, 33, 27, 0.12);
   --velo: rgba(42, 33, 27, 0.45);
+  /* Rellenos de las fotos (mientras cargan o si no hay): relleno() de dom.js elige uno por receta. */
+  --relleno-1: #5A3A28;
+  --relleno-2: #C99A5B;
+  --relleno-3: #7C8455;
+  --relleno-4: #D8B78A;
+  --relleno-5: #8A5A3C;
+  --relleno-6: #B5835A;
   /* Ícono de las fotos que faltan: crema sobre los rellenos, igual en los dos modos. */
   --sobre-foto: rgba(255, 251, 245, 0.6);
   --serif: 'Fraunces', Georgia, serif;
@@ -70,6 +77,13 @@
     --alerta: #F08A6A;
     --sombra: rgba(0, 0, 0, 0.4);
     --velo: rgba(0, 0, 0, 0.6);
+    /* Los mismos rellenos, un poco más apagados para no encandilar sobre el fondo oscuro. */
+    --relleno-1: #4A2F20;
+    --relleno-2: #A67E48;
+    --relleno-3: #656C44;
+    --relleno-4: #B09470;
+    --relleno-5: #714930;
+    --relleno-6: #946B49;
   }
 }
 

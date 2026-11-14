@@ -668,3 +668,24 @@ test('estilos.css: los pares de colores que se usan tienen contraste AA en los d
     }
   }
 });
+
+// Fase 6: los rellenos de las fotos son tokens, en los dos modos.
+test('relleno(): un token --relleno-N que existe en estilos.css, fijo por receta', async () => {
+  const { relleno, CANTIDAD_RELLENOS } = await cargar('dom.js');
+  const css = fs.readFileSync(path.join(APP, 'css', 'estilos.css'), 'utf8');
+  const claro = tokensDe(/:root\s*{([^}]*)}/.exec(css)[1]);
+  const oscuro = tokensDe(/@media \(prefers-color-scheme: dark\)\s*{\s*:root\s*{([^}]*)}/.exec(css)[1]);
+  for (let n = 1; n <= CANTIDAD_RELLENOS; n++) {
+    assert.ok(claro['relleno-' + n] && oscuro['relleno-' + n], `--relleno-${n} está en los dos modos`);
+  }
+  assert.equal(claro['relleno-' + (CANTIDAD_RELLENOS + 1)], undefined, 'no hay más rellenos que los que usa dom.js');
+  const usados = new Set();
+  for (let i = 0; i < 200; i++) {
+    const r = relleno('r_' + i);
+    assert.match(r, /^var\(--relleno-[1-6]\)$/);
+    usados.add(r);
+  }
+  assert.equal(usados.size, CANTIDAD_RELLENOS, 'reparte entre todos');
+  assert.equal(relleno('r_abc'), relleno('r_abc'));
+  assert.doesNotMatch(fs.readFileSync(path.join(APP, 'js', 'dom.js'), 'utf8'), /#[0-9a-f]{6}\b/i, 'dom.js no tiene colores sueltos');
+});

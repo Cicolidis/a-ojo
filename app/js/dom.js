@@ -66,13 +66,14 @@ export function icono(nombre, tamano = 20) {
   return span;
 }
 
-/** Color de fondo para las fotos que faltan o no cargan: uno cálido, fijo por receta. */
-const RELLENOS = ['#5A3A28', '#C99A5B', '#7C8455', '#D8B78A', '#8A5A3C', '#B5835A'];
+/** Cuántos rellenos hay: los tokens --relleno-1 … --relleno-6 de estilos.css (cambian con el modo oscuro). */
+export const CANTIDAD_RELLENOS = 6;
 
+/** Color de fondo para las fotos que faltan o no cargan: uno cálido, fijo por receta. */
 export function relleno(id) {
   let n = 0;
   for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) >>> 0;
-  return RELLENOS[n % RELLENOS.length];
+  return 'var(--relleno-' + (n % CANTIDAD_RELLENOS + 1) + ')';
 }
 
 /** Foto de una receta, sobre su color de relleno. Si no hay foto o no carga, queda el color con una olla tenue. */
