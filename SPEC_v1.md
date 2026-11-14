@@ -479,6 +479,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.
    - *Decidido (14/11):* se hacen «¿Qué cocino hoy?» y la exportación a Obsidian; `/recetas` programado, no por ahora (el procesamiento sigue a mano).
    - *Hecho (14/11):* «¿Qué cocino hoy?», como modo «Con lo que tengo» de la Biblioteca.
+   - *Hecho (14/11):* exportación a Obsidian, `procesamiento/aojo obsidian` (`obsidian.py`): una nota por receta (no descartada) en `30_recursos/Recetas` de «mental palace» (`A_OJO_OBSIDIAN`), con propiedades, ingredientes, pasos, nuestras notas y «Cómo se armó». Se corre a mano; renombra por `a_ojo_id` y nunca pisa una nota ajena.
 
 #### 6.4 Forma de trabajo
 - Se implementa en Claude Code, un ítem por sesión y por commit, siguiendo `CLAUDE.md`.

@@ -88,7 +88,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [x] Editar y borrar notas
 - [x] Volver a agregar una receta a compras sin perder lo marcado
 - [x] Pendientes de v2: «¿Qué cocino hoy?» simple
-- [ ] Pendientes de v2: exportación a Obsidian
+- [x] Pendientes de v2: exportación a Obsidian
 - Pendientes de v2: `/recetas` programado: descartado por ahora (el procesamiento sigue a mano)
 
 ### 6.4 Forma de trabajo

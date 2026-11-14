@@ -192,6 +192,14 @@ Por cada link va sumando capas solo mientras falten datos: metadatos y caption, 
 
 Los scripts también se pueden correr a mano, por ejemplo `procesamiento/aojo fetch meta b_e3cgj https://www.youtube.com/shorts/a2qRJHVeJwk` o `procesamiento/aojo api pendientes`.
 
+## Exportar a Obsidian
+
+`procesamiento/aojo obsidian` escribe una nota por receta en la carpeta de `A_OJO_OBSIDIAN` (en el `.env`) o la de `--carpeta`: propiedades (estado, valoración, tipo, etiquetas…), ingredientes por sección, pasos, «Nuestras notas» y «Cómo se armó». Se corre a mano, cuando quieras actualizarlas; con `--dry-run` solo cuenta.
+
+- Cada nota lleva el id de la receta (`a_ojo_id`): si cambia el título, se renombra en lugar de duplicarse. Solo se reescribe si cambió algo.
+- Las notas se reescriben: editá la receta en la app, no en Obsidian.
+- Las descartadas no se exportan (la nota que ya estaba queda). Una nota tuya con el mismo nombre nunca se pisa: el comando avisa y no hace nada.
+
 ## API
 
 Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. Los `POST` mandan JSON como `text/plain` (sin preflight de CORS) o form-urlencoded. Respuesta: `{ ok, data }` o `{ ok: false, error, mensaje, status }`. Apps Script no permite códigos HTTP propios, así que el 401 y los demás viajan en `status`.

@@ -22,6 +22,7 @@ import api  # noqa: E402
 import comun  # noqa: E402
 import fetch  # noqa: E402
 import frames  # noqa: E402
+import obsidian  # noqa: E402
 
 VTT_AUTOMATICO = """WEBVTT
 Kind: captions
@@ -472,6 +473,77 @@ class TestCorregir(unittest.TestCase):
         with mock.patch.object(api, 'llamar', return_value={'filas': [fila], 'quedan': 0}):
             r, _ = correr_api('tomar')
         self.assertEqual(r['filas'][0]['pedido'], 'La harina son 300 g.')
+
+
+TODO_OBSIDIAN = {
+    'recetas': [
+        {'id': 'r_brown', 'titulo': 'Brownie: húmedo/con nueces', 'tipo': 'dulce', 'etiquetas': 'rápida, chocolate', 'estado': 'favorita',
+         'valoracion': 4, 'porciones': 6, 'tiempo_min': 45, 'molde': '20×30 cm', 'autor': '@cocina', 'confianza': 'alta',
+         'fuente_url': 'https://www.youtube.com/shorts/x', 'foto_url': 'https://drive.google.com/thumbnail?id=1',
+         'origen_datos': 'descripcion,subtitulos', 'notas_proceso': 'El tiempo es estimado.', 'creado': '2026-10-01'},
+        {'id': 'r_desc', 'titulo': 'Licuado', 'estado': 'descartada', 'creado': '2026-10-02'},
+    ],
+    'ingredientes': [
+        {'receta_id': 'r_brown', 'orden': 1, 'nombre': 'chocolate semiamargo', 'cantidad': 200, 'unidad': 'g', 'nota': 'picado', 'rol': 'principal'},
+        {'receta_id': 'r_brown', 'orden': 2, 'nombre': 'azúcar', 'cantidad': 1.5, 'unidad': 'taza', 'rol': 'principal'},
+        {'receta_id': 'r_brown', 'orden': 3, 'nombre': 'sal', 'cantidad': None, 'unidad': 'a ojo', 'rol': 'condimento'},
+        {'receta_id': 'r_brown', 'orden': 4, 'nombre': 'vainilla', 'cantidad': 1, 'unidad': 'cdita', 'rol': 'condimento'},
+        {'receta_id': 'r_brown', 'orden': 5, 'nombre': 'nueces', 'cantidad': 100, 'unidad': 'g', 'rol': 'principal', 'rol_usuario': 'opcional'},
+        {'receta_id': 'r_brown', 'orden': 6, 'nombre': 'papel manteca', 'unidad': 'a ojo', 'rol': 'utensilio'},
+    ],
+    'pasos': [
+        {'receta_id': 'r_brown', 'orden': 2, 'texto': 'Horneá 23 minutos.', 'tip': 'Tiene que quedar blando.'},
+        {'receta_id': 'r_brown', 'orden': 1, 'texto': 'Derretí el chocolate.'},
+    ],
+    'notas': [
+        {'receta_id': 'r_brown', 'quien': 'pareja', 'fecha': '2026-09-12T10:00:00.000Z', 'texto': 'Con menos azúcar.'},
+        {'receta_id': 'r_brown', 'quien': 'camilo', 'fecha': '2026-10-05T10:00:00.000Z', 'texto': 'Borrada.', 'borrada': True},
+    ],
+}
+
+
+class TestObsidian(unittest.TestCase):
+    def test_la_nota_de_una_receta(self):
+        r = TODO_OBSIDIAN
+        texto = obsidian.nota_markdown(r['recetas'][0], r['ingredientes'], r['pasos'], r['notas'])
+        self.assertTrue(texto.startswith('---\na_ojo_id: "r_brown"\ntipo: "dulce"\netiquetas: ["rápida", "chocolate"]\nestado: "favorita"\nvaloracion: 4\n'))
+        self.assertIn('tags: ["receta"]', texto)
+        self.assertIn('Para 6 porciones · 45 min · Molde 20×30 cm · [Ver el video](https://www.youtube.com/shorts/x) de @cocina', texto)
+        self.assertIn('- Chocolate semiamargo: 200 g (picado)\n- Azúcar: 1 ½ tazas\n- Sal y vainilla (1 cdita)\n- Nueces: 100 g *(opcional)*', texto)
+        self.assertIn('También vas a necesitar: papel manteca.', texto)
+        self.assertIn('## Pasos\n1. Derretí el chocolate.\n2. Horneá 23 minutos.\n    *Tiene que quedar blando.*', texto)
+        self.assertIn('- **Laura · 12/9/2026:** Con menos azúcar.', texto)
+        self.assertNotIn('Borrada', texto)
+        self.assertIn('## Cómo se armó\n\nSalió de la descripción del video y los subtítulos.', texto)
+        self.assertIn('El tiempo es estimado.', texto)
+
+    def test_nombre_de_archivo(self):
+        self.assertEqual(obsidian.nombre_archivo('Brownie: húmedo/con nueces'), 'Brownie húmedo con nueces')
+        self.assertEqual(obsidian.nombre_archivo('  #[]  '), 'Receta sin título')
+
+    def test_exportar_escribe_renombra_y_no_pisa(self):
+        carpeta = Path(tempfile.mkdtemp(prefix='obsidian-'))
+        r = obsidian.exportar(TODO_OBSIDIAN, carpeta)
+        self.assertEqual((r['escritas'], r['descartadas']), (1, 1))
+        self.assertEqual(sorted(p.name for p in carpeta.iterdir()), ['Brownie húmedo con nueces.md'])
+        self.assertEqual(obsidian.exportar(TODO_OBSIDIAN, carpeta)['sin_cambios'], 1, 'sin cambios, no escribe')
+
+        # Cambió el título: la nota se renombra, no se duplica.
+        otro = json.loads(json.dumps(TODO_OBSIDIAN))
+        otro['recetas'][0]['titulo'] = 'Brownie de la abuela'
+        r = obsidian.exportar(otro, carpeta, dry_run=True)
+        self.assertEqual((r['renombradas'], r['escritas']), (1, 1))
+        self.assertEqual(sorted(p.name for p in carpeta.iterdir()), ['Brownie húmedo con nueces.md'], 'dry-run no toca nada')
+        obsidian.exportar(otro, carpeta)
+        self.assertEqual(sorted(p.name for p in carpeta.iterdir()), ['Brownie de la abuela.md'])
+
+        # Una nota tuya con el mismo nombre no se pisa.
+        (carpeta / 'Brownie de la abuela.md').unlink()
+        (carpeta / 'Brownie de la abuela.md').write_text('Mi nota.', encoding='utf-8')
+        with contextlib.redirect_stdout(io.StringIO()) as out, self.assertRaises(SystemExit):
+            obsidian.exportar(otro, carpeta)
+        self.assertEqual(json.loads(out.getvalue())['error'], 'nombre_ocupado')
+        self.assertEqual((carpeta / 'Brownie de la abuela.md').read_text(encoding='utf-8'), 'Mi nota.')
 
 
 class TestCapturas(unittest.TestCase):
