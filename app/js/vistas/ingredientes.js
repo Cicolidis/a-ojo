@@ -124,8 +124,8 @@ export function montar(contenedor, { app, volver, editar }, id) {
   }
 
   pintar();
-  // Lo que bajó la sincronización no pisa lo que están editando.
-  return { actualizar() {} };
+  // Lo que bajó la sincronización no pisa lo que están editando, y una versión nueva espera.
+  return { actualizar() {}, ocupada: () => cambiados().length > 0 };
 }
 
 /** Campo para escribir el nombre de una sección, con «Listo» y «Cancelar». */

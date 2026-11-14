@@ -697,3 +697,16 @@ test('la app no usa confirm(), alert() ni prompt(): van con el estilo de la app 
     assert.doesNotMatch(codigo, /(^|[^.\w])(confirm|alert|prompt)\(/m, f);
   }
 });
+
+test('vistaOcupada(): una versión nueva no recarga en el modo cocina ni con algo a medio escribir', async () => {
+  const { vistaOcupada } = await cargar('rutas.js');
+  assert.equal(vistaOcupada(null), false);
+  assert.equal(vistaOcupada({ actualizar() {} }), false, 'una pantalla sin ocupada() se puede recargar');
+  assert.equal(vistaOcupada({ enCocina: true }), true);
+  let texto = '';
+  const ficha = { actualizar() {}, ocupada: () => texto.trim() !== '' };
+  assert.equal(vistaOcupada(ficha), false);
+  texto = 'Le faltó sal';
+  assert.equal(vistaOcupada(ficha), true);
+  assert.equal(vistaOcupada({ ocupada: () => 'sí' }), false, 'solo cuenta true');
+});

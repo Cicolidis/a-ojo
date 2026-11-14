@@ -1,6 +1,6 @@
 // Arranque de A ojo: configuración, datos locales, rutas, ediciones y sincronización en segundo plano.
 
-import { leerRuta, tituloDe } from './rutas.js';
+import { leerRuta, tituloDe, vistaOcupada } from './rutas.js';
 import { leerConfig, guardarConfig, leerLinkConfig } from './config.js';
 import { leer, guardar, borrar } from './db.js';
 import { indexar } from './datos.js';
@@ -235,11 +235,12 @@ function sincronizarAhora() {
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  // Con una versión nueva de la app se recarga, salvo en el modo cocina: ahí espera a que se salga.
+  // Con una versión nueva de la app se recarga, salvo que la pantalla esté ocupada (el modo
+  // cocina, una nota a medio escribir, ingredientes sin guardar): ahí espera a que se cambie de pantalla.
   const habiaControlador = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!habiaControlador) return;
-    if (leerRuta(location.hash).nombre === 'cocina') recargarAlSalir = true;
+    if (vistaOcupada(vista)) recargarAlSalir = true;
     else location.reload();
   });
   navigator.serviceWorker.register('sw.js').catch(err => console.warn('No se pudo registrar el service worker:', err));

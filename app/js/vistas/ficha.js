@@ -264,7 +264,11 @@ export function montar(contenedor, { app, volver, editar }, id) {
   }
 
   pintar();
-  return { actualizar: pintar };
+  return {
+    actualizar: pintar,
+    // Una nota a medio escribir: una versión nueva de la app espera para recargar.
+    ocupada: () => !formNota.hidden && textoNota.value.trim() !== '',
+  };
 }
 
 /** Repinta `zona` y, si el foco estaba en un botón de ahí, lo devuelve al equivalente (misma etiqueta o texto). */

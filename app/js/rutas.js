@@ -28,6 +28,16 @@ const NOMBRES = {
   bandeja: 'Bandeja',
 };
 
+/**
+ * ¿La pantalla tiene algo a medio hacer que una recarga perdería? El modo cocina
+ * siempre; las demás, si su vista lo dice con `ocupada()` (una nota a medio
+ * escribir, ingredientes sin guardar). Con una versión nueva, la recarga espera.
+ */
+export function vistaOcupada(vista) {
+  if (!vista) return false;
+  return vista.enCocina === true || (typeof vista.ocupada === 'function' && vista.ocupada() === true);
+}
+
 /** Título de la pestaña (y del selector de apps): «Compras · A ojo», «Torta vasca · A ojo». */
 export function tituloDe(ruta, receta) {
   return [NOMBRES[ruta.nombre], receta && receta.titulo, 'A ojo'].filter(Boolean).join(' · ');
