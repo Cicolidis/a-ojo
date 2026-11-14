@@ -11,6 +11,14 @@
 const MIMES_IMAGEN_ = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MAX_BYTES_IMAGEN_ = 5 * 1024 * 1024;
 
+/**
+ * Cómo se arma la URL de las fotos (urlImagen_): 'thumbnail' (drive.google.com/thumbnail)
+ * o 'lh3' (lh3.googleusercontent.com/d/<id>), la alternativa por si la primera deja de andar.
+ * Cambiarla solo vale para las fotos nuevas: las que ya están en la Sheet guardan su URL.
+ * La CSP de la app (index.html) ya permite las dos.
+ */
+const FORMA_URL_FOTOS_ = 'thumbnail';
+
 /** Carpeta "A ojo/fotos". */
 function carpetaFotos_() {
   return carpeta_('CARPETA_FOTOS', 'fotos');
@@ -89,7 +97,9 @@ function guardarImagen_(base, imagen) {
   return urlImagen_(archivo.getId());
 }
 
-function urlImagen_(idArchivo) {
+/** URL para <img> de un archivo público de Drive, de 1200 px de ancho. `forma`: ver FORMA_URL_FOTOS_. */
+function urlImagen_(idArchivo, forma) {
+  if ((forma || FORMA_URL_FOTOS_) === 'lh3') return 'https://lh3.googleusercontent.com/d/' + idArchivo + '=w1200';
   return 'https://drive.google.com/thumbnail?id=' + idArchivo + '&sz=w1200';
 }
 

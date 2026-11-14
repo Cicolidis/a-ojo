@@ -1,5 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { cargarProyecto } = require('./fakes/apps-script.js');
 
 function leer(salida) {
@@ -842,4 +844,13 @@ test('compras y capturas piden correr setup() si faltan sus columnas; todo anda 
   const todo = p.get({ action: 'todo', t: p.token });
   assert.equal(todo.ok, true);
   assert.deepEqual(todo.data.lugares, []);
+});
+
+test('urlImagen_: thumbnail por defecto y la alternativa lh3 preparada', () => {
+  const p = proyecto();
+  assert.equal(p.ctx.urlImagen_('abc_123'), 'https://drive.google.com/thumbnail?id=abc_123&sz=w1200');
+  assert.equal(p.ctx.urlImagen_('abc_123', 'thumbnail'), 'https://drive.google.com/thumbnail?id=abc_123&sz=w1200');
+  assert.equal(p.ctx.urlImagen_('abc_123', 'lh3'), 'https://lh3.googleusercontent.com/d/abc_123=w1200');
+  const csp = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  assert.match(csp, /img-src[^;]*https:\/\/\*\.googleusercontent\.com/, 'la CSP de la app permite lh3');
 });
