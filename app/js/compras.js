@@ -79,15 +79,74 @@ export function vaARevisar(ingrediente) {
   return A_REVISAR.includes(rolDe(ingrediente));
 }
 
-/** Lo que arranca marcado en «Agregar a compras»: los principales (los opcionales, no). */
-export function elegidosIniciales(receta) {
-  return new Set(receta.ingredientes.filter(i => rolDe(i) === 'principal').map(i => i.id));
+/**
+ * Lo que arranca marcado en «Agregar a compras»: los principales (los opcionales, no).
+ * Si la receta ya está en la lista, lo que está ahí, para cambiarla sin empezar de cero.
+ * Y si la receta cambió desde entonces (se reprocesó: algo de la lista ya no corresponde a
+ * ningún ingrediente), también los principales nuevos, para que no se pierdan.
+ */
+export function elegidosIniciales(receta, compras) {
+  const principales = receta.ingredientes.filter(i => rolDe(i) === 'principal');
+  const enLista = deLaReceta(compras, receta.id);
+  if (!enLista.length) return new Set(principales.map(i => i.id));
+  const ids = emparejar(receta, compras);
+  const elegidos = new Set(receta.ingredientes.filter(i => !vaARevisar(i) && ids.has(i.id)).map(i => i.id));
+  if (recetaCambio(receta, compras)) principales.filter(i => !ids.has(i.id)).forEach(i => elegidos.add(i.id));
+  return elegidos;
+}
+
+/** ¿La receta cambió desde que se agregó a la lista? Algo de la lista ya no corresponde a ningún ingrediente. */
+export function recetaCambio(receta, compras) {
+  const usados = new Set(emparejar(receta, compras).values());
+  return deLaReceta(compras, receta.id).some(c => !usados.has(c.id));
+}
+
+const deLaReceta = (compras, recetaId) => (compras || []).filter(c => c.receta_id === recetaId);
+
+/**
+ * Qué ítem de la lista corresponde a cada ingrediente de la receta: Map id de ingrediente → id de compras.
+ * En pasadas, de la más segura a la menos: mismo nombre, rol y cantidad (para las porciones del ítem);
+ * mismo nombre y rol; mismo nombre. Así, con nombres repetidos («azúcar» en la masa y en el almíbar),
+ * cada uno se queda con el suyo. El nombre tolera plurales simples (huevo / huevos).
+ */
+function emparejar(receta, compras) {
+  const libres = deLaReceta(compras, receta.id).slice();
+  const asignados = new Map();
+  const base = porcionesBase(receta);
+  const cantidadPara = (i, c) => {
+    const factor = base && Number(c.porciones) > 0 ? Number(c.porciones) / base : 1;
+    const n = Number(escalar(i.cantidad, i.unidad || 'a ojo', factor));
+    return (i.unidad || 'a ojo') === c.unidad && (c.unidad === 'a ojo' || n === Number(c.cantidad));
+  };
+  const pasada = coincide => receta.ingredientes.forEach(i => {
+    if (asignados.has(i.id)) return;
+    const k = libres.findIndex(c => mismoNombre(c.nombre, i.nombre) && coincide(c, i));
+    if (k !== -1) asignados.set(i.id, libres.splice(k, 1)[0].id);
+  });
+  pasada((c, i) => (c.rol || 'principal') === rolDe(i) && cantidadPara(i, c));
+  pasada((c, i) => (c.rol || 'principal') === rolDe(i));
+  pasada(() => true);
+  return asignados;
+}
+
+/**
+ * Para volver a agregar una receta sin perder lo marcado: el id de compras de cada ingrediente.
+ * Si ese ingrediente ya está en la lista (ver emparejar), su id; si no, uno nuevo con `nuevoId()`.
+ * Devuelve una función ingrediente → id, que siempre da el mismo id para el mismo ingrediente.
+ */
+export function idsPara(receta, compras, nuevoId = () => '') {
+  const asignados = emparejar(receta, compras);
+  return ing => {
+    if (!asignados.has(ing.id)) asignados.set(ing.id, nuevoId());
+    return asignados.get(ing.id);
+  };
 }
 
 /**
  * Los ítems de compras.agregar para una receta: lo elegido para comprar más los
  * condimentos y utensilios (que van a «Revisá si tenés»), con las cantidades para
- * `porciones`. `elegidos` es un Set de ids de ingredientes; `nuevoId()` da un id c_….
+ * `porciones`. `elegidos` es un Set de ids de ingredientes; `nuevoId(ingrediente)` da su id c_…
+ * (con idsPara(), el que ya tiene en la lista).
  */
 export function itemsDeReceta(receta, porciones, elegidos, nuevoId) {
   const base = porcionesBase(receta);
@@ -98,7 +157,7 @@ export function itemsDeReceta(receta, porciones, elegidos, nuevoId) {
       const unidad = i.unidad || 'a ojo';
       const n = Number(escalar(i.cantidad, unidad, factor));
       return {
-        id: nuevoId(),
+        id: nuevoId(i),
         nombre: i.nombre,
         cantidad: unidad !== 'a ojo' && n > 0 ? n : null,
         unidad,

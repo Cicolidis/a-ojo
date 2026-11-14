@@ -87,10 +87,20 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       });
     }
     case 'compras.agregar': {
-      // Como la API: suma lo que no está (por id) y, con receta_id, saca lo de esa receta que no vino.
+      // Como la API: suma lo que no está (por id), actualiza lo de la receta que ya está (sin tocar
+      // `hecho` ni `lugar`) y, con receta_id, saca lo de esa receta que no vino.
       const ids = new Set(d.items.map(i => i.id));
       const existentes = new Set(compras.map(c => c.id));
-      const quedan = compras.filter(c => !(d.receta_id && c.receta_id === d.receta_id && !ids.has(c.id)));
+      const porId = new Map(d.items.map(i => [i.id, i]));
+      const quedan = compras
+        .filter(c => !(d.receta_id && c.receta_id === d.receta_id && !ids.has(c.id)))
+        .map(c => {
+          const i = porId.get(c.id);
+          if (!i || !d.receta_id || c.receta_id !== d.receta_id) return c;
+          const nuevo = { nombre: i.nombre, cantidad: i.cantidad ?? null, unidad: i.unidad || 'a ojo', gondola: i.gondola || '',
+            rol: i.rol || 'principal', porciones: d.porciones ?? null };
+          return Object.assign({}, c, nuevo, { hecho: c.hecho && !haceFaltaMas(c, nuevo) });
+        });
       const nuevos = d.items.filter(i => !existentes.has(i.id)).map(i => ({
         id: i.id,
         receta_id: d.receta_id || '',
@@ -202,6 +212,12 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
     default:
       return datos;
   }
+}
+
+/** Como haceFaltaMas_ de la API: un ítem marcado vuelve a la lista si ahora hace falta más de algo que se compra. */
+function haceFaltaMas(viejo, nuevo) {
+  const aRevisar = viejo.lugar === 'revisar' || (!viejo.lugar && (nuevo.rol === 'condimento' || nuevo.rol === 'utensilio'));
+  return !aRevisar && viejo.unidad === nuevo.unidad && Number(nuevo.cantidad) > Number(viejo.cantidad || 0);
 }
 
 /** Los datos con todas las ediciones pendientes aplicadas, en orden. */

@@ -212,7 +212,7 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 | POST | `nota.agregar` | `{ id?, receta_id, quien, texto, fecha? }` | `{ id, fecha }`. Con un `id` que ya existe responde `repetida: true` sin duplicarla |
 | POST | `nota.editar` | `{ id, texto }` | `{ id, texto }`. Con el mismo texto no escribe; una nota borrada responde `409 nota_borrada` |
 | POST | `nota.borrar` | `{ id }` | `{ id, borrada }`. La marca como borrada (queda en la Sheet, así llega en el delta) |
-| POST | `compras.agregar` | `{ receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }` | `{ ids, nuevos, quitados }`. Suma lo que no está (por id); con `receta_id`, lo de esa receta que no vino se borra |
+| POST | `compras.agregar` | `{ receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }` | `{ ids, nuevos, actualizados, quitados }`. Suma lo que no está (por id); lo de la receta que ya está se actualiza sin perder el `lugar` (y sigue marcado, salvo que ahora haga falta más); con `receta_id`, lo de esa receta que no vino se borra |
 | POST | `compras.marcar` | `{ ids, hecho }` | `{ ids, hecho }` |
 | POST | `compras.mover` | `{ ids, lugar }` | `{ ids, lugar }`. `lugar`: uno de los 7, `revisar` o vacío (el de la regla) |
 | POST | `compras.quitar` | `{ ids }` | `{ quitados }` |

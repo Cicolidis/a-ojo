@@ -86,7 +86,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [x] «Cómo se armó» en la ficha: `notas_proceso`, plegado
 - [x] Compartir una receta por WhatsApp
 - [x] Editar y borrar notas
-- [ ] Volver a agregar una receta a compras sin perder lo marcado
+- [x] Volver a agregar una receta a compras sin perder lo marcado
 - [ ] Pendientes de v2: «¿Qué cocino hoy?» simple, exportación a Obsidian y, si se revisa la decisión, `/recetas` programado
 
 ### 6.4 Forma de trabajo

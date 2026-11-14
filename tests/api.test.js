@@ -802,6 +802,31 @@ test('compras.agregar suma los ítems, no duplica al reintentar y, con receta_id
   agregar({ receta_id: id, items: itemsCompra() });
   assert.equal(p.filas('Compras').find(c => c.id === 'c_chocoa').hecho, true);
 
+  // Volver a agregarla con los mismos ids (la app los reusa) y otras porciones: actualiza cantidad y porciones,
+  // conserva adónde lo movieron; lo marcado sigue marcado, salvo que ahora haga falta más.
+  p.postJson({ action: 'compras.mover', t: p.token, ids: ['c_huevoa'], lugar: 'almacenata' });
+  p.postJson({ action: 'compras.marcar', t: p.token, ids: ['c_sal00a', 'c_huevoa'], hecho: true });
+  const mitad = itemsCompra().map(it => Object.assign({}, it, { cantidad: it.cantidad ? it.cantidad / 2 : null }));
+  let re = agregar({ receta_id: id, porciones: 12, items: mitad });
+  assert.deepEqual([re.data.nuevos, re.data.actualizados, re.data.quitados], [0, 3, 0], 'también la sal: cambian sus porciones');
+  const fila = cid => p.filas('Compras').find(c => c.id === cid);
+  assert.deepEqual([fila('c_chocoa').cantidad, fila('c_chocoa').porciones, fila('c_chocoa').hecho], [200, 12, true], 'con menos, sigue marcado');
+  assert.deepEqual([fila('c_huevoa').cantidad, fila('c_huevoa').lugar, fila('c_huevoa').hecho], [3, 'almacenata', true]);
+  const doble = itemsCompra().map(it => Object.assign({}, it, { cantidad: it.cantidad ? it.cantidad * 2 : null }));
+  re = agregar({ receta_id: id, porciones: 48, items: doble });
+  assert.deepEqual([fila('c_chocoa').cantidad, fila('c_chocoa').hecho], [800, false], 'con más, vuelve a la lista');
+  assert.deepEqual([fila('c_huevoa').cantidad, fila('c_huevoa').hecho], [12, false]);
+  assert.equal(fila('c_sal00a').hecho, true, 'lo de «Revisá si tenés» sigue tildado');
+  assert.equal(agregar({ receta_id: id, porciones: 48, items: doble }).data.actualizados, 0, 'un reintento no escribe');
+
+  // En una misma llamada: actualizar, borrar uno de arriba y sumar uno (borrar corre los números de fila).
+  re = agregar({ receta_id: id, porciones: 24, items: [
+    Object.assign({}, doble[1], { cantidad: 6 }), Object.assign({}, doble[2]), { id: 'c_nuev1', nombre: 'nueces', cantidad: 100, unidad: 'g' },
+  ] });
+  assert.deepEqual([re.data.nuevos, re.data.actualizados, re.data.quitados], [1, 2, 1], 'los huevos y la sal (porciones)');
+  assert.deepEqual(p.filas('Compras').filter(c => c.receta_id === id).map(c => [c.id, c.cantidad, c.porciones]).sort(),
+    [['c_huevoa', 6, 24], ['c_nuev1', 100, 24], ['c_sal00a', '', 24]].sort((a, b) => String(a).localeCompare(String(b))));
+
   // Agregarla de nuevo (otras porciones, ids nuevos) reemplaza; lo agregado a mano queda.
   agregar({ items: [{ id: 'c_mano1', nombre: 'Servilletas' }] });
   const otra = agregar({ receta_id: id, porciones: 12, items: itemsCompra('b').slice(0, 2) });

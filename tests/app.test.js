@@ -959,3 +959,69 @@ test('nota.editar y nota.borrar: como la API, idempotentes, y las borradas no se
   d = aplicarCola(d, [nuevaEdicion('nota.editar', { id, texto: 'otra' })]);
   assert.equal(d.notas.find(n => n.id === id).texto, 'Mejor con menos azúcar.', 'una borrada no se edita');
 });
+
+test('volver a agregar una receta a compras: reusa los ids y no pierde lo marcado ni lo movido', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const c = await cargar('compras.js');
+  const { aplicarEdicion, nuevaEdicion } = await cargar('ediciones.js');
+  let datos = aplicarDelta(null, fixture());
+  const brownie = () => indexar(datos).porId.get('r_brown');
+  let n = 0;
+  const nuevo = () => 'c_nuevo' + n++;
+
+  // Primera vez: ids nuevos, lo principal elegido.
+  const elegidos = c.elegidosIniciales(brownie(), datos.compras);
+  const primera = c.itemsDeReceta(brownie(), 6, elegidos, c.idsPara(brownie(), datos.compras, nuevo));
+  datos = aplicarEdicion(datos, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 6, items: primera }));
+  const choco = datos.compras.find(x => x.nombre === 'chocolate semiamargo');
+  datos = aplicarEdicion(datos, nuevaEdicion('compras.marcar', { ids: [choco.id], hecho: true }));
+  datos = aplicarEdicion(datos, nuevaEdicion('compras.mover', { ids: [choco.id], lugar: 'dietética' }));
+
+  // Sin las nueces (opcional), lo que estaba en la lista vuelve elegido.
+  const otraVez = c.elegidosIniciales(brownie(), datos.compras);
+  assert.deepEqual([...otraVez].sort(), [...elegidos].sort());
+
+  // Segunda vez, para 12: mismos ids, cantidades nuevas, y lo marcado y movido queda.
+  const ids = c.idsPara(brownie(), datos.compras, nuevo);
+  const segunda = c.itemsDeReceta(brownie(), 12, otraVez, ids);
+  assert.deepEqual(segunda.map(i => i.id).sort(), primera.map(i => i.id).sort(), 'los mismos ids');
+  const ing = brownie().ingredientes.find(i => i.nombre === 'chocolate semiamargo');
+  assert.equal(ids(ing), choco.id);
+  assert.equal(ids(ing), choco.id, 'siempre el mismo para el mismo ingrediente');
+  datos = aplicarEdicion(datos, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 12, items: segunda }));
+  const despues = datos.compras.find(x => x.id === choco.id);
+  assert.deepEqual([despues.cantidad, despues.porciones, despues.hecho, despues.lugar], [400, 12, false, 'dietética'],
+    'hace falta más: vuelve a la lista, pero en el lugar adonde lo movieron');
+  assert.equal(datos.compras.filter(x => x.receta_id === 'r_brown').length, primera.length, 'no duplica');
+
+  // Sumar las nueces: id nuevo para ellas, los demás iguales.
+  const conNueces = new Set(otraVez);
+  conNueces.add(brownie().ingredientes.find(i => i.nombre === 'nueces').id);
+  const tercera = c.itemsDeReceta(brownie(), 12, conNueces, c.idsPara(brownie(), datos.compras, nuevo));
+  assert.equal(tercera.filter(i => !primera.some(p => p.id === i.id)).map(i => i.nombre).join(), 'nueces');
+});
+
+test('idsPara y elegidosIniciales: con nombres repetidos cada uno se queda con el suyo; una receta que cambió', async () => {
+  const c = await cargar('compras.js');
+  const receta = { id: 'r_x', porciones: 4, ingredientes: [
+    { id: 'i_1', nombre: 'azúcar', cantidad: 200, unidad: 'g', rol: 'principal', seccion: 'Masa' },
+    { id: 'i_2', nombre: 'azúcar', cantidad: 100, unidad: 'g', rol: 'principal', seccion: 'Almíbar' },
+    { id: 'i_3', nombre: 'aceite', cantidad: 100, unidad: 'ml', rol: 'principal' },
+    { id: 'i_4', nombre: 'aceite', cantidad: null, unidad: 'a ojo', rol: 'condimento' },
+  ] };
+  // En la lista: solo el azúcar del almíbar y el aceite «a ojo» (tildado «lo tengo»).
+  const compras = [
+    { id: 'c_azu2', receta_id: 'r_x', nombre: 'azúcar', cantidad: 100, unidad: 'g', rol: 'principal', porciones: 4 },
+    { id: 'c_ace4', receta_id: 'r_x', nombre: 'aceites', cantidad: null, unidad: 'a ojo', rol: 'condimento', porciones: 4, hecho: true },
+  ];
+  const ids = c.idsPara(receta, compras, () => 'c_nuevo');
+  assert.deepEqual(receta.ingredientes.map(ids), ['c_nuevo', 'c_azu2', 'c_nuevo', 'c_ace4'], 'por rol y cantidad, y tolera el plural');
+  assert.deepEqual([...c.elegidosIniciales(receta, compras)], ['i_2'], 'arranca con lo que estaba, no con el otro azúcar');
+  assert.equal(c.recetaCambio(receta, compras), false);
+
+  // Reprocesada: la lista tiene «manteca», que la receta ya no lleva. Algo no corresponde a nada:
+  // también arrancan elegidos los principales que no están, para que no se pierdan.
+  const conManteca = compras.concat({ id: 'c_mant', receta_id: 'r_x', nombre: 'manteca', cantidad: 50, unidad: 'g', rol: 'principal', porciones: 4 });
+  assert.equal(c.recetaCambio(receta, conManteca), true);
+  assert.deepEqual([...c.elegidosIniciales(receta, conManteca)].sort(), ['i_1', 'i_2', 'i_3']);
+});

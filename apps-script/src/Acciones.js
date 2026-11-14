@@ -876,9 +876,10 @@ function filasCompras_(ids) {
 
 /**
  * POST compras.agregar { receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }
- * Suma los ítems que todavía no están (por id); los que ya están no se tocan, así
- * se conservan `hecho` y `lugar`. Con `receta_id`, los ítems de esa receta que no
- * vengan se borran: volver a agregarla (con otras porciones) la reemplaza.
+ * Suma los ítems que todavía no están (por id). Con `receta_id`, los de esa receta que ya
+ * están (la app reusa sus ids al volver a agregarla) se actualizan: cantidad, porciones, rol…,
+ * sin tocar adónde los movieron; siguen marcados salvo que ahora haga falta más de algo que
+ * se compra (misma unidad, más cantidad). Los de esa receta que no vengan se borran.
  */
 function accionComprasAgregar_(req) {
   const lista = Array.isArray(req.items) ? req.items : [];
@@ -932,6 +933,22 @@ function accionComprasAgregar_(req) {
     if (recetaId) filaReceta_(recetaId);
     const filas = leerFilas_('Compras');
     const ids = items.map(it => it.id);
+    // Volver a agregar la receta (la app reusa los ids): los que ya están se actualizan
+    // (cantidad, porciones, rol…) sin tocar lo que eligieron en la lista: si está marcado y adónde lo movieron.
+    // Antes de borrar, que corre los números de fila.
+    let actualizados = 0;
+    filas.forEach(f => {
+      const it = items.filter(x => x.id === f.datos.id)[0];
+      if (!it || !recetaId || f.datos.receta_id !== recetaId) return;
+      const nuevos = { nombre: it.nombre, cantidad: it.cantidad, unidad: it.unidad, gondola: it.gondola, rol: it.rol,
+        porciones: porciones, hecho: f.datos.hecho && !haceFaltaMas_(f.datos, it) };
+      const cambia = Object.keys(nuevos).some(k => String(f.datos[k] === null || f.datos[k] === undefined ? '' : f.datos[k])
+        !== String(nuevos[k] === null || nuevos[k] === undefined ? '' : nuevos[k]));
+      if (!cambia) return;
+      Object.assign(f.datos, nuevos);
+      escribirFila_('Compras', f.fila, f.datos);
+      actualizados++;
+    });
     const sobran = recetaId ? filas.filter(f => f.datos.receta_id === recetaId && ids.indexOf(f.datos.id) === -1) : [];
     borrarFilas_('Compras', sobran.map(f => f.fila));
     const existentes = filas.map(f => f.datos.id);
@@ -943,8 +960,17 @@ function accionComprasAgregar_(req) {
       creado: ahora,
     }));
     agregarFilas_('Compras', nuevos);
-    return { ids: ids, nuevos: nuevos.length, quitados: sobran.length };
+    return { ids: ids, nuevos: nuevos.length, actualizados: actualizados, quitados: sobran.length };
   });
+}
+
+/**
+ * ¿Un ítem marcado como comprado tiene que volver a la lista? Si ahora hace falta más
+ * (misma unidad, más cantidad) y es algo que se compra: en «Revisá si tenés», «lo tengo» sigue valiendo.
+ */
+function haceFaltaMas_(viejo, nuevo) {
+  const aRevisar = viejo.lugar === REVISAR || (!viejo.lugar && (nuevo.rol === 'condimento' || nuevo.rol === 'utensilio'));
+  return !aRevisar && viejo.unidad === nuevo.unidad && Number(nuevo.cantidad) > Number(viejo.cantidad || 0);
 }
 
 /** POST compras.marcar { ids, hecho } */

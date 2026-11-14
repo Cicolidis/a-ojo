@@ -1,13 +1,14 @@
 // Agregar a compras (#/compras/agregar/:id): qué comprar de una receta. Los
 // principales arrancan marcados y los opcionales no; los condimentos y utensilios
-// van a «Revisá si tenés». Si la receta ya está en la lista, guardar la reemplaza.
+// van a «Revisá si tenés». Si la receta ya está en la lista, arranca con lo que está
+// ahí (y sus porciones) y guardar la actualiza: cada ingrediente conserva su ítem.
 // Se llega desde la ficha (y se vuelve ahí, con «Ver la lista» en el aviso) o
 // desde Compras, por el buscador de recetas (y se vuelve a la lista).
 
 import { h, icono, rellenar } from '../dom.js';
 import { capitalizar, formatearCantidad } from '../formato.js';
 import { agrupar, enUnaLinea, escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
-import { elegidosIniciales, itemsDeReceta, recetasEnLista, vaARevisar } from '../compras.js';
+import { elegidosIniciales, idsPara, itemsDeReceta, recetaCambio, recetasEnLista, vaARevisar } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { contadorPorciones, sinReceta } from './controles.js';
 
@@ -20,10 +21,12 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   }
 
   const base = porcionesBase(r);
-  let porciones = app.porciones.get(id) || porcionesIniciales(r);
-  const elegidos = elegidosIniciales(r);
-  const hayRevisar = r.ingredientes.some(vaARevisar);
   const enLista = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
+  // Si ya está en la lista, con las porciones de la lista: así cambiar algo no cambia las cantidades.
+  let porciones = (enLista && Number(enLista.porciones)) || app.porciones.get(id) || porcionesIniciales(r);
+  const elegidos = elegidosIniciales(r, app.datos?.compras);
+  const cambio = enLista && recetaCambio(r, app.datos?.compras);
+  const hayRevisar = r.ingredientes.some(vaARevisar);
   // Vuelve a la lista si se llegó desde ahí; si no, a la receta.
   const desde = history.state && history.state.desde;
   const aLaLista = desde === '#/compras';
@@ -31,7 +34,8 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   const verLista = aLaLista ? undefined : { texto: 'Ver la lista', href: '#/compras' };
 
   const guardar = () => {
-    const items = itemsDeReceta(r, porciones, elegidos, () => idAzar('c'));
+    // Lo que ya está en la lista conserva su id: así no se pierde si está marcado ni adónde lo movieron.
+    const items = itemsDeReceta(r, porciones, elegidos, idsPara(r, app.datos?.compras, () => idAzar('c')));
     editar(nuevaEdicion('compras.agregar', { receta_id: id, porciones: base ? porciones : null, items }));
     if (base) app.porciones.set(id, porciones);
     salir();
@@ -57,7 +61,8 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     }) : null,
     enLista ? h('div', { class: 'aviso-lista' },
       h('p', null, 'Ya está en la lista' + (enLista.porciones ? ' para ' + enLista.porciones + ' porciones' : '') +
-        '. Si guardás, se reemplaza.'),
+        '. Si guardás, se actualiza: lo que ya marcaste sigue marcado, salvo lo que ahora lleva más.'),
+      cambio ? h('p', null, 'La receta cambió desde que la agregaste: revisá lo que quedó elegido.') : null,
       h('button', { type: 'button', class: 'boton-texto alerta-texto', onclick: quitar }, 'Quitar de la lista')) : null,
     lista,
     h('div', { class: 'barra-acciones' }, boton),
