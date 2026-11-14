@@ -81,7 +81,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | receta_id | texto | se completa cuando está `lista` |
 | intentos | número | |
 | actualizado | fecha-hora ISO | |
-| capturas | texto | ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma |
+| capturas | texto | ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma. Cuando la fila queda `lista`, van a la papelera de Drive (30 días) y la columna se vacía |
 
 **Deduplicación:** si la URL normalizada ya existe, no se crea una fila nueva y la API responde `duplicada`.
 
@@ -161,7 +161,7 @@ Dónde se compra cada cosa, compartido por los dos:
 | GET o POST | `ping` | — | `{version, ahora, hojas_faltantes, mensaje}` (prueba la conexión y el token: lo usan `setup.sh` y `npm run smoke`) |
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
 | GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
-| POST | `receta.upsert` | receta completa (con ingredientes y pasos) | `{id}` |
+| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista` y manda sus capturas a la papelera: `capturas_papelera`) |
 | POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
 | POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
 | POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
@@ -415,6 +415,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
   - *Revisado (14/11):* entre los 100 links procesados no hay ninguno `/share/`, y el Android de Laura comparte `/reel/<id>/`. **Queda pendiente** hasta que aparezca uno real.
 - **Dos corridas de `/recetas` a la vez** (la Mac y la computadora de Laura): `bandeja.pendientes` no reserva nada, así que las dos podrían tomar la misma fila. Sumar una acción `bandeja.tomar` que, dentro del lock, pase a `procesando` las filas que devuelve, y que `/recetas` la use en lugar de `pendientes` + `actualizar procesando`.
 - **Capturas que quedan en Drive.** Mandarlas a la papelera cuando la fila pasa a `lista` (en `receta.upsert`) o con una limpieza de las de más de 30 días.
+  - *Decidido (14/11):* al pasar a `lista`, en `receta.upsert`. Las de filas descartadas quedan (son pocas).
 - **`procesamiento/aojo`:** validar el subcomando antes de buscar el `.venv`, así `test_aojo_sin_script_valido` pasa en cualquier máquina (también en CI).
 - **SPEC al día:** sumar `notas_proceso` a la hoja `Recetas` (§3) y `ping` a la tabla de la API (§4); describir en §6.1 los comentarios del autor en YouTube y los posts de fotos de Instagram (`sin_video`); aclarar en §6.4 que yt-dlp se actualiza con pip dentro del venv. Actualizar el estado del README.
 - **Detalles menores:**

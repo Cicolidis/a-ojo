@@ -255,7 +255,8 @@ function accionBandejaActualizar_(req) {
  * último por fuente_url: así, reprocesar un link no la duplica. Al actualizar
  * conserva estado, valoracion, creado y foto_url (salvo que venga una foto nueva),
  * y reemplaza todos sus ingredientes y pasos.
- * Con `bandeja_id`, deja esa fila en `lista`. Con `validar`, no escribe nada (dry-run).
+ * Con `bandeja_id`, deja esa fila en `lista` y manda sus capturas (si tenía) a la
+ * papelera de Drive. Con `validar`, no escribe nada (dry-run).
  */
 function accionRecetaUpsert_(req) {
   const r = req.receta;
@@ -300,11 +301,17 @@ function accionRecetaUpsert_(req) {
     reemplazarDeReceta_('Ingredientes', id, v.ingredientes, conservarEdiciones_);
     reemplazarDeReceta_('Pasos', id, v.pasos);
 
+    let capturasPapelera = 0;
     if (bandeja) {
+      const capturas = listaCapturas_(bandeja.datos.capturas);
       Object.assign(bandeja.datos, { estado: 'lista', motivo: '', receta_id: id, actualizado: ahora });
+      if (capturas.length) bandeja.datos.capturas = '';
       escribirFila_('Bandeja', bandeja.fila, bandeja.datos);
+      // Ya cumplieron: quedan 30 días en la papelera, por si hay que reprocesar.
+      if (capturas.length) capturasPapelera = capturasAPapelera_(capturas);
     }
-    return Object.assign({ id: id, foto_url: datos.foto_url, mensaje: '✓ Receta guardada' }, resumen);
+    return Object.assign({ id: id, foto_url: datos.foto_url, mensaje: '✓ Receta guardada' }, resumen,
+      capturasPapelera ? { capturas_papelera: capturasPapelera } : {});
   });
 }
 

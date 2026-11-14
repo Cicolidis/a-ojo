@@ -61,7 +61,7 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 1. **Foto:** `procesamiento/aojo fetch foto <id>` (en un Short usa la miniatura vertical). Miralá con Read. Si no se ve el plato (una cara, una placa con texto, algo crudo), elegí un cuadro del plato terminado con `procesamiento/aojo fetch foto <id> --segundo N` (necesita el video; los segundos salen de los mosaicos), si vino de la web `--url <receta.imagen>` o, si una captura muestra el plato, `--archivo <dir>/capturas/N.jpg`. Si no hay ninguna imagen del plato, guardala sin foto (no mandes una captura de texto).
 2. **Receta:** escribí `<dir>/receta.json` con Write. `dir` es el que devolvió `fetch meta` (`~/.a-ojo/trabajo/<id>`). El formato está en §2.
 3. **Relectura antes de guardar:** volvé a leer la descripción entera (y la receta de la web, si hubo) **línea por línea**. Por cada dato, comprobá que esté en `receta.json`: cantidades, técnicas, advertencias, variantes, rinde, conservación (freezer, heladera, cuántos días) y sugerencias para servir. Hacé lo mismo con lo que se dice en el audio o en los subtítulos. Si falta algo, sumalo antes de mandar.
-4. **Guardar:** `procesamiento/aojo api upsert <id>`. Manda la receta y la foto, y deja la fila en `lista`. Si responde `receta_invalida`, los `detalles` dicen qué corregir: arreglá `receta.json` y volvé a mandar.
+4. **Guardar:** `procesamiento/aojo api upsert <id>`. Manda la receta y la foto, y deja la fila en `lista` (si tenía capturas, la API las manda a la papelera de Drive: ya las tenés en `<dir>/capturas/`). Si responde `receta_invalida`, los `detalles` dicen qué corregir: arreglá `receta.json` y volvé a mandar.
 
 ### 1.4 Cuando algo falla
 

@@ -115,6 +115,25 @@ function guardarCaptura_(nombre, imagen) {
   return carpeta.createFile(Utilities.newBlob(imagen.bytes, imagen.mime, completo)).getId();
 }
 
+/**
+ * Manda a la papelera las capturas con esos ids (cuando su fila ya es una receta).
+ * La papelera de Drive las guarda 30 días. Saltea las que ya no existen. Devuelve cuántas mandó.
+ */
+function capturasAPapelera_(ids) {
+  let enviadas = 0;
+  ids.forEach(id => {
+    try {
+      const archivo = DriveApp.getFileById(id);
+      if (archivo.isTrashed()) return;
+      archivo.setTrashed(true);
+      enviadas++;
+    } catch (err) {
+      // Ya no existe: nada que hacer.
+    }
+  });
+  return enviadas;
+}
+
 /** Las capturas con esos ids, en base64. Saltea las que ya no existen o están en la papelera. */
 function leerCapturas_(ids) {
   const imagenes = [];

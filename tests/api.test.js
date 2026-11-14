@@ -903,6 +903,32 @@ test('capturas.subir las guarda privadas, deja la fila pendiente y no duplica al
   assert.equal(p.get({ action: 'capturas.bajar', t: p.token, bandeja_id: 'b_nada0' }).status, 404);
 });
 
+test('receta.upsert manda a la papelera las capturas de la fila cuando queda lista', () => {
+  const p = proyecto();
+  const id = p.capturar('https://www.instagram.com/reel/Ddthx0exm4L/').data.id;
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'ayuda', motivo: 'Instagram pide login' });
+  p.postJson({ action: 'capturas.subir', t: p.token, bandeja_id: id, lote: 'k3x9a0', imagenes: [FOTO, FOTO] });
+  const capturas = p.drive.archivosVivos();
+  assert.equal(capturas.length, 2);
+
+  // Con validar (dry-run) no toca nada.
+  p.upsert(receta({ fuente_url: 'https://www.instagram.com/reel/Ddthx0exm4L/' }), { bandeja_id: id, validar: true });
+  assert.equal(p.drive.archivosVivos().length, 2);
+  assert.equal(p.filas('Bandeja')[0].capturas.split(',').length, 2);
+
+  // Una ya la habían borrado a mano: se saltea.
+  capturas[1].setTrashed(true);
+  const r = p.upsert(receta({ fuente_url: 'https://www.instagram.com/reel/Ddthx0exm4L/' }), { bandeja_id: id });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.equal(r.data.capturas_papelera, 1);
+  assert.ok(capturas.every(a => a.papelera), 'las dos en la papelera');
+  const fila = p.filas('Bandeja')[0];
+  assert.deepEqual([fila.estado, fila.capturas], ['lista', ''], 'la fila ya no las nombra');
+
+  // Reprocesar sin capturas no manda nada.
+  assert.equal(p.upsert(receta({ fuente_url: 'https://www.instagram.com/reel/Ddthx0exm4L/' }), { bandeja_id: id }).data.capturas_papelera, undefined);
+});
+
 test('compras y capturas piden correr setup() si faltan sus columnas; todo anda sin la hoja Lugares', () => {
   const p = proyecto();
   for (const [hoja, columna] of [['Compras', 'lugar'], ['Bandeja', 'capturas']]) {
