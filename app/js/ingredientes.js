@@ -1,7 +1,7 @@
 // Ingredientes en la ficha: cómo se agrupan por sección y rol, cómo se escalan
 // las cantidades y qué vistas de porciones tiene cada receta. Puro, sin DOM.
 
-import { capitalizar, formatearCantidad } from './formato.js';
+import { capitalizar, formatearCantidad, formatearMinutos } from './formato.js';
 
 export const ROLES = ['principal', 'condimento', 'opcional', 'utensilio'];
 export const NOMBRES_ROL = { principal: 'Principal', condimento: 'Condimento', opcional: 'Opcional', utensilio: 'Utensilio' };
@@ -137,4 +137,49 @@ export function hayQueGuardarVista(receta, n) {
   const vistas = vistasDe(receta);
   if (!base || !(n > 0) || vistas[0] === n) return false;
   return n !== base || vistas.length > 0;
+}
+
+/** Un ingrediente en el texto para compartir: «Chocolate semiamargo: 200 g (picado)». */
+function lineaCompartir(ing, factor, opcional) {
+  const cantidad = formatearCantidad(escalar(ing.cantidad, ing.unidad, factor), ing.unidad);
+  const nota = [String(ing.nota || '').trim(), opcional ? 'opcional' : ''].filter(Boolean)
+    .filter((x, i, xs) => xs.indexOf(x) === i).join(', ');
+  return '- ' + capitalizar(ing.nombre) + (cantidad === 'a ojo' ? '' : ': ' + cantidad) + (nota ? ' (' + nota + ')' : '');
+}
+
+/**
+ * La receta como texto para mandar por WhatsApp: título, porciones, tiempo y molde;
+ * ingredientes por sección (con las cantidades para `porciones`), pasos numerados con
+ * su tip, y el link al video. Con el formato de WhatsApp (*negrita*).
+ */
+export function textoReceta(receta, porciones) {
+  const base = porcionesBase(receta);
+  const n = porciones || base;
+  const factor = base && n ? n / base : 1;
+  const datos = [
+    n ? 'Para ' + n + (n === 1 ? ' porción' : ' porciones') : '',
+    receta.tiempo_min ? formatearMinutos(receta.tiempo_min) : '',
+    receta.molde ? 'Molde ' + receta.molde : '',
+  ].filter(Boolean).join(' · ');
+
+  const { secciones, utensilios } = agrupar(receta.ingredientes);
+  const ingredientes = secciones.map(s => [
+    s.nombre ? '_' + s.nombre + '_' : '',
+    ...s.principales.map(i => lineaCompartir(i, factor, false)),
+    s.condimentos.length ? '- ' + enUnaLinea(s.condimentos, factor) : '',
+    ...s.opcionales.map(i => lineaCompartir(i, factor, true)),
+  ].filter(Boolean).join('\n'));
+  if (utensilios.length) ingredientes.push('También vas a necesitar: ' + enUnaLinea(utensilios, factor).replace(/^./, c => c.toLowerCase()));
+
+  const pasos = (receta.pasos || []).map((p, i) => (i + 1) + '. ' + String(p.texto || '').trim() +
+    (String(p.tip || '').trim() ? '\n   ' + String(p.tip).trim() : ''));
+  const fuente = /^https?:\/\//i.test(String(receta.fuente_url || '')) ? receta.fuente_url : '';
+
+  return [
+    '*' + String(receta.titulo || '').trim() + '*' + (datos ? '\n' + datos : ''),
+    ingredientes.length ? '*Ingredientes*\n' + ingredientes.join('\n\n') : '',
+    factor !== 1 ? 'Ojo: los pasos dicen las cantidades para ' + base + '.' : '',
+    pasos.length ? '*Pasos*\n' + pasos.join('\n') : '',
+    fuente ? (receta.autor ? 'De ' + String(receta.autor).trim() + ': ' : 'El video: ') + fuente : '',
+  ].filter(Boolean).join('\n\n');
 }

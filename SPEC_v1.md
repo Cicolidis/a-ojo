@@ -288,14 +288,14 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
 - Búsqueda local, sin tildes y sin distinguir mayúsculas, sobre título, ingredientes y etiquetas.
 - **Wake Lock API** en el modo cocina: la pantalla no se apaga.
-- **Web Share API** para la lista de compras. Si no está disponible, se abre `https://wa.me/?text=…`.
+- **Web Share API** para la lista de compras y para compartir una receta (`compartirTexto()`, `vistas/controles.js`). Si no está disponible, se abre `https://wa.me/?text=…`.
 - Las capturas se achican en el celular (JPEG de hasta 1600 px) y se mandan directo, sin pasar por la cola: piden conexión.
 - Configuración inicial (URL de la API, token, quién soy) mediante un **link de configuración** único con parámetros, para no tipear nada en el celular.
 - **`share_target`** (§5.3): la app abierta desde Compartir lee los parámetros, limpia la dirección y guarda el link por la cola. Mientras no llega a la API, la Bandeja muestra una fila provisoria (`local`), que se reemplaza por la de verdad cuando baja `todo`. Sin configuración, lo compartido se pierde: se ve la bienvenida, con el aviso «Primero abrí el link de configuración; después volvé a compartirlo».
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande, título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
+2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
@@ -468,6 +468,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
    - *Hecho (14/11):* un `<details>` en la ficha con el origen (`textoOrigen()`, `formato.js`), la confianza y `notas_proceso`. `/recetas` las escribe desde ahora para ellos, sin jerga; las de antes quedan como están.
 6. **Compartir una receta** por WhatsApp, como la lista de compras.
+   - *Hecho (14/11):* botón sobre la foto de la ficha; el texto lo arma `textoReceta()` (`ingredientes.js`), con las porciones de la ficha.
 7. **Editar y borrar notas.**
 8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
 9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.

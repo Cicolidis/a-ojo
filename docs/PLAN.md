@@ -84,7 +84,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [x] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
 - [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (desplegado con la API 0.8.0; falta la prueba con una receta nueva)
 - [x] «Cómo se armó» en la ficha: `notas_proceso`, plegado
-- [ ] Compartir una receta por WhatsApp
+- [x] Compartir una receta por WhatsApp
 - [ ] Editar y borrar notas
 - [ ] Volver a agregar una receta a compras sin perder lo marcado
 - [ ] Pendientes de v2: «¿Qué cocino hoy?» simple, exportación a Obsidian y, si se revisa la decisión, `/recetas` programado

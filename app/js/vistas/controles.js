@@ -203,3 +203,16 @@ export function sinReceta(app, id, falta) {
   }
   return h('div', { class: 'centrada' }, contenido);
 }
+
+/** Comparte un texto (en Android abre el selector, con WhatsApp) o, si no se puede, abre WhatsApp Web. */
+export async function compartirTexto(texto) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: texto });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+}

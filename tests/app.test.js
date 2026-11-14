@@ -918,3 +918,26 @@ test('textoOrigen: de dónde salió la receta, en castellano', async () => {
   assert.equal(textoOrigen(''), '');
   assert.equal(textoOrigen(null), '');
 });
+
+test('textoReceta: la receta para WhatsApp, con las porciones que se están viendo', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const { textoReceta } = await cargar('ingredientes.js');
+  const { porId } = indexar(aplicarDelta(null, fixture()));
+  const brownie = porId.get('r_brown');
+  const texto = textoReceta(brownie);
+  assert.match(texto, /^\*Brownie húmedo con nueces\*\nPara 6 porciones · 45 min · Molde 20×30 cm\n\n\*Ingredientes\*\n- Chocolate semiamargo: 200 g \(picado\)/);
+  assert.match(texto, /\n- Esencia de vainilla \(1 cdita\), sal y pimienta\n/, 'los condimentos en una línea');
+  assert.match(texto, /\n- Nueces: 100 g \(.*opcional\)/);
+  assert.match(texto, /\*Pasos\*\n1\. Precalentá el horno a 170 °C\.\n2\. /);
+  assert.match(texto, /\n   Tiene que salir con el centro todavía blando\./, 'el tip, debajo de su paso');
+  assert.match(texto, /\n\nDe @cocina\.de\.prueba: https:\/\//);
+  assert.doesNotMatch(texto, /Ojo:/);
+
+  const doble = textoReceta(brownie, 12);
+  assert.match(doble, /Para 12 porciones/);
+  assert.match(doble, /- Chocolate semiamargo: 400 g/);
+  assert.match(doble, /Ojo: los pasos dicen las cantidades para 6\./);
+
+  const sinLink = textoReceta(Object.assign({}, brownie, { fuente_url: 'javascript:alert(1)', autor: '' }));
+  assert.doesNotMatch(sinLink, /javascript:/);
+});

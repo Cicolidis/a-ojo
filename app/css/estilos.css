@@ -501,6 +501,8 @@ textarea:focus, input[type="text"]:focus, select:focus {
   z-index: 1;
 }
 
+.ficha-foto .boton-redondo.compartir { left: auto; right: 16px; }
+
 .ficha-cuerpo {
   display: flex;
   flex-direction: column;

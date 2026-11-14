@@ -5,7 +5,7 @@
 import { h, icono, rellenar } from '../dom.js';
 import { LUGARES, REVISAR, armarLista, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
-import { cargando, navegacion, tocarAfueraCierra, vacio } from './controles.js';
+import { cargando, compartirTexto, navegacion, tocarAfueraCierra, vacio } from './controles.js';
 
 export function montar(contenedor, { app, editar }) {
   const sync = h('p', { class: 'estado-sync', role: 'status' });
@@ -146,7 +146,7 @@ export function montar(contenedor, { app, editar }) {
     const todoListo = grupos.length > 0 && grupos.every(g => g.filas.every(f => f.hecho));
     rellenar(zonaAcciones,
       todoListo ? h('p', { class: 'listo-todo' }, icono('check', 18), 'Ya está todo.') : null,
-      texto ? h('button', { type: 'button', class: 'boton-principal', onclick: () => mandar(texto) },
+      texto ? h('button', { type: 'button', class: 'boton-principal', onclick: () => compartirTexto(texto) },
         icono('compartir', 20), 'Mandar por WhatsApp') : null,
       marcados.length ? h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
         editar(nuevaEdicion('compras.quitar', { ids: marcados }));
@@ -181,17 +181,4 @@ export function montar(contenedor, { app, editar }) {
       if (dialogo.open) dialogo.close();
     },
   };
-}
-
-/** Comparte la lista (en Android abre el selector, con WhatsApp) o, si no se puede, abre WhatsApp Web. */
-async function mandar(texto) {
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: texto });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-    }
-  }
-  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
 }

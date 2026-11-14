@@ -5,13 +5,13 @@
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
-import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, vistasDe } from '../ingredientes.js';
+import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoReceta, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
 import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
-import { estrellas, navegacion, segmentado, sinReceta } from './controles.js';
+import { compartirTexto, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
 const ESTADOS = [
   { valor: 'para_probar', nombre: 'Para probar' },
@@ -36,7 +36,10 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
 
   const portada = foto(r, 'ficha-foto');
   portada.prepend(h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Volver', onclick: () => volver('#/') },
-    icono('volver')));
+    icono('volver')),
+  // Compartir la receta (por WhatsApp), con las porciones que se están viendo.
+  h('button', { type: 'button', class: 'boton-redondo compartir', 'aria-label': 'Compartir la receta',
+    onclick: () => compartirTexto(textoReceta(r, app.porciones.get(id))) }, icono('compartir')));
   const titulo = h('h1', { class: 'titulo-receta', tabindex: '-1' });
   const zonaMeta = h('div');
 
