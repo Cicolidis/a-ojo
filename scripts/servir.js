@@ -15,6 +15,7 @@
 // hubiera conexión (para probar la cola offline), y /api-falsa/demorar?segundos=N
 // hace que cada respuesta tarde N segundos (para ver la primera carga; 0 vuelve a lo normal).
 // Con --vacia arranca sin recetas, compras ni bandeja (para ver las pantallas vacías).
+// Escucha solo en 127.0.0.1: la API falsa acepta cualquier edición y no tiene que verse desde la red.
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -206,7 +207,7 @@ http.createServer((req, res) => {
   const archivo = dentroDe(RAIZ, url.pathname.endsWith('/') ? url.pathname + 'index.html' : url.pathname);
   if (!archivo) return res.writeHead(403).end();
   enviarArchivo(res, archivo);
-}).listen(PUERTO, () => {
+}).listen(PUERTO, '127.0.0.1', () => {
   console.log(`A ojo en http://localhost:${PUERTO}/` + (FALSA ? ' (con la API falsa en /api-falsa' + (VACIA ? ', sin datos)' : ')') : ''));
   if (FALSA) {
     const api = encodeURIComponent(`http://localhost:${PUERTO}/api-falsa`);
