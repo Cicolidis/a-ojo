@@ -1,0 +1,3 @@
+# Siempre LF: los scripts de shell (setup.sh, procesamiento/aojo, scripts/*.sh) no
+# corren con CRLF. Importa si alguien clona el repo desde Windows en lugar de WSL.
+* text=auto eol=lf

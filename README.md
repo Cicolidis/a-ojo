@@ -158,7 +158,7 @@ Los íconos de la app (`app/iconos/`) y de la extensión (`extension/icons/`) sa
 
 ## Procesamiento: `/recetas`
 
-Corre a mano, en la computadora donde esté el repo: hoy, la Mac Mini. La computadora de Laura es Windows: para correrlo ahí se va a usar WSL 2 (Fase 6.2, todavía no está). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
+Corre a mano, en la computadora donde esté el repo: la Mac Mini o la de Laura, que es Windows y lo corre dentro de WSL 2 (Ubuntu), con su propia cuenta de Claude Code: ver [`docs/procesar-en-windows.md`](docs/procesar-en-windows.md). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
 
 ### Preparar la computadora (una sola vez)
 
@@ -166,7 +166,7 @@ Corre a mano, en la computadora donde esté el repo: hoy, la Mac Mini. La comput
 ./setup.sh
 ```
 
-Instala ffmpeg, uv y Node con Homebrew si faltan, crea `procesamiento/.venv` con yt-dlp y faster-whisper, baja el modelo `small` de Whisper (unos 500 MB) y prueba la conexión con la API. Se puede volver a correr para actualizar.
+En la Mac instala ffmpeg, uv y Node con Homebrew si faltan; en Linux (WSL 2), ffmpeg con apt y uv con su instalador (Node no hace falta para procesar). Después crea `procesamiento/.venv` con yt-dlp y faster-whisper, baja el modelo `small` de Whisper (unos 500 MB) y prueba la conexión con la API. Se puede volver a correr para actualizar.
 
 Para los Reels de Instagram hace falta un perfil de navegador con la cuenta secundaria y exportar sus cookies una vez desde la Terminal (`procesamiento/aojo fetch cookies`): seguí [`docs/perfil-instagram.md`](docs/perfil-instagram.md).
 
