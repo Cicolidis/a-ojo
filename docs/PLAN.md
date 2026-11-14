@@ -85,7 +85,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (desplegado con la API 0.8.0; falta la prueba con una receta nueva)
 - [x] «Cómo se armó» en la ficha: `notas_proceso`, plegado
 - [x] Compartir una receta por WhatsApp
-- [ ] Editar y borrar notas (implementado; falta publicar en este orden: `npm run deploy` con la API 0.9.0, `setup()` en el editor y recién después el push de la app)
+- [x] Editar y borrar notas
 - [ ] Volver a agregar una receta a compras sin perder lo marcado
 - [ ] Pendientes de v2: «¿Qué cocino hoy?» simple, exportación a Obsidian y, si se revisa la decisión, `/recetas` programado
 
