@@ -74,6 +74,8 @@ npm run push
 
 `setup()` se puede correr de nuevo cuando quieras: solo agrega lo que falte. `verToken()` muestra el token y `rotarToken()` genera uno nuevo.
 
+`setup()` también instala el **backup semanal**: los domingos a las 4, una copia de la planilla en «A ojo/backups», con las últimas 8 (las viejas van a la papelera de Drive). Si todavía no hay ninguna, hace la primera en el momento. Para una copia a mano, corré `hacerBackup` desde el editor. Para volver a un backup, abrilo desde Drive y copiá las hojas que hagan falta.
+
 ### 4. Publicar el web app
 
 El primer deploy crea el web app (ejecuta como vos, con acceso para cualquiera):
@@ -102,7 +104,7 @@ npm run smoke
 
 Deja una fila de prueba de `example.com` en estado `descartada`; se puede borrar a mano.
 
-**Si una versión nueva usa un servicio de Google que antes no usaba** (como Drive en la Fase 2), antes del deploy hay que correr `setup()` en el editor y aceptar el permiso nuevo. Si no, el web app deja de responder hasta que alguien lo acepte.
+**Si una versión nueva usa un servicio de Google que antes no usaba** (como Drive en la Fase 2 o los triggers del backup en la Fase 6), antes del deploy hay que correr `setup()` en el editor y aceptar el permiso nuevo. Si no, el web app deja de responder hasta que alguien lo acepte.
 
 **Si una versión nueva suma columnas u hojas** (como las fases 4a y 4b), también: `npm run push`, `setup()` en el editor y recién ahí `npm run deploy`. Hasta que se corra, las acciones que escriben esas columnas responden «Corré setup()». En la 4b, `setup()` además crea la hoja `Lugares` con el mapa inicial y la carpeta «A ojo/capturas».
 

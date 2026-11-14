@@ -32,11 +32,18 @@ function setup() {
   // La primera vez, esto pide el permiso de Drive (el web app lo necesita para las fotos y las capturas).
   const fotos = carpetaFotos_();
   const capturas = carpetaCapturas_();
+  // Backup semanal (Fase 6): la primera vez pide el permiso de los triggers. Si todavía no hay
+  // ninguna copia, hace una ahora, así se ve enseguida que anda.
+  const backups = carpetaBackups_();
+  const triggerNuevo = instalarBackup_();
+  const primerBackup = hayBackups_() ? null : hacerBackup();
   const token = asegurarToken_();
   console.log('Listo: hojas creadas o actualizadas (' + nombres.join(', ') + ').');
   if (sembrados) console.log('Lugares: ' + sembrados + ' reglas iniciales (se editan desde la app).');
   console.log('Carpeta de fotos: A ojo/' + fotos.getName() + ' (' + fotos.getId() + ').');
   console.log('Carpeta de capturas: A ojo/' + capturas.getName() + ' (' + capturas.getId() + ').');
+  console.log('Backups: A ojo/' + backups.getName() + ', los domingos a las 4, las últimas ' + BACKUPS_A_GUARDAR_ +
+    (triggerNuevo ? ' (trigger recién instalado)' : '') + (primerBackup ? '. Primera copia: «' + primerBackup.nombre + '»' : '') + '.');
   console.log('Token de la API: ' + token);
 }
 

@@ -137,6 +137,8 @@ class PlanillaFalsa {
     this.hojas.splice(pos - 1, 0, this.activa);
   }
   setSpreadsheetTimeZone() {}
+  getId() { return 'planilla-a-ojo'; }
+  getName() { return 'A ojo — datos'; }
 }
 
 function constructorValidacion() {
@@ -164,6 +166,16 @@ class DriveFalso {
     this.raiz = this.carpeta('Mi unidad');
   }
   nuevoId(prefijo) { return prefijo + this.siguiente++; }
+  /** Reloj de Drive: cada archivo nuevo es 1 s más nuevo que el anterior (así se pueden ordenar). */
+  ahora() { this.reloj = (this.reloj || Date.parse('2026-11-01T00:00:00Z')) + 1000; return this.reloj; }
+  /** La planilla también es un archivo de Drive (para makeCopy); sin bytes, no cuenta en archivosVivos(). */
+  registrarPlanilla(planilla) {
+    const a = this.archivo({ getName: () => planilla.getName(), getContentType: () => 'application/vnd.google-apps.spreadsheet', getBytes: () => null });
+    this.porId.delete(a.id);
+    a.id = planilla.getId();
+    this.porId.set(a.id, a);
+    return a;
+  }
   carpeta(nombre) {
     const drive = this;
     const c = {
@@ -175,17 +187,25 @@ class DriveFalso {
       getFoldersByName: n => iterador(c.carpetas.filter(x => x.nombre === n && !x.papelera)),
       createFolder: n => { const nueva = drive.carpeta(n); c.carpetas.push(nueva); return nueva; },
       getFilesByName: n => iterador(c.archivos.filter(x => x.nombre === n && !x.papelera)),
+      getFiles: () => iterador(c.archivos.filter(x => !x.papelera)),
       createFile: blob => { const a = drive.archivo(blob); c.archivos.push(a); return a; },
     };
     this.porId.set(c.id, c);
     return c;
   }
   archivo(blob) {
+    const drive = this;
     const a = {
       id: this.nuevoId('archivo'), nombre: blob.getName(), mime: blob.getContentType(), bytes: blob.getBytes(),
-      papelera: false, acceso: null, permiso: null,
+      papelera: false, acceso: null, permiso: null, creado: this.ahora(),
       getId: () => a.id,
       getName: () => a.nombre,
+      getDateCreated: () => new Date(a.creado),
+      makeCopy: (nombre, carpeta) => {
+        const copia = drive.archivo({ getName: () => nombre, getContentType: () => a.mime, getBytes: () => a.bytes });
+        carpeta.archivos.push(copia);
+        return copia;
+      },
       isTrashed: () => a.papelera,
       setTrashed: x => { a.papelera = x; return a; },
       setSharing: (acceso, permiso) => { a.acceso = acceso; a.permiso = permiso; return a; },
@@ -206,7 +226,7 @@ class DriveFalso {
       },
       getFileById: id => {
         const a = this.porId.get(id);
-        if (!a || !a.bytes) throw new Error('No item with the given ID could be found');
+        if (!a || a.carpetas) throw new Error('No item with the given ID could be found');
         return a;
       },
       Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' },
@@ -219,6 +239,8 @@ class DriveFalso {
 function cargarProyecto() {
   const planilla = new PlanillaFalsa();
   const drive = new DriveFalso();
+  drive.registrarPlanilla(planilla);
+  const triggers = [];
   const propiedades = new Map();
   const registro = [];
   const contexto = {
@@ -243,6 +265,21 @@ function cargarProyecto() {
       }),
     },
     DriveApp: drive.servicio(),
+    ScriptApp: {
+      WeekDay: { SUNDAY: 'SUNDAY' },
+      getProjectTriggers: () => [...triggers],
+      newTrigger: funcion => {
+        const t = { funcion, getHandlerFunction: () => funcion };
+        const b = {
+          timeBased: () => b,
+          everyWeeks: n => { t.cadaSemanas = n; return b; },
+          onWeekDay: d => { t.dia = d; return b; },
+          atHour: h => { t.hora = h; return b; },
+          create: () => { triggers.push(t); return t; },
+        };
+        return b;
+      },
+    },
     Utilities: {
       getUuid: () => crypto.randomUUID(),
       base64Decode: s => {
@@ -265,7 +302,7 @@ function cargarProyecto() {
     vm.runInContext(fs.readFileSync(path.join(dir, archivo), 'utf8'), contexto, { filename: archivo });
   }
   const evaluar = codigo => vm.runInContext(codigo, contexto);
-  return { ctx: contexto, evaluar, planilla, drive, propiedades, registro };
+  return { ctx: contexto, evaluar, planilla, drive, propiedades, registro, triggers };
 }
 
 module.exports = { cargarProyecto };

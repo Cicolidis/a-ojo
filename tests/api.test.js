@@ -92,23 +92,53 @@ test('setup crea las 7 hojas en orden, con encabezados, y borra la hoja por defe
   assert.ok(p.registro.some(l => l.includes(p.token)), 'el token aparece en el registro');
 });
 
-test('setup crea las carpetas "A ojo/fotos" y "A ojo/capturas" una sola vez', () => {
+test('setup crea las carpetas "A ojo/fotos", "A ojo/capturas" y "A ojo/backups" una sola vez', () => {
   const p = proyecto();
   const id = p.propiedades.get('CARPETA_FOTOS');
   const [aOjo] = p.drive.raiz.carpetas;
   assert.equal(aOjo.nombre, 'A ojo');
-  assert.deepEqual(aOjo.carpetas.map(c => c.nombre), ['fotos', 'capturas']);
+  assert.deepEqual(aOjo.carpetas.map(c => c.nombre), ['fotos', 'capturas', 'backups']);
   assert.equal(aOjo.carpetas[0].id, id);
   assert.equal(aOjo.carpetas[1].id, p.propiedades.get('CARPETA_CAPTURAS'));
+  assert.equal(aOjo.carpetas[2].id, p.propiedades.get('CARPETA_BACKUPS'));
   p.ctx.setup();
   assert.equal(p.propiedades.get('CARPETA_FOTOS'), id);
   assert.equal(p.drive.raiz.carpetas.length, 1);
-  assert.equal(aOjo.carpetas.length, 2);
+  assert.equal(aOjo.carpetas.length, 3);
 
   // Si la mandan a la papelera, se crea otra.
   aOjo.carpetas[0].setTrashed(true);
   p.ctx.setup();
   assert.notEqual(p.propiedades.get('CARPETA_FOTOS'), id);
+});
+
+test('setup instala el backup semanal una sola vez y hace la primera copia', () => {
+  const p = proyecto();
+  assert.equal(p.triggers.length, 1);
+  assert.deepEqual([p.triggers[0].funcion, p.triggers[0].cadaSemanas, p.triggers[0].dia, p.triggers[0].hora],
+    ['hacerBackup', 1, 'SUNDAY', 4]);
+  const backups = p.drive.raiz.carpetas[0].carpetas.find(c => c.nombre === 'backups');
+  assert.equal(backups.archivos.length, 1, 'la primera copia, enseguida');
+  assert.match(backups.archivos[0].nombre, /^A ojo — datos · backup \d{4}-\d{2}-\d{2}$/);
+  assert.equal(backups.archivos[0].mime, 'application/vnd.google-apps.spreadsheet');
+
+  p.ctx.setup();
+  assert.equal(p.triggers.length, 1, 'no duplica el trigger');
+  assert.equal(backups.archivos.length, 1, 'ya hay backups: no hace otro');
+  assert.ok(p.registro.some(l => l.startsWith('Backups: A ojo/backups, los domingos')));
+});
+
+test('hacerBackup conserva las últimas 8 copias', () => {
+  const p = proyecto();
+  const backups = p.drive.raiz.carpetas[0].carpetas.find(c => c.nombre === 'backups');
+  let r;
+  for (let i = 0; i < 9; i++) r = p.ctx.hacerBackup();
+  assert.equal(r.borrados, 1, 'la décima copia manda una a la papelera');
+  const vivos = backups.archivos.filter(a => !a.papelera);
+  assert.equal(vivos.length, 8);
+  assert.ok(backups.archivos[0].papelera && backups.archivos[1].papelera, 'las más viejas');
+  assert.equal(vivos.at(-1).id, r.id, 'la recién hecha queda');
+  assert.equal(p.drive.archivosVivos().length, 0, 'las copias no cuentan como fotos ni capturas');
 });
 
 test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
