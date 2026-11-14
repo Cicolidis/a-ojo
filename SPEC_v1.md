@@ -173,6 +173,7 @@ Dónde se compra cada cosa, compartido por los dos:
 | POST | `compras.quitar` | `{ids}` | `{quitados}` (limpiar los marcados, sacar una receta o un ítem) |
 | POST | `lugares.asignar` | `{por, clave, lugar}` | `{por, clave, lugar}` (por ingrediente, `lugar` vacío borra la regla) |
 | GET | `bandeja.pendientes` | — | filas `pendiente` (las usa `/recetas`) |
+| GET | `bandeja.fila` | `{id}` | `{fila}`: una fila cualquiera (`/recetas <id>`, para reprocesar) |
 | POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?}` | `{id, estado, intentos}` (volver a `pendiente` desde `ayuda` o `descartada` reinicia los intentos) |
 | POST | `capturas.subir` | `{bandeja_id, lote, imagenes: [{base64, mime}]}` (hasta 6) | `{id, estado, capturas}`: las guarda en Drive, privadas, y deja la fila en `pendiente` (el `lote` evita duplicarlas al reintentar) |
 | GET | `capturas.bajar` | `{bandeja_id}` | `{imagenes: [{id, nombre, mime, base64}]}` (las usa `/recetas`) |

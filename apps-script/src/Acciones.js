@@ -131,6 +131,15 @@ function accionBandejaPendientes_() {
   return { filas: filas };
 }
 
+/** GET bandeja.fila { id }: una fila cualquiera de la bandeja (la usa `/recetas <id>`), sin bajar `todo` entero. */
+function accionBandejaFila_(req) {
+  const id = String(req.id || '').trim();
+  if (!id) throw errorApi_('sin_id', 400, 'Falta el «id» de la fila.');
+  const fila = leerDatos_('Bandeja').filter(b => b.id === id)[0];
+  if (!fila) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + id + '» en la bandeja.');
+  return { fila: fila };
+}
+
 /**
  * POST bandeja.actualizar { id, estado, motivo?, receta_id? }
  * La usan /recetas y la app (Descartar, Probar de nuevo). Volver a `pendiente`

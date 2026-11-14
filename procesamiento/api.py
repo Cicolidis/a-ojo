@@ -100,10 +100,17 @@ def cmd_pendientes(args):
 
 
 def cmd_fila(args):
-    filas = [f for f in llamar('GET', 'todo')['bandeja'] if f.get('id') == args.bandeja_id]
-    if not filas:
-        fallar('no_encontrada', f'No encontré la fila «{args.bandeja_id}» en la bandeja.')
-    salida({'ok': True, 'fila': {k: filas[0].get(k) for k in RESUMEN_FILA}})
+    try:
+        fila = llamar('GET', 'bandeja.fila', {'id': args.bandeja_id})['fila']
+    except ErrorApi as e:
+        if e.codigo != 'accion_desconocida':
+            raise
+        # Una API desplegada antes de bandeja.fila: se busca en `todo`, como antes.
+        filas = [f for f in llamar('GET', 'todo')['bandeja'] if f.get('id') == args.bandeja_id]
+        if not filas:
+            fallar('no_encontrada', f'No encontré la fila «{args.bandeja_id}» en la bandeja.')
+        fila = filas[0]
+    salida({'ok': True, 'fila': {k: fila.get(k) for k in RESUMEN_FILA}})
 
 
 def cmd_capturar(args):

@@ -388,6 +388,29 @@ class TestCapturas(unittest.TestCase):
             r, codigo = correr_api('capturas', 'b_cap01')
         self.assertEqual((r['error'], codigo), ('sin_capturas', 1))
 
+    def test_fila_usa_bandeja_fila(self):
+        with mock.patch.object(api, 'llamar', return_value={'fila': {'id': 'b_1', 'estado': 'lista', 'otra': 'x'}}) as llamar:
+            r, _ = correr_api('fila', 'b_1')
+        llamar.assert_called_once_with('GET', 'bandeja.fila', {'id': 'b_1'})
+        self.assertEqual((r['fila']['id'], r['fila']['estado']), ('b_1', 'lista'))
+        self.assertNotIn('otra', r['fila'])
+
+    def test_fila_con_una_api_vieja_busca_en_todo(self):
+        def llamar(metodo, accion, datos=None):
+            if accion == 'bandeja.fila':
+                raise api.ErrorApi('accion_desconocida', 'No conozco la acción.', status=404)
+            return {'bandeja': [{'id': 'b_1', 'estado': 'pendiente'}]}
+        with mock.patch.object(api, 'llamar', side_effect=llamar):
+            r, _ = correr_api('fila', 'b_1')
+            self.assertEqual(r['fila']['estado'], 'pendiente')
+            r, codigo = correr_api('fila', 'b_2')
+        self.assertEqual((r['error'], codigo), ('no_encontrada', 1))
+
+    def test_fila_no_encontrada(self):
+        with mock.patch.object(api, 'llamar', side_effect=api.ErrorApi('no_encontrada', 'No encontré la fila.', status=404)):
+            r, codigo = correr_api('fila', 'b_9')
+        self.assertEqual((r['error'], codigo), ('no_encontrada', 1))
+
     def test_las_filas_dicen_si_tienen_capturas(self):
         with mock.patch.object(api, 'llamar', return_value={'filas': [{'id': 'b_1', 'url': 'u', 'capturas': 'x,y'}]}):
             r, _ = correr_api('pendientes')

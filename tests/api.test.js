@@ -265,6 +265,18 @@ test('todo: completo sin since; con since solo lo cambiado (compras y lugares si
   assert.equal(p.get({ action: 'todo', t: p.token, since: 'ayer' }).error, 'since_invalido');
 });
 
+test('bandeja.fila devuelve una fila cualquiera, por id', () => {
+  const p = proyecto();
+  const a = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id: a, estado: 'ayuda', motivo: 'Instagram pide login' });
+  const r = p.get({ action: 'bandeja.fila', t: p.token, id: a });
+  assert.equal(r.ok, true);
+  assert.deepEqual([r.data.fila.id, r.data.fila.estado, r.data.fila.motivo], [a, 'ayuda', 'Instagram pide login']);
+  assert.equal(p.get({ action: 'bandeja.fila', t: p.token, id: 'b_nada' }).error, 'no_encontrada');
+  assert.equal(p.get({ action: 'bandeja.fila', t: p.token }).error, 'sin_id');
+  assert.equal(p.postJson({ action: 'bandeja.fila', t: p.token, id: a }).error, 'metodo_incorrecto');
+});
+
 test('bandeja.pendientes suma las filas trabadas en procesando', () => {
   const p = proyecto();
   const a = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;

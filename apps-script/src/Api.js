@@ -10,7 +10,7 @@
  * Con `formato=texto` responde solo el mensaje en texto plano (para avisos de Android).
  */
 
-const VERSION_API = '0.4.0';
+const VERSION_API = '0.6.0';
 
 function doGet(e) {
   return manejar_(e, 'GET');
@@ -26,6 +26,7 @@ function rutas_() {
     'capturar': { metodos: ['POST'], fn: accionCapturar_ },
     'todo': { metodos: ['GET'], fn: accionTodo_ },
     'bandeja.pendientes': { metodos: ['GET'], fn: accionBandejaPendientes_ },
+    'bandeja.fila': { metodos: ['GET'], fn: accionBandejaFila_ },
     'bandeja.actualizar': { metodos: ['POST'], fn: accionBandejaActualizar_ },
     'receta.upsert': { metodos: ['POST'], fn: accionRecetaUpsert_ },
     'receta.estado': { metodos: ['POST'], fn: accionRecetaEstado_ },
