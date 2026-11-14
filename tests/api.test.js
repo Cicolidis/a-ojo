@@ -267,6 +267,38 @@ test('todo: completo sin since; con since solo lo cambiado (compras y lugares si
   assert.equal(p.get({ action: 'todo', t: p.token, since: 'ayer' }).error, 'since_invalido');
 });
 
+test('bandeja.actualizar con desde: no pisa una fila que cambió mientras tanto', () => {
+  const p = proyecto();
+  const id = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;
+  const actualizar = datos => p.postJson(Object.assign({ action: 'bandeja.actualizar', t: p.token, id }, datos));
+  p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'ayuda', motivo: 'Instagram pide login' });
+
+  // La app la ve en ayuda y pide «Probar de nuevo»: coincide, se aplica.
+  let r = actualizar({ estado: 'pendiente', desde: 'ayuda' });
+  assert.equal(r.ok, true);
+  assert.deepEqual([p.filas('Bandeja')[0].estado, p.filas('Bandeja')[0].intentos], ['pendiente', 0]);
+
+  // Reintento de la cola de algo que ya llegó: ok, sin escribir.
+  const antes = p.filas('Bandeja')[0].actualizado;
+  r = actualizar({ estado: 'pendiente', desde: 'ayuda' });
+  assert.equal(r.ok, true);
+  assert.equal(r.data.estado, 'pendiente');
+  assert.equal(p.filas('Bandeja')[0].actualizado, antes);
+
+  // La Mac la procesó y quedó en lista; un «Descartar» mandado sin conexión llega tarde.
+  p.editar('Bandeja', id, { estado: 'lista', receta_id: 'r_00001' });
+  r = actualizar({ estado: 'descartada', desde: 'pendiente' });
+  assert.deepEqual([r.ok, r.error, r.status], [false, 'estado_cambio', 409]);
+  assert.match(r.mensaje, /ya es una receta/);
+  assert.deepEqual(r.detalles, { estado: 'lista' });
+  assert.deepEqual([p.filas('Bandeja')[0].estado, p.filas('Bandeja')[0].receta_id], ['lista', 'r_00001'], 'no la toca');
+
+  // Sin desde (lo que manda /recetas), como siempre.
+  assert.equal(actualizar({ estado: 'procesando' }).ok, true);
+  assert.equal(p.filas('Bandeja')[0].estado, 'procesando');
+  assert.equal(actualizar({ estado: 'descartada', desde: 'nada' }).error, 'estado_invalido');
+});
+
 test('bandeja.fila devuelve una fila cualquiera, por id', () => {
   const p = proyecto();
   const a = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;

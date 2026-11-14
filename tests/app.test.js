@@ -335,6 +335,7 @@ test('procesarCola: manda en orden, corta sin conexión y descarta lo que la API
   assert.equal(esReintentable(new ErrorApi('falta_columna', 'Corré setup()', 500)), true);
   assert.equal(esReintentable(new ErrorApi('accion_desconocida', 'No conozco', 404)), true, 'la API todavía no se actualizó');
   assert.equal(esReintentable(new ErrorApi('token_invalido', 'Token', 401)), true);
+  assert.equal(esReintentable(new ErrorApi('estado_cambio', 'Ese link ya es una receta', 409)), false, 'la bandeja cambió: se descarta con aviso');
   assert.equal(esReintentable(new ErrorApi('ingredientes_cambiaron', 'Cambió', 409)), false);
 });
 
@@ -605,6 +606,15 @@ test('aplicarEdicion: compras, lugares y bandeja, como la API, e idempotentes', 
   assert.deepEqual([ayuda.estado, ayuda.motivo, ayuda.intentos], ['pendiente', '', 0]);
   d = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00072', estado: 'descartada' }));
   assert.equal(d.bandeja.find(b => b.id === 'b_00072').estado, 'descartada');
+
+  // Con `desde`, como la API: si la fila ya no está así, no se toca.
+  const fila = id => d.bandeja.find(b => b.id === id);
+  d = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00072', estado: 'pendiente', desde: 'ayuda' }));
+  assert.equal(fila('b_00072').estado, 'descartada', 'la vio en ayuda, pero ya estaba descartada');
+  d = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00072', estado: 'pendiente', desde: 'descartada' }));
+  assert.deepEqual([fila('b_00072').estado, fila('b_00072').intentos], ['pendiente', 0]);
+  const otraVez = aplicarEdicion(d, nuevaEdicion('bandeja.actualizar', { id: 'b_00072', estado: 'pendiente', desde: 'descartada' }));
+  assert.deepEqual(otraVez.bandeja, d.bandeja, 'aplicarla dos veces da lo mismo');
   assert.deepEqual(datos.compras, [], 'no cambia los datos originales');
 });
 

@@ -140,17 +140,35 @@ function accionBandejaFila_(req) {
   return { fila: fila };
 }
 
+/** Por qué no se aplicó un cambio de la app: según dónde quedó la fila mientras tanto. */
+const MOTIVOS_ESTADO_CAMBIO_ = {
+  lista: 'Ese link ya es una receta: no lo cambié.',
+  procesando: 'Ese link se está procesando justo ahora: no lo cambié.',
+  pendiente: 'Ese link ya había vuelto a la cola: no lo cambié.',
+  ayuda: 'Ese link volvió a necesitar ayuda: no lo cambié.',
+  descartada: 'Ese link ya estaba descartado: no lo cambié.',
+};
+
 /**
- * POST bandeja.actualizar { id, estado, motivo?, receta_id? }
+ * POST bandeja.actualizar { id, estado, motivo?, receta_id?, desde? }
  * La usan /recetas y la app (Descartar, Probar de nuevo). Volver a `pendiente`
  * desde `ayuda` o `descartada` reinicia los intentos.
+ *
+ * `desde` (la app): el estado que veía la fila. Si mientras tanto cambió (la Mac
+ * la dejó en `lista`, el otro celular la descartó), responde 409 y no la toca:
+ * la cola descarta la edición con un aviso. Si ya está en `estado` (un reintento
+ * de algo que sí llegó), responde ok sin escribir.
  */
 function accionBandejaActualizar_(req) {
   const id = String(req.id || '').trim();
   const estado = String(req.estado || '').trim();
+  const desde = req.desde === undefined || req.desde === null ? '' : String(req.desde).trim();
   if (!id) throw errorApi_('sin_id', 400, 'Falta el «id» de la fila.');
   if (ENUMS.estadoBandeja.indexOf(estado) === -1) {
     throw errorApi_('estado_invalido', 400, '«estado» tiene que ser uno de: ' + ENUMS.estadoBandeja.join(', ') + '.');
+  }
+  if (desde && ENUMS.estadoBandeja.indexOf(desde) === -1) {
+    throw errorApi_('estado_invalido', 400, '«desde» tiene que ser uno de: ' + ENUMS.estadoBandeja.join(', ') + '.');
   }
 
   return conLock_(() => {
@@ -158,6 +176,12 @@ function accionBandejaActualizar_(req) {
     if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + id + '» en la bandeja.');
 
     const datos = encontrada.datos;
+    if (desde && datos.estado === estado) return { id: datos.id, estado: datos.estado, intentos: datos.intentos };
+    if (desde && datos.estado !== desde) {
+      const err = errorApi_('estado_cambio', 409, MOTIVOS_ESTADO_CAMBIO_[datos.estado] || 'Ese link cambió mientras tanto: no lo cambié.');
+      err.detalles = { estado: datos.estado };
+      throw err;
+    }
     if (estado === 'pendiente' && (datos.estado === 'ayuda' || datos.estado === 'descartada')) datos.intentos = 0;
     datos.estado = estado;
     datos.motivo = estado === 'ayuda' ? String(req.motivo || '') : '';

@@ -72,7 +72,8 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
 
   function cambiarEstado(fila, estado, aviso) {
     liberar(fila.id);
-    editar(nuevaEdicion('bandeja.actualizar', { id: fila.id, estado }));
+    // `desde`: si mientras tanto la Mac la procesó o el otro celular la cambió, la API no la pisa.
+    editar(nuevaEdicion('bandeja.actualizar', { id: fila.id, estado, desde: fila.estado }));
     pintar();
     // La tarjeta cambió de lugar o ya no está: el foco vuelve al título.
     titulo.focus();

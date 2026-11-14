@@ -99,6 +99,8 @@ export function aplicarEdicion(datos, { accion, datos: d }) {
       return Object.assign({}, datos, {
         bandeja: datos.bandeja.map(b => {
           if (b.id !== d.id) return b;
+          // Como la API: si la fila ya no está como la vio la app (`desde`), no se toca.
+          if (d.desde && b.estado !== d.desde && b.estado !== d.estado) return b;
           const reinicia = d.estado === 'pendiente' && (b.estado === 'ayuda' || b.estado === 'descartada');
           return Object.assign({}, b, {
             estado: d.estado,

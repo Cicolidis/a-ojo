@@ -14,6 +14,8 @@
 // /api-falsa/cortar?segundos=N la deja sin responder N segundos, como si no
 // hubiera conexión (para probar la cola offline), y /api-falsa/demorar?segundos=N
 // hace que cada respuesta tarde N segundos (para ver la primera carga; 0 vuelve a lo normal).
+// /api-falsa/bandeja?id=…&estado=lista cambia una fila a mano, como si la Mac la hubiera
+// procesado (para probar el `desde` de bandeja.actualizar).
 // Con --vacia arranca sin recetas, compras ni bandeja (para ver las pantallas vacías).
 // Escucha solo en 127.0.0.1: la API falsa acepta cualquier edición y no tiene que verse desde la red.
 
@@ -142,8 +144,14 @@ async function editarFalsa(pedido, ahora) {
   if (recetaId && !todo.recetas.some(r => r.id === recetaId)) {
     return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la receta «' + recetaId + '».', status: 404 };
   }
-  if (action === 'bandeja.actualizar' && !todo.bandeja.some(b => b.id === cuerpo.id)) {
-    return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + cuerpo.id + '» en la bandeja.', status: 404 };
+  if (action === 'bandeja.actualizar') {
+    const fila = todo.bandeja.find(b => b.id === cuerpo.id);
+    if (!fila) return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + cuerpo.id + '» en la bandeja.', status: 404 };
+    // Como la API: con `desde`, si la fila cambió mientras tanto, 409 y no se toca.
+    if (cuerpo.desde && fila.estado !== cuerpo.desde && fila.estado !== cuerpo.estado) {
+      console.log('API falsa: bandeja.actualizar ' + fila.id + ' rechazada (está ' + fila.estado + ')');
+      return { ok: false, error: 'estado_cambio', mensaje: 'Ese link ya está «' + fila.estado + '»: no lo cambié.', status: 409 };
+    }
   }
   datosFalsos = aplicarEdicion(todo, { accion: action, datos: cuerpo });
   const tocar = (lista, id, campos) => lista.map(x => (x.id === id ? Object.assign({}, x, campos) : x));
@@ -187,6 +195,17 @@ http.createServer((req, res) => {
     cortadaHasta = Date.now() + (Number(url.searchParams.get('segundos')) || 30) * 1000;
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('API falsa sin conexión hasta las ' + new Date(cortadaHasta).toLocaleTimeString('es-AR') + '\n');
+  }
+  if (FALSA && url.pathname === '/api-falsa/bandeja') {
+    // Cambia una fila a mano, como si la Mac la hubiera procesado: /api-falsa/bandeja?id=b_00075&estado=lista
+    const id = url.searchParams.get('id');
+    const estado = url.searchParams.get('estado');
+    const todo = datos();
+    if (!todo.bandeja.some(b => b.id === id) || !estado) return res.writeHead(404).end('No existe esa fila (o falta estado)\n');
+    datosFalsos = Object.assign({}, todo, { bandeja: todo.bandeja.map(b => (b.id === id
+      ? Object.assign({}, b, { estado, motivo: '', actualizado: new Date().toISOString() }) : b)) });
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('Fila ' + id + ' en «' + estado + '»\n');
   }
   if (FALSA && url.pathname === '/api-falsa/demorar') {
     const segundos = Number(url.searchParams.get('segundos'));
