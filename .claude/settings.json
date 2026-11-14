@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(~/.a-ojo/**)",
+      "Bash(procesamiento/aojo api *)"
+    ]
+  }
+}

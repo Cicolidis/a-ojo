@@ -31,6 +31,7 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 - El audio se decodifica con ffmpeg, no con PyAV: las versiones nuevas de PyAV rompen la de faster-whisper.
 - macOS no deja que Claude Code lea la carpeta de Chrome. Las cookies de Instagram se exportan desde la Terminal (`procesamiento/aojo fetch cookies`) a `~/.a-ojo/cookies-instagram.txt`, y `comun.args_cookies()` prefiere ese archivo.
 - Las reglas para armar cada receta viven en `.claude/commands/recetas.md`; la validación definitiva la hace `receta.upsert` en la API.
+- Los permisos que necesita `/recetas` van en `.claude/settings.json` (versionado), con rutas `~/.a-ojo/**`: así corre igual en la Mac y en la computadora de Laura. Nada personal ahí; lo de cada uno, en `.claude/settings.local.json` (ignorado).
 
 ## App (`app/`)
 

@@ -1,5 +1,7 @@
 # Secretos y configuración local
 .env
+# Permisos personales de Claude Code (los de /recetas van en .claude/settings.json)
+.claude/settings.local.json
 apps-script/.clasp.json
 .clasprc.json
 
