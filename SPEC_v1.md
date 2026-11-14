@@ -437,6 +437,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
     - *Hecho (14/11):* el nombre visible del perfil de Firefox se resuelve con su `profiles.ini`, también el de Windows desde WSL (`/mnt/c/Users/*/AppData/Roaming/Mozilla/Firefox`), y yt-dlp recibe la ruta de la carpeta.
   - Su propio `.env` (misma URL de la API y mismo token, que se le pasan por privado; sin clasp ni `A_OJO_DEPLOYMENT_ID`, porque no despliega).
   - Una guía `docs/procesar-en-windows.md`: instalar WSL 2, Claude Code adentro de WSL, clonar el repo en el disco de WSL (no en `/mnt/c`, que es lento), correr `./setup.sh` y probar con `/recetas --dry-run`.
+  - *Hecho (14/11):* `setup.sh` acepta Linux con apt; la guía está en `docs/procesar-en-windows.md`, y `.gitattributes` fuerza LF por si se clona desde Windows. Falta la prueba real en la computadora de Laura.
   - Alternativa descartada por ahora: Windows nativo (Claude Code con Git Bash), que pediría un `setup.ps1` y adaptar las rutas del venv (`Scripts\python.exe`).
 
 #### 6.3 Funciones nuevas (de más a menos valor)

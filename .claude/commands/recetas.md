@@ -71,7 +71,7 @@ La receta **alcanza** cuando cada ingrediente importante tiene cantidad (o es le
 | `no_disponible` | `ayuda` con «El video ya no está disponible.» |
 | `limite` | La fila vuelve a `pendiente`. **Cortá la corrida**: la plataforma está limitando. Avisá que conviene esperar un rato |
 | `red` | La fila vuelve a `pendiente` y cortá la corrida |
-| `cookies` | La fila vuelve a `pendiente`. Salteá el resto de Instagram en esta corrida y pedí que corran `procesamiento/aojo fetch cookies` en la Terminal (`docs/perfil-instagram.md`). No lo corras vos: macOS no te deja leer Chrome |
+| `cookies` | La fila vuelve a `pendiente`. Salteá el resto de Instagram en esta corrida y pedí que corran `procesamiento/aojo fetch cookies` en la Terminal (`docs/perfil-instagram.md`; en WSL, con Firefox cerrado). No lo corras vos: en la Mac, macOS no te deja leer Chrome, y en los dos casos hay que volver a entrar a Instagram en el perfil |
 | cualquier otro | Si `intentos` < 3, la fila vuelve a `pendiente`. Si no, `ayuda` con un motivo legible |
 
 Si el video **no es una receta** o, después de todas las capas, no se puede saber ni qué lleva, pasala a `ayuda`: «No encontré la receta en el video. Mandá 2 o 3 capturas.» Si solo faltan algunas cantidades, **no** es `ayuda`: guardala con confianza `baja`.
