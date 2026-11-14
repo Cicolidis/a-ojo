@@ -1238,6 +1238,20 @@ label.boton-principal:focus-within { outline: 2px solid var(--acento); outline-o
 
 .ok-texto { display: flex; align-items: center; gap: 6px; color: var(--ok); font-size: 14px; font-weight: 500; }
 
+.pegar-link { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+.pegar-link label { font-size: 14px; font-weight: 600; color: var(--tinta); }
+
+.pegar-fila { display: flex; gap: 8px; }
+
+.pegar-fila input { flex: 1; min-width: 0; }
+
+.pegar-fila .boton-principal { flex: none; min-height: 44px; padding: 0 18px; border-radius: 14px; font-size: 15px; }
+
+.pegar-link input[aria-invalid="true"] { border-color: var(--alerta); }
+
+.error-campo { color: var(--alerta); font-size: 14px; font-weight: 500; }
+
 .tarjeta-reciente {
   display: flex;
   align-items: center;

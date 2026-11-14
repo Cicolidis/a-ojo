@@ -201,6 +201,11 @@ Las acciones que usa la app son **idempotentes**: la cola offline puede mandar d
 - Feedback: insignia verde "✓" durante 2 segundos, o roja si hubo error.
 - Configuración (URL del web app y token) en la página de opciones de la extensión, guardada en `chrome.storage.local`.
 
+### 5.3 Desde la app
+- **Compartir → A ojo:** el manifest declara un `share_target` (`GET` a `./?titulo=…&texto=…&link=…`). En Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Se abre en la Bandeja, con el aviso «✓ Guardada. Queda esperando a la Mac.» (sin conexión: «Se manda cuando vuelva la conexión.»).
+- **«Pegar un link»** en la Bandeja: para un iPhone, un iPad o una computadora sin la extensión.
+- Las dos van por la **cola offline** con `capturar` (`quien` sale de la configuración): sin conexión, el link espera como «Sin mandar todavía» y se manda cuando vuelve. `capturar` deduplica, así que un reintento no crea otra fila. Si el link ya estaba, el aviso lo dice («Ese link ya estaba en la bandeja», «Ese link ya es una receta» con «Verla», «Estaba descartado: vuelve a la bandeja»). La app compara los links con la misma clave que `normalizarUrl` (`claveLink`, `js/bandeja.js`; un test exige que coincidan); si no se dio cuenta, avisa cuando contesta la API.
+
 ---
 
 ## 6. Procesamiento: comando `/recetas` (Claude Code en la Mac)
@@ -281,6 +286,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - **Web Share API** para la lista de compras. Si no está disponible, se abre `https://wa.me/?text=…`.
 - Las capturas se achican en el celular (JPEG de hasta 1600 px) y se mandan directo, sin pasar por la cola: piden conexión.
 - Configuración inicial (URL de la API, token, quién soy) mediante un **link de configuración** único con parámetros, para no tipear nada en el celular.
+- **`share_target`** (§5.3): la app abierta desde Compartir lee los parámetros, limpia la dirección y guarda el link por la cola. Mientras no llega a la API, la Bandeja muestra una fila provisoria (`local`), que se reemplaza por la de verdad cuando baja `todo`. Sin configuración, lo compartido se pierde: se ve la bienvenida, con el aviso «Primero abrí el link de configuración; después volvé a compartirlo».
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
@@ -294,7 +300,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
    - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
    - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
-5. **Bandeja:** la hora del último procesamiento y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
+5. **Bandeja:** la hora del último procesamiento, «Pegar un link» (un campo y «Guardar»; si el texto no tiene link, lo dice abajo del campo) y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza).
 
 **Estados vacíos y primera carga.**
 - Cada pantalla sin datos lleva un ícono, un título corto, una explicación y, si sirve, una acción: «Borrar la búsqueda», «Ver todas», «Ver las descartadas», «Probá de nuevo», «Volver a la receta».
@@ -445,6 +451,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 
 #### 6.3 Funciones nuevas (de más a menos valor)
 1. **Compartir directo a A ojo.** `share_target` en el manifest: en Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Además, un campo «Pegar un link» en la Bandeja (para iPhone, iPad o una computadora sin la extensión). `capturar` ya deduplica, así que puede ir por la cola.
+   - *Hecho (14/11):* §5.3. Sin cambios en la API. Falta la prueba en Android: Chrome actualiza el manifest de la app instalada solo, pero puede tardar; si «A ojo» no aparece en Compartir, reinstalarla.
 2. **«Algo está mal en esta receta».** Desde la ficha se pide reprocesarla con un texto («la harina son 300 g»). Queda en la bandeja y `/recetas` lo lee como instrucción.
 3. **Quién escribió cada nota.** Un mapa de nombres para mostrar en el código (`camilo` → Camilo, `pareja` → Laura), que usan las notas y cualquier otro texto que nombre a alguien.
 4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesDelPaso()` (`cocina.js`) queda como respaldo para las recetas viejas.

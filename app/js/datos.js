@@ -42,7 +42,9 @@ export function aplicarDelta(datos, resp) {
     compras: resp.compras,
     // Una API de antes de la Fase 4b no la manda.
     lugares: resp.lugares || datos.lugares || [],
-    bandeja: porId(datos.bandeja, resp.bandeja),
+    // Las filas provisorias (`local`, de un link guardado en este celular) se sacan: si la
+    // captura sigue en la cola, aplicarCola() la vuelve a sumar; si ya llegó, viene la de verdad.
+    bandeja: porId(datos.bandeja.filter(b => !b.local), resp.bandeja),
   };
 }
 

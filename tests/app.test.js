@@ -323,13 +323,18 @@ test('procesarCola: manda en orden, corta sin conexión y descarta lo que la API
   assert.deepEqual(enviadas, ['r_1', 'r_2', 'r_3']);
   assert.deepEqual(cola.map(x => x.datos.id), ['r_3', 'r_4'], 'sin conexión, queda para reintentar en orden');
   assert.equal(r.error.codigo, 'red');
-  assert.equal(guardadas, 2);
+  assert.equal(cola[0].reintentada, true, 'queda marcada: si llegó, la respuesta del reintento puede ser «duplicada»');
+  assert.equal(guardadas, 3, 'las dos enviadas y la marca');
 
   r = await procesarCola(cola, async x => {
     if (x.datos.id === 'r_3') throw new ErrorApi('estado_invalido', '«estado» no es válido.', 400);
   });
   assert.deepEqual(cola, []);
   assert.deepEqual([r.enviadas, r.descartadas.length, r.descartadas[0].mensaje, r.error], [1, 1, '«estado» no es válido.', null]);
+
+  const captura = nuevaEdicion('capturar', { url: 'https://youtu.be/a', quien: 'camilo' });
+  r = await procesarCola([captura], async () => ({ duplicada: true, id: 'b_00001' }));
+  assert.deepEqual(r.respuestas, [{ edicion: captura, data: { duplicada: true, id: 'b_00001' } }], 'devuelve lo que respondió la API');
 
   assert.equal(esReintentable(new ErrorApi('ocupado', 'Ocupada', 503)), true);
   assert.equal(esReintentable(new ErrorApi('falta_columna', 'Corré setup()', 500)), true);
@@ -564,6 +569,89 @@ test('agruparBandeja: ayuda, esperando a la Mac, recién llegadas y la última c
   assert.equal(b.descripcionLink({ plataforma: 'web', url: 'https://www.paulinacocina.net/receta/' }), 'paulinacocina.net');
 });
 
+test('links compartidos o pegados: extraerLink, leerCompartido, plataformaDe y mismoLink', async () => {
+  const b = await cargar('bandeja.js');
+  assert.equal(b.extraerLink('Mirá este reel https://www.instagram.com/reel/DdpNR_7N6hm/?igsh=abc.'),
+    'https://www.instagram.com/reel/DdpNR_7N6hm/?igsh=abc', 'saca el punto final');
+  assert.equal(b.extraerLink('(https://youtu.be/cyTOswdJ4TY)'), 'https://youtu.be/cyTOswdJ4TY');
+  assert.equal(b.extraerLink('youtube.com/shorts/a2qRJHVeJwk'), 'https://youtube.com/shorts/a2qRJHVeJwk', 'pegado sin https://');
+  assert.equal(b.extraerLink('una torta riquísima'), null);
+  assert.equal(b.extraerLink(null), null);
+
+  // Instagram manda el link en `texto`; otras apps, en `link`, con el título aparte.
+  assert.equal(b.leerCompartido('?texto=Mir%C3%A1+https%3A%2F%2Fwww.instagram.com%2Freel%2FX%2F'), 'Mirá https://www.instagram.com/reel/X/');
+  assert.equal(b.leerCompartido('?titulo=Brownie&link=https%3A%2F%2Fyoutu.be%2Fa'), 'https://youtu.be/a Brownie');
+  assert.equal(b.leerCompartido(''), null);
+  assert.equal(b.leerCompartido('?otra=cosa'), null);
+
+  assert.equal(b.plataformaDe('https://m.youtube.com/watch?v=abc'), 'youtube');
+  assert.equal(b.plataformaDe('https://youtu.be/abc'), 'youtube');
+  assert.equal(b.plataformaDe('https://www.instagram.com/p/abc/'), 'instagram');
+  assert.equal(b.plataformaDe('https://www.paulinacocina.net/x'), 'web');
+
+});
+
+test('claveLink y mismoLink deduplican igual que normalizarUrl de la API (Url.js)', async () => {
+  const b = await cargar('bandeja.js');
+  const { normalizarUrl } = require('../apps-script/src/Url.js');
+  const links = [
+    'https://youtu.be/cyTOswdJ4TY?si=abc', 'https://www.youtube.com/watch?v=cyTOswdJ4TY', 'https://m.youtube.com/watch?v=cyTOswdJ4TY&feature=share',
+    'https://www.youtube.com/shorts/cyTOswdJ4TY', 'https://www.youtube.com/live/a2qRJHVeJwk', 'https://www.youtube.com/watch?v=a2qRJHVeJwk',
+    'https://www.youtube.com/@paulinacocina', 'https://youtube.com/@paulinacocina/',
+    'https://www.instagram.com/reel/DdpNR_7N6hm/?igsh=x', 'https://instagram.com/reels/DdpNR_7N6hm', 'https://www.instagram.com/fulana/reel/DdpNR_7N6hm/',
+    'https://www.instagram.com/p/Ddthx0exm4L/', 'https://www.instagram.com/fulana/',
+    'https://blog.com/?p=123', 'https://blog.com/?p=456&utm_source=x', 'https://www.blog.com/?p=123&fbclid=y', 'https://blog.com:8080/receta/',
+    'Mirá https://www.paulinacocina.net/torta/.', 'http://paulinacocina.net/torta',
+  ];
+  for (const a of links) {
+    assert.equal(b.claveLink(a), normalizarUrl(a).clave, 'clave de ' + a);
+    for (const c of links) {
+      assert.equal(b.mismoLink(a, c), normalizarUrl(a).clave === normalizarUrl(c).clave, a + ' contra ' + c);
+    }
+  }
+});
+
+test('capturar: una fila provisoria hasta que llega a la API, sin duplicar', async () => {
+  const { aplicarDelta } = await cargar('datos.js');
+  const { aplicarEdicion, aplicarCola, nuevaCaptura } = await cargar('ediciones.js');
+  const datos = aplicarDelta(null, fixture());
+  const ahora = new Date('2026-11-14T15:00:00.000Z');
+
+  assert.equal(nuevaCaptura('sin ningún link', 'pareja'), null);
+  const e = nuevaCaptura('Mirá https://www.instagram.com/reel/NUEVO123/?igsh=x', 'pareja', ahora);
+  assert.deepEqual([e.accion, e.datos], ['capturar', { url: 'https://www.instagram.com/reel/NUEVO123/?igsh=x', quien: 'pareja' }]);
+
+  const d = aplicarCola(datos, [e, e]);
+  const nuevas = d.bandeja.filter(b => b.local);
+  assert.equal(nuevas.length, 1, 'aplicarla dos veces no la duplica');
+  assert.deepEqual([nuevas[0].id, nuevas[0].estado, nuevas[0].plataforma, nuevas[0].creado, nuevas[0].quien],
+    [e.id, 'pendiente', 'instagram', '2026-11-14T15:00:00.000Z', 'pareja']);
+  assert.equal(d.bandeja.length, datos.bandeja.length + 1);
+
+  // Un link que ya está en la bandeja no suma otra fila: la API va a responder `duplicada`.
+  const yaEsta = datos.bandeja[0];
+  const otra = nuevaCaptura(yaEsta.url + '?utm_source=x', 'camilo', ahora);
+  assert.deepEqual(aplicarEdicion(datos, otra).bandeja, datos.bandeja);
+  assert.equal(aplicarEdicion(null, e), null, 'sin datos todavía, queda solo en la cola');
+
+  // Como la API, volver a guardar algo descartado lo devuelve a la bandeja (aunque el link venga con otra forma).
+  const conDescartada = Object.assign({}, datos, { bandeja: datos.bandeja.concat({ id: 'b_00098', url: 'https://www.youtube.com/watch?v=a2qRJHVeJwk',
+    plataforma: 'youtube', estado: 'descartada', motivo: '', intentos: 3, creado: '2026-10-01T10:00:00.000Z', actualizado: '2026-10-01T10:00:00.000Z' }) });
+  const revive = nuevaCaptura('https://youtu.be/a2qRJHVeJwk?si=z', 'camilo', ahora);
+  const vuelta = aplicarCola(conDescartada, [revive, revive]);
+  assert.deepEqual(vuelta.bandeja.filter(f => /a2qRJHVeJwk/.test(f.url)).map(f => [f.id, f.estado, f.intentos]), [['b_00098', 'pendiente', 0]]);
+
+  // Cuando llega a la API, el delta trae la fila de verdad y la provisoria desaparece.
+  const real = { id: 'b_00099', creado: '2026-11-14T15:00:05.000Z', url: 'https://www.instagram.com/reel/NUEVO123/',
+    plataforma: 'instagram', quien: 'pareja', estado: 'pendiente', motivo: '', receta_id: '', intentos: 0, actualizado: '2026-11-14T15:00:05.000Z' };
+  const delta = { ahora: '2026-11-14T15:01:00.000Z', completo: false, recetas: [], ingredientes: [], pasos: [], notas: [],
+    compras: [], lugares: datos.lugares, bandeja: [real] };
+  const despues = aplicarCola(aplicarDelta(d, delta), []);
+  assert.deepEqual(despues.bandeja.filter(b => /NUEVO123/.test(b.url)).map(b => b.id), ['b_00099']);
+  assert.equal(aplicarCola(aplicarDelta(d, Object.assign({}, delta, { bandeja: [] })), [e]).bandeja.filter(b => b.local).length, 1,
+    'si sigue en la cola, la provisoria vuelve');
+});
+
 test('aplicarEdicion: compras, lugares y bandeja, como la API, e idempotentes', async () => {
   const { aplicarDelta } = await cargar('datos.js');
   const { aplicarEdicion, aplicarCola, nuevaEdicion } = await cargar('ediciones.js');
@@ -719,4 +807,15 @@ test('vistaOcupada(): una versión nueva no recarga en el modo cocina ni con alg
   texto = 'Le faltó sal';
   assert.equal(vistaOcupada(ficha), true);
   assert.equal(vistaOcupada({ ocupada: () => 'sí' }), false, 'solo cuenta true');
+});
+
+test('manifest: el share_target abre la app con los parámetros que lee leerCompartido()', async () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(APP, 'manifest.json'), 'utf8'));
+  const st = manifest.share_target;
+  assert.ok(st, 'tiene share_target');
+  assert.equal(st.method, 'GET', 'GET: GitHub Pages es estático y el service worker responde la navegación');
+  assert.equal(new URL(st.action, 'https://x.test/a-ojo/').href, new URL(manifest.scope, 'https://x.test/a-ojo/').href, 'abre la raíz de la app');
+  assert.deepEqual(st.params, { title: 'titulo', text: 'texto', url: 'link' });
+  const { leerCompartido } = await cargar('bandeja.js');
+  assert.equal(leerCompartido('?' + new URLSearchParams({ [st.params.text]: 'https://youtu.be/a' })), 'https://youtu.be/a');
 });

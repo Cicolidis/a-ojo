@@ -11,7 +11,8 @@ export const CACHE_FOTOS = 'a-ojo-fotos';
  * Primero manda las ediciones de la cola; después pide a `todo` lo cambiado (o
  * todo), le vuelve a aplicar lo que haya quedado sin mandar y guarda el snapshot.
  * Sin conexión, falla con el error `red` sin pedir nada más.
- * Devuelve { datos, cambios, descartadas, pendiente } (`pendiente`: por qué quedaron ediciones sin mandar).
+ * Devuelve { datos, cambios, respuestas, descartadas, pendiente } (`respuestas`: lo que contestó la API a cada
+ * edición mandada; `pendiente`: por qué quedaron ediciones sin mandar).
  */
 export async function sincronizar(config, datos, cola) {
   const envio = await procesarCola(cola,
@@ -27,6 +28,7 @@ export async function sincronizar(config, datos, cola) {
   return {
     datos: nuevos,
     cambios: envio.enviadas > 0 || envio.descartadas.length > 0 || trajoCambios(completa ? null : datos, resp),
+    respuestas: envio.respuestas,
     descartadas: envio.descartadas,
     pendiente: envio.error,
   };

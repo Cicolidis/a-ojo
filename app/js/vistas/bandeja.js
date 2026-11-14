@@ -1,7 +1,7 @@
-// Bandeja (#/bandeja): los links que necesitan ayuda (Subir capturas, Descartar,
-// Probar de nuevo), los que esperan a la Mac y las recetas recién llegadas.
-// Descartar y Probar de nuevo van por la cola; las capturas, que pesan, se mandan
-// directo y piden conexión.
+// Bandeja (#/bandeja): «Pegar un link», los links que necesitan ayuda (Subir
+// capturas, Descartar, Probar de nuevo), los que esperan a la Mac y las recetas
+// recién llegadas. Pegar, Descartar y Probar de nuevo van por la cola; las
+// capturas, que pesan, se mandan directo y piden conexión.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { fechaHora } from '../formato.js';
@@ -14,7 +14,7 @@ import { cargando, navegacion, vacio } from './controles.js';
 const MAX_CAPTURAS = 6;
 const CONFIANZA = { alta: 'Confianza alta', media: 'Confianza media', baja: 'Faltan datos' };
 
-export function montar(contenedor, { app, editar, avisar, sincronizar }) {
+export function montar(contenedor, { app, editar, avisar, guardarLink, sincronizar }) {
   const ultima = h('p', { class: 'secundario' });
   const sync = h('p', { class: 'estado-sync', role: 'status' });
   const zona = h('div', { class: 'bandeja-secciones' });
@@ -25,10 +25,45 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
 
   const titulo = h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, 'Bandeja');
 
+  // Pegar un link: para un iPhone, un iPad o una compu sin la extensión. Va por la cola.
+  const errorLink = h('p', { class: 'error-campo', id: 'error-link', role: 'alert', hidden: true },
+    'No encontré un link. Copiá el del video y pegalo acá.');
+  const campoLink = h('input', { type: 'text', id: 'campo-link', inputmode: 'url', autocomplete: 'off',
+    autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done', placeholder: 'https://…',
+    oninput: () => marcarError(false) });
+  const marcarError = conError => {
+    errorLink.hidden = !conError;
+    if (conError) {
+      campoLink.setAttribute('aria-invalid', 'true');
+      campoLink.setAttribute('aria-describedby', 'error-link');
+    } else {
+      campoLink.removeAttribute('aria-invalid');
+      campoLink.removeAttribute('aria-describedby');
+    }
+  };
+  const pegar = h('form', { class: 'pegar-link', onsubmit: e => {
+    e.preventDefault();
+    if (!campoLink.value.trim() || !guardarLink(campoLink.value)) {
+      marcarError(true);
+      campoLink.focus();
+      return;
+    }
+    campoLink.value = '';
+    marcarError(false);
+    // El foco pasa al título: se cierra el teclado del celular, que si no tapa el aviso.
+    titulo.focus({ preventScroll: true });
+  } },
+  h('label', { for: 'campo-link' }, 'Pegar un link'),
+  h('div', { class: 'pegar-fila' },
+    campoLink,
+    h('button', { type: 'submit', class: 'boton-principal' }, 'Guardar')),
+  errorLink);
+
   contenedor.append(h('div', { class: 'bandeja con-navegacion' },
     titulo,
     ultima,
     sync,
+    pegar,
     zona,
   ), nav);
 
@@ -132,13 +167,15 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
 
   function tarjetaEsperando(fila) {
     const n = cuantasCapturas(fila);
-    const estado = fila.estado === 'procesando' ? 'Procesando…'
+    // `local`: la acaban de guardar en este celular y todavía no llegó a la Sheet.
+    const estado = fila.local ? 'Sin mandar todavía'
+      : fila.estado === 'procesando' ? 'Procesando…'
       : (n ? (n === 1 ? 'Con 1 captura · ' : 'Con ' + n + ' capturas · ') : '') + 'Esperando a la Mac';
     return h('li', { class: 'tarjeta-link' },
       cabeza(fila),
       h('div', { class: 'link-pie' },
         h('span', { class: 'secundario' }, estado),
-        fila.estado === 'pendiente' ? h('button', { type: 'button', class: 'boton-texto alerta-texto',
+        fila.estado === 'pendiente' && !fila.local ? h('button', { type: 'button', class: 'boton-texto alerta-texto',
           'aria-label': 'Descartar ' + descripcionLink(fila),
           onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar') : null));
   }
@@ -172,7 +209,7 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
         ? (app.sync.estado === 'sincronizando' ? cargando('Bajando la bandeja…')
           : vacio({ figura: 'aviso', titulo: 'Todavía no se bajó la bandeja', texto: 'Cuando haya conexión, aparece sola.' }))
         : vacio({ figura: 'bandeja', titulo: 'La bandeja está vacía',
-          texto: 'Compartí un video con «Guardar receta» o guardalo desde la extensión.' }),
+          texto: 'Compartí un video con A ojo o pegá el link acá arriba.' }),
     );
     const el = foco && zona.querySelector('[data-foco="' + foco + '"]');
     if (el) el.focus({ preventScroll: true });
@@ -197,6 +234,8 @@ export function montar(contenedor, { app, editar, avisar, sincronizar }) {
   actualizar();
   return {
     actualizar,
+    // Un link pegado sin guardar: una versión nueva de la app espera para recargar.
+    ocupada: () => campoLink.value.trim() !== '',
     desmontar() {
       [...subidas.keys()].forEach(liberar);
     },

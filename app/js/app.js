@@ -4,7 +4,8 @@ import { leerRuta, tituloDe, vistaOcupada } from './rutas.js';
 import { leerConfig, guardarConfig, leerLinkConfig } from './config.js';
 import { leer, guardar, borrar } from './db.js';
 import { indexar } from './datos.js';
-import { aplicarCola, aplicarEdicion } from './ediciones.js';
+import { aplicarCola, aplicarEdicion, nuevaCaptura } from './ediciones.js';
+import { filaDelLink, leerCompartido } from './bandeja.js';
 import { sincronizar, precargarFotos } from './sync.js';
 import { h, rellenar } from './dom.js';
 import * as biblioteca from './vistas/biblioteca.js';
@@ -89,7 +90,7 @@ function mostrar({ enfocar = false } = {}) {
   contenedor.replaceChildren();
   if (ruta.nombre !== 'biblioteca') window.scrollTo(0, 0);
 
-  const ctx = { app, volver, reemplazar, editar, avisar, sincronizar: sincronizarAhora };
+  const ctx = { app, volver, reemplazar, editar, avisar, guardarLink, sincronizar: sincronizarAhora };
   if (!app.config) vista = bienvenida.montar(contenedor, ctx);
   else if (ruta.nombre === 'receta') vista = ficha.montar(contenedor, ctx, ruta.id);
   else if (ruta.nombre === 'cocina') vista = cocina.montar(contenedor, ctx, ruta.id);
@@ -122,13 +123,44 @@ function refrescar() {
  * y la manda cuando se pueda. Las vistas la arman con ediciones.js.
  */
 function editar(edicion) {
-  if (!app.datos) return;
+  // Sin datos todavía, solo un link compartido puede esperar en la cola (la app recién
+  // instalada, antes de la primera sincronización): se aplica cuando baje `todo`.
+  if (!app.datos && edicion.accion !== 'capturar') return;
   app.cola.push(edicion);
   app.datos = aplicarEdicion(app.datos, edicion);
   app.indice = indexar(app.datos);
   guardar('cola', app.cola).catch(err => console.warn('No se pudo guardar la cola:', err));
-  guardar('datos', app.datos).catch(err => console.warn('No se pudieron guardar los datos:', err));
+  if (app.datos) guardar('datos', app.datos).catch(err => console.warn('No se pudieron guardar los datos:', err));
   sincronizarAhora();
+}
+
+/**
+ * Guarda en la bandeja el link de un texto (compartido con la app o pegado en la
+ * Bandeja), por la cola, y avisa cómo quedó. Devuelve false si el texto no tiene link.
+ */
+function guardarLink(texto) {
+  const edicion = nuevaCaptura(texto, app.config.quien);
+  if (!edicion) return false;
+  const ya = filaDelLink(app.datos?.bandeja, edicion.datos.url);
+  // Si ya se sabe que estaba, el aviso sale ahora y no cuando conteste la API.
+  if (ya) edicion.yaEstaba = true;
+  const sinConexion = navigator.onLine === false || app.sync.estado === 'sin_conexion';
+  editar(edicion);
+  refrescar();
+  if (ya) avisarYaEstaba(ya);
+  else avisar(sinConexion ? '✓ Guardada. Se manda cuando vuelva la conexión.' : '✓ Guardada. Queda esperando a la Mac.');
+  return true;
+}
+
+/** Avisa que un link ya estaba guardado, según cómo está su fila (si es receta, con «Verla»). */
+function avisarYaEstaba(fila) {
+  if (fila && fila.estado === 'lista' && app.indice.porId.has(fila.receta_id)) {
+    avisar('Ese link ya es una receta.', { texto: 'Verla', href: '#/receta/' + fila.receta_id });
+  } else if (fila && fila.estado === 'descartada') {
+    avisar('Estaba descartado: vuelve a la bandeja.');
+  } else {
+    avisar('Ese link ya estaba en la bandeja.');
+  }
 }
 
 // Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
@@ -199,7 +231,7 @@ function sincronizarAhora() {
   app.sync = { estado: 'sincronizando', mensaje: '' };
   if (!app.datos) refrescar();
   sincronizando = sincronizar(app.config, app.datos, app.cola)
-    .then(({ datos, cambios, descartadas, pendiente }) => {
+    .then(({ datos, cambios, respuestas, descartadas, pendiente }) => {
       // Las ediciones que se hicieron mientras bajaba `todo` también se ven.
       app.datos = aplicarCola(datos, app.cola);
       app.ultimaSync = Date.now();
@@ -208,6 +240,10 @@ function sincronizarAhora() {
         : { estado: 'ok', mensaje: '' };
       if (cambios) app.indice = indexar(app.datos);
       descartadas.forEach(d => avisar('No se pudo guardar un cambio: ' + d.mensaje));
+      // Un link que no se sabía que estaba (o con otra forma): el aviso sale cuando contesta la API.
+      // Si la edición ya se había intentado mandar, `duplicada` puede ser ella misma: no se avisa.
+      respuestas.filter(r => r.edicion.accion === 'capturar' && !r.edicion.yaEstaba && !r.edicion.reintentada && r.data && r.data.duplicada)
+        .forEach(r => avisarYaEstaba(app.datos.bandeja.find(b => b.id === r.data.id)));
       if (cambios || pendiente || antes === 'sin_conexion' || antes === 'error') refrescar();
       precargarFotos(datos.recetas.map(r => r.foto_url)).catch(() => {});
     })
@@ -264,6 +300,10 @@ async function arrancar() {
     if (app.cola.length || Date.now() - app.ultimaSync > CINCO_MIN_MS) sincronizarAhora();
   });
 
+  // Abierta desde Compartir (el share_target del manifest): se limpia la dirección y se va a la Bandeja.
+  const compartido = leerCompartido(location.search);
+  if (compartido !== null) history.replaceState(null, '', location.pathname + '#/bandeja');
+
   if (leerRuta(location.hash).nombre === 'config') return configurar();
   if (app.config) {
     try {
@@ -276,7 +316,12 @@ async function arrancar() {
     app.indice = indexar(app.datos);
   }
   mostrar();
-  sincronizarAhora();
+  // Sin configuración se ve la bienvenida: no hay adónde mandar lo compartido.
+  if (compartido !== null && !app.config) avisar('Primero abrí el link de configuración; después volvé a compartirlo.');
+  // guardarLink() ya sincroniza (por editar()); si no se guardó nada, se sincroniza acá.
+  const guardado = compartido !== null && app.config && guardarLink(compartido);
+  if (compartido !== null && app.config && !guardado) avisar('No encontré un link en lo que compartiste.');
+  if (!guardado) sincronizarAhora();
 }
 
 arrancar();

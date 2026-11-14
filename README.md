@@ -2,7 +2,7 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 6 (correcciones e infraestructura), en curso.** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
+**Estado: Fase 6 (correcciones e infraestructura), en curso.** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Instalada en Android, aparece en el menú Compartir; en la Bandeja también se puede pegar un link. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages

@@ -2,6 +2,8 @@
 
 Con esto, guardar un Reel queda en 3 toques: **Compartir → HTTP Shortcuts → listo**. Aparece un aviso breve ("✓ Guardada" o "Ya estaba guardada") y el link entra en la bandeja.
 
+> **Con la app A ojo instalada no hace falta este atajo:** en el menú Compartir aparece **A ojo**, que guarda el link en la bandeja (también sin conexión: lo manda cuando vuelve). Si no aparece, desinstalá la app y volvé a instalarla con el link de configuración. El atajo sigue sirviendo si preferís que no se abra la app.
+
 La app puede estar en castellano o en inglés. Cada opción aparece así: **Castellano** (*English*).
 
 ## Qué necesitás

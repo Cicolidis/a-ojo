@@ -6,6 +6,7 @@
 
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
 import { claveIngrediente } from './compras.js';
+import { extraerLink, mismoLink, plataformaDe } from './bandeja.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -32,8 +33,18 @@ export function nuevaNota(recetaId, quien, texto, ahora = new Date()) {
   }, ahora);
 }
 
+/**
+ * Edición para guardar un link en la bandeja (compartido con la app o pegado), o
+ * null si el texto no tiene ningún link. Se manda solo el link: la API lo normaliza
+ * y, si ya estaba, responde `duplicada` sin crear otra fila.
+ */
+export function nuevaCaptura(texto, quien, ahora = new Date()) {
+  const url = extraerLink(texto);
+  return url ? nuevaEdicion('capturar', { url, quien }, ahora) : null;
+}
+
 /** Aplica una edición a los datos locales, como lo haría la API. Devuelve datos nuevos; aplicarla dos veces da lo mismo. */
-export function aplicarEdicion(datos, { accion, datos: d }) {
+export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
   if (!datos) return datos;
   const enReceta = cambios => Object.assign({}, datos, {
     recetas: datos.recetas.map(r => (r.id === d.id ? Object.assign({}, r, cambios(r)) : r)),
@@ -109,6 +120,25 @@ export function aplicarEdicion(datos, { accion, datos: d }) {
           });
         }),
       });
+    case 'capturar': {
+      // Una fila provisoria (`local`), con el id de la edición, hasta que la API mande la de verdad.
+      // Si el link ya está en la bandeja, no se suma otra: la API va a responder `duplicada`.
+      // Como la API, volver a guardar algo descartado lo devuelve a la bandeja.
+      const bandeja = datos.bandeja || [];
+      const ya = bandeja.find(b => b.id === id || mismoLink(b.url, d.url));
+      if (ya && ya.estado === 'descartada') {
+        return Object.assign({}, datos, {
+          bandeja: bandeja.map(b => (b === ya ? Object.assign({}, b, { estado: 'pendiente', motivo: '', intentos: 0 }) : b)),
+        });
+      }
+      if (ya) return datos;
+      return Object.assign({}, datos, {
+        bandeja: bandeja.concat({
+          id, local: true, creado: creada, actualizado: creada, url: d.url, plataforma: plataformaDe(d.url),
+          quien: d.quien, estado: 'pendiente', motivo: '', receta_id: '', intentos: 0, capturas: '',
+        }),
+      });
+    }
     case 'nota.agregar':
       if (datos.notas.some(n => n.id === d.id)) return datos;
       return Object.assign({}, datos, {
@@ -140,23 +170,32 @@ export function esReintentable(err) {
  * Saca de `cola` (la misma lista, así entran las que se sumen mientras tanto) cada
  * una que llega y llama a `alCambiar()` para guardarla. Si una falla y conviene
  * reintentarla, corta ahí; si no, la descarta y sigue.
- * Devuelve { enviadas, descartadas: [{ edicion, mensaje }], error }.
+ * Devuelve { enviadas, respuestas: [{ edicion, data }], descartadas: [{ edicion, mensaje }], error }.
  */
 export async function procesarCola(cola, enviar, alCambiar = () => {}) {
   let enviadas = 0;
+  const respuestas = [];
   const descartadas = [];
   while (cola.length) {
     const edicion = cola[0];
     try {
-      await enviar(edicion);
+      respuestas.push({ edicion, data: await enviar(edicion) });
       enviadas++;
     } catch (err) {
-      if (esReintentable(err)) return { enviadas, descartadas, error: err };
+      if (esReintentable(err)) {
+        // Pudo haber llegado y perderse la respuesta: al reintentar, la API puede contestar
+        // como si ya estuviera (`duplicada` en capturar). Se marca y se guarda.
+        if (!edicion.reintentada) {
+          edicion.reintentada = true;
+          await alCambiar();
+        }
+        return { enviadas, respuestas, descartadas, error: err };
+      }
       descartadas.push({ edicion, mensaje: err.message });
     }
     const i = cola.indexOf(edicion);
     if (i !== -1) cola.splice(i, 1);
     await alCambiar();
   }
-  return { enviadas, descartadas, error: null };
+  return { enviadas, respuestas, descartadas, error: null };
 }

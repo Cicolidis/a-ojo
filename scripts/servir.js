@@ -8,8 +8,8 @@
 // prueba sin el token real. El token de la API falsa es «prueba»:
 //   http://localhost:4173/#/config?api=http%3A%2F%2Flocalhost%3A4173%2Fapi-falsa&t=prueba&quien=camilo
 //
-// La API falsa responde ping y todo, y acepta las ediciones de la app (POST) y
-// capturas.subir: las guarda en memoria, así `todo` las devuelve, hasta que se
+// La API falsa responde ping y todo, y acepta las ediciones de la app (POST),
+// capturar (con la normalización de apps-script/src/Url.js) y capturas.subir: las guarda en memoria, así `todo` las devuelve, hasta que se
 // reinicia el servidor. De las capturas solo guarda ids falsos.
 // /api-falsa/cortar?segundos=N la deja sin responder N segundos, como si no
 // hubiera conexión (para probar la cola offline), y /api-falsa/demorar?segundos=N
@@ -105,6 +105,7 @@ async function apiFalsa(req, url, res) {
   if (q.action === 'ping') return responder({ ok: true, data: { version: 'falsa', ahora, mensaje: 'Conectado' } });
   if (req.method === 'POST' && EDICIONES.includes(q.action)) return responder(await editarFalsa(q, ahora));
   if (req.method === 'POST' && q.action === 'capturas.subir') return responder(subirFalsa(q, ahora));
+  if (req.method === 'POST' && q.action === 'capturar') return responder(capturarFalsa(q, ahora));
   if (q.action !== 'todo') {
     return responder({ ok: false, error: 'accion_desconocida', mensaje: 'La API falsa no conoce «' + q.action + '».', status: 404 });
   }
@@ -167,6 +168,30 @@ async function editarFalsa(pedido, ahora) {
   const detalle = recetaId || cuerpo.id || (cuerpo.ids || []).join(',') || cuerpo.clave || (cuerpo.items || []).map(i => i.nombre).join(', ');
   console.log('API falsa: ' + action + ' ' + detalle);
   return { ok: true, data: { id: cuerpo.id || recetaId } };
+}
+
+/** capturar: como accionCapturar_ (Acciones.js), deduplica por la URL normalizada. */
+function capturarFalsa(q, ahora) {
+  const { normalizarUrl } = require('../apps-script/src/Url.js');
+  if (!['camilo', 'pareja'].includes(q.quien)) return { ok: false, error: 'quien_invalido', mensaje: '«quien» tiene que ser camilo o pareja.', status: 400 };
+  const norm = normalizarUrl(q.url);
+  if (!norm) return { ok: false, error: 'sin_url', mensaje: 'No encontré un link en lo que mandaste.', status: 400 };
+  const todo = datos();
+  const clave = url => (normalizarUrl(url) || { clave: url }).clave;
+  const existente = todo.bandeja.find(b => clave(b.url) === norm.clave);
+  if (existente) {
+    if (existente.estado === 'descartada') {
+      datosFalsos = Object.assign({}, todo, { bandeja: todo.bandeja.map(b => (b === existente
+        ? Object.assign({}, b, { estado: 'pendiente', motivo: '', intentos: 0, actualizado: ahora }) : b)) });
+    }
+    console.log('API falsa: capturar ' + norm.url + ' (duplicada: ' + existente.id + ')');
+    return { ok: true, data: { duplicada: true, id: existente.id, estado: existente.estado === 'descartada' ? 'pendiente' : existente.estado, mensaje: 'Ya estaba guardada' } };
+  }
+  const id = 'b_' + String(todo.bandeja.length + 90000);
+  datosFalsos = Object.assign({}, todo, { bandeja: todo.bandeja.concat({ id, creado: ahora, url: norm.url, plataforma: norm.plataforma,
+    quien: q.quien, estado: 'pendiente', motivo: '', receta_id: '', intentos: 0, actualizado: ahora, capturas: '' }) });
+  console.log('API falsa: capturar ' + norm.url + ' → ' + id);
+  return { ok: true, data: { id, estado: 'pendiente', mensaje: '✓ Guardada' } };
 }
 
 /** capturas.subir: deja la fila pendiente con ids falsos (las imágenes no se guardan). */
