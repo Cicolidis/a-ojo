@@ -6,7 +6,7 @@ import { h, icono } from '../dom.js';
 import { capitalizar, formatearCantidad } from '../formato.js';
 import { NOMBRES_ROL, ROLES, rolDe, seccionDe } from '../ingredientes.js';
 import { nuevaEdicion } from '../ediciones.js';
-import { segmentado, sinReceta } from './controles.js';
+import { confirmar, segmentado, sinReceta } from './controles.js';
 
 // Valor de «Nueva sección…» en los selectores. Empieza con espacio: ninguna sección puede (se guardan sin espacios a los costados).
 const NUEVA = ' nueva';
@@ -27,8 +27,11 @@ export function montar(contenedor, { app, volver, editar }, id) {
     return e.rol !== rolDe(i) || e.seccion !== seccionDe(i);
   });
   const aLaFicha = () => volver('#/receta/' + id);
-  const salir = () => {
-    if (!cambiados().length || confirm('¿Salir sin guardar los cambios?')) aLaFicha();
+  const salir = async () => {
+    if (!cambiados().length) return aLaFicha();
+    const salgo = await confirmar({ titulo: '¿Salir sin guardar los cambios?',
+      texto: 'Lo que cambiaste en los ingredientes se pierde.', si: 'Salir sin guardar', no: 'Seguir editando' });
+    if (salgo) aLaFicha();
   };
   const guardar = () => {
     const lista = cambiados();

@@ -5,6 +5,42 @@ import { h, icono } from '../dom.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
 import { resumenBandeja } from '../datos.js';
 
+/** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
+export function tocarAfueraCierra(dialogo) {
+  dialogo.addEventListener('click', e => {
+    const r = dialogo.getBoundingClientRect();
+    const afuera = e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right;
+    if (e.target === dialogo && afuera) dialogo.close();
+  });
+  return dialogo;
+}
+
+/**
+ * En lugar del confirm del navegador: una hoja inferior con el estilo de la app. Devuelve una
+ * promesa con true si eligen `si`. Tocar afuera, Esc o `no` es false. El foco
+ * arranca en `no` (lo que no pierde nada) y, al cerrar, vuelve a donde estaba.
+ */
+export function confirmar({ titulo, texto, si, no = 'Cancelar' }) {
+  const previo = document.activeElement;
+  return new Promise(resolver => {
+    let respuesta = false;
+    const dialogo = h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-confirmar',
+      'aria-describedby': texto ? 'texto-confirmar' : null },
+      h('h2', { id: 'titulo-confirmar' }, titulo),
+      texto ? h('p', { id: 'texto-confirmar', class: 'secundario' }, texto) : null,
+      h('div', { class: 'hoja-botones' },
+        h('button', { type: 'button', class: 'boton-principal', onclick: () => { respuesta = true; dialogo.close(); } }, si),
+        h('button', { type: 'button', class: 'boton-secundario', autofocus: true, onclick: () => dialogo.close() }, no)));
+    dialogo.addEventListener('close', () => {
+      dialogo.remove();
+      if (previo && previo.isConnected) previo.focus();
+      resolver(respuesta);
+    });
+    document.body.append(tocarAfueraCierra(dialogo));
+    dialogo.showModal();
+  });
+}
+
 /**
  * Selector segmentado: opciones [{ valor, nombre }], con la elegida marcada.
  * `alElegir(valor)` se llama al tocar otra opción.

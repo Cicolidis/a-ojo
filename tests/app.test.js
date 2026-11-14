@@ -689,3 +689,11 @@ test('relleno(): un token --relleno-N que existe en estilos.css, fijo por receta
   assert.equal(relleno('r_abc'), relleno('r_abc'));
   assert.doesNotMatch(fs.readFileSync(path.join(APP, 'js', 'dom.js'), 'utf8'), /#[0-9a-f]{6}\b/i, 'dom.js no tiene colores sueltos');
 });
+
+test('la app no usa confirm(), alert() ni prompt(): van con el estilo de la app (confirmar(), controles.js)', () => {
+  const archivos = fs.readdirSync(path.join(APP, 'js'), { recursive: true }).filter(f => f.endsWith('.js'));
+  for (const f of archivos) {
+    const codigo = fs.readFileSync(path.join(APP, 'js', f), 'utf8');
+    assert.doesNotMatch(codigo, /(^|[^.\w])(confirm|alert|prompt)\(/m, f);
+  }
+});

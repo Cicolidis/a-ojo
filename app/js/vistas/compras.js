@@ -5,20 +5,14 @@
 import { h, icono, rellenar } from '../dom.js';
 import { LUGARES, REVISAR, armarLista, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
-import { cargando, navegacion, vacio } from './controles.js';
+import { cargando, navegacion, tocarAfueraCierra, vacio } from './controles.js';
 
 export function montar(contenedor, { app, editar }) {
   const sync = h('p', { class: 'estado-sync', role: 'status' });
   const zonaRecetas = h('div');
   const zonaLista = h('div', { class: 'compras-lista' });
   const zonaAcciones = h('div', { class: 'compras-acciones' });
-  const dialogo = h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-mover',
-    // Tocar afuera de la hoja (en el fondo oscuro) la cierra.
-    onclick: e => {
-      const r = dialogo.getBoundingClientRect();
-      const afuera = e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right;
-      if (e.target === dialogo && afuera) dialogo.close();
-    } });
+  const dialogo = tocarAfueraCierra(h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-mover' }));
   const nav = navegacion('compras', app);
 
   // Sumar algo a mano. El formulario no se repinta nunca: no pierde lo escrito.

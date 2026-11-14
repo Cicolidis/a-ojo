@@ -1152,7 +1152,7 @@ input[type="checkbox"]:checked::after {
 
 .compras-acciones .boton-texto { align-self: center; }
 
-/* Hoja inferior para mover un ítem de lugar */
+/* Hoja inferior: mover un ítem de lugar y las confirmaciones (confirmar(), controles.js) */
 
 .hoja {
   width: 100%;
@@ -1171,6 +1171,8 @@ input[type="checkbox"]:checked::after {
 .hoja::backdrop { background: var(--velo); }
 
 .hoja h2 { font: 500 22px/1.2 var(--serif); }
+
+.hoja-botones { display: flex; flex-direction: column; gap: 8px; }
 
 .opciones-lugar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 
