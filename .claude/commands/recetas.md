@@ -12,7 +12,7 @@ Argumentos: `$ARGUMENTS`
 
 - Un número `N`: procesá hasta N filas. Sin número, **hasta 10** (YouTube corta con HTTP 429 si se le pide mucho seguido).
 - Un id de la bandeja (ej.: `b_e3cgj`): procesá solo esa fila, esté en el estado que esté (sirve para reprocesar).
-- `--dry-run`: no escribe nada en la Sheet. Pasá `--dry-run` a todos los `api actualizar` y `api upsert` (este último solo valida la receta contra la API).
+- `--dry-run`: no escribe nada en la Sheet. Pasá `--dry-run` a todos los `api actualizar` y `api upsert` (este último solo valida la receta contra la API). En lugar de `api tomar`, que reserva, procesá en orden las filas de `api pendientes --limite N` (o la de `api fila <id>`).
 - `--sin-cookies`: pasáselo a `fetch meta` (para probar Instagram sin la cuenta secundaria).
 - `--clasificar`: no procesa la bandeja. Completa la sección y el rol de los ingredientes de las recetas ya guardadas que no los tienen. Seguí §5 y no hagas nada más.
 
@@ -21,18 +21,24 @@ Todos los comandos se corren **desde la raíz del repo** con `procesamiento/aojo
 ## 0. Arranque
 
 1. `procesamiento/aojo fetch actualizar` (una vez por corrida; si avisa que no pudo actualizar, seguí igual).
-2. Las filas:
-   - Con un id: `procesamiento/aojo api fila <id>`.
-   - Si no: `procesamiento/aojo api pendientes --limite N`. Trae las `pendiente` y las que quedaron trabadas en `procesando` por una corrida cortada.
-3. Si no hay filas, decilo en una línea y terminá. Si hay, decí cuántas vas a procesar y de cuántas en total.
+2. Cuántas hay:
+   - Con un id: `procesamiento/aojo api fila <id>` (para ver en qué estado está).
+   - Si no: `procesamiento/aojo api pendientes`. Solo cuenta: trae las `pendiente` y las que quedaron trabadas en `procesando` por una corrida cortada. **No proceses desde esta lista**: las filas se toman de a una (§1.1), porque puede haber otra corrida a la vez (la computadora de Laura).
+3. Si no hay filas, decilo en una línea y terminá. Si hay, decí cuántas vas a procesar (hasta N) y de cuántas en total.
 
-Procesá las filas **de a una, en orden**. Después de cada una, contá en una línea cómo salió.
+Procesá las filas **de a una**. Después de cada una, contá en una línea cómo salió.
 
 ## 1. Por cada fila
 
-### 1.1 Marcarla
+### 1.1 Tomarla
 
-`procesamiento/aojo api actualizar <id> procesando`. La respuesta trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» y seguí con la próxima.
+`procesamiento/aojo api tomar` (con un id: `api tomar --id <id>`). Reserva la fila más vieja que queda (o esa), la deja en `procesando` y suma un intento: otra corrida ya no la puede tomar. Devuelve `filas` (una, o ninguna) y `quedan`.
+- Si `filas` viene vacía, no queda nada (o lo tomó otra corrida): terminá y andá a §4.
+- Si responde `procesando` (con un id), la tiene otra corrida: decilo y terminá.
+- Si trae `aviso`, la API todavía no tiene `bandeja.tomar`: seguí igual y mencionalo al final (hay que desplegarla).
+- La fila trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» y tomá la próxima.
+
+Cuando termines una fila, volvé a §1.1 hasta procesar N (sin número, 10).
 
 ### 1.2 Capas, solo mientras falten datos
 

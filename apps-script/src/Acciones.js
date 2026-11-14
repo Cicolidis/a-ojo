@@ -124,11 +124,64 @@ function accionTodo_(req) {
  * También devuelve las que quedaron trabadas en `procesando` por una corrida que se cortó.
  */
 function accionBandejaPendientes_() {
-  const limite = Date.now() - MINUTOS_TRABADA_ * 60 * 1000;
-  const filas = leerDatos_('Bandeja')
-    .filter(b => b.estado === 'pendiente' || (b.estado === 'procesando' && !(Date.parse(b.actualizado) > limite)))
-    .sort((a, b) => (a.creado < b.creado ? -1 : a.creado > b.creado ? 1 : 0));
+  const filas = leerDatos_('Bandeja').filter(paraProcesar_).sort(porCreado_);
   return { filas: filas };
+}
+
+/** ¿Una corrida que se cortó dejó esta fila en `procesando` hace más de MINUTOS_TRABADA_? */
+function trabada_(b) {
+  return b.estado === 'procesando' && !(Date.parse(b.actualizado) > Date.now() - MINUTOS_TRABADA_ * 60 * 1000);
+}
+
+/** Lo que /recetas procesa: las `pendiente` y las trabadas. */
+function paraProcesar_(b) {
+  return b.estado === 'pendiente' || trabada_(b);
+}
+
+/** De la más vieja a la más nueva. */
+function porCreado_(a, b) {
+  return a.creado < b.creado ? -1 : a.creado > b.creado ? 1 : 0;
+}
+
+const MAX_TOMAR_ = 20;
+
+/**
+ * POST bandeja.tomar { limite?, id? } (la usa /recetas, de a una)
+ * Reserva filas para procesar dentro del lock: las pasa a `procesando`, suma un
+ * intento y las devuelve. Así dos corridas a la vez (la Mac y la computadora de
+ * Laura) nunca toman la misma. Sin `id`: las de bandeja.pendientes, de la más
+ * vieja a la más nueva, hasta `limite` (1 si no viene). Con `id`: esa fila, esté
+ * como esté (para reprocesar), salvo que otra corrida la esté procesando.
+ * Devuelve { filas, quedan }: `quedan`, cuántas siguen para procesar.
+ */
+function accionBandejaTomar_(req) {
+  const id = String(req.id || '').trim();
+  const limite = req.limite === undefined || req.limite === null || req.limite === '' ? 1 : Number(req.limite);
+  if (!(limite >= 1 && limite <= MAX_TOMAR_ && Math.floor(limite) === limite)) {
+    throw errorApi_('limite_invalido', 400, '«limite» tiene que ser un número entero de 1 a ' + MAX_TOMAR_ + '.');
+  }
+
+  return conLock_(() => {
+    const filas = leerFilas_('Bandeja');
+    let elegidas;
+    if (id) {
+      const encontrada = filas.filter(f => f.datos.id === id)[0];
+      if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + id + '» en la bandeja.');
+      if (encontrada.datos.estado === 'procesando' && !trabada_(encontrada.datos)) {
+        throw errorApi_('procesando', 409, 'Esa fila la está procesando otra corrida. Probá en unos minutos.');
+      }
+      elegidas = [encontrada];
+    } else {
+      elegidas = filas.filter(f => paraProcesar_(f.datos)).sort((a, b) => porCreado_(a.datos, b.datos)).slice(0, limite);
+    }
+
+    const ahora = ahoraIso_();
+    elegidas.forEach(f => {
+      Object.assign(f.datos, { estado: 'procesando', motivo: '', intentos: (Number(f.datos.intentos) || 0) + 1, actualizado: ahora });
+      escribirFila_('Bandeja', f.fila, f.datos);
+    });
+    return { filas: elegidas.map(f => f.datos), quedan: filas.filter(f => paraProcesar_(f.datos)).length };
+  });
 }
 
 /** GET bandeja.fila { id }: una fila cualquiera de la bandeja (la usa `/recetas <id>`), sin bajar `todo` entero. */

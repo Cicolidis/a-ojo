@@ -27,6 +27,7 @@ function rutas_() {
     'todo': { metodos: ['GET'], fn: accionTodo_ },
     'bandeja.pendientes': { metodos: ['GET'], fn: accionBandejaPendientes_ },
     'bandeja.fila': { metodos: ['GET'], fn: accionBandejaFila_ },
+    'bandeja.tomar': { metodos: ['POST'], fn: accionBandejaTomar_ },
     'bandeja.actualizar': { metodos: ['POST'], fn: accionBandejaActualizar_ },
     'receta.upsert': { metodos: ['POST'], fn: accionRecetaUpsert_ },
     'receta.estado': { metodos: ['POST'], fn: accionRecetaEstado_ },

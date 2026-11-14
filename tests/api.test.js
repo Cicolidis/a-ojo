@@ -323,6 +323,50 @@ test('bandeja.pendientes suma las filas trabadas en procesando', () => {
   assert.deepEqual(pendientes(), [a], 'más de 30 minutos: sí');
 });
 
+test('bandeja.tomar reserva de a una: dos corridas no toman la misma fila', () => {
+  const p = proyecto();
+  const a = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;
+  const b = p.capturar('https://youtube.com/shorts/a2qRJHVeJwk').data.id;
+  const c = p.capturar('https://www.instagram.com/reel/Ddthx0exm4L/').data.id;
+  const tomar = (datos = {}) => p.postJson(Object.assign({ action: 'bandeja.tomar', t: p.token }, datos));
+  const fila = id => p.filas('Bandeja').find(f => f.id === id);
+
+  // La Mac y la computadora de Laura piden a la vez: cada una se lleva otra fila.
+  const mac = tomar();
+  const laura = tomar();
+  assert.deepEqual(mac.data.filas.map(f => f.id), [a], 'la más vieja primero');
+  assert.deepEqual(laura.data.filas.map(f => f.id), [b]);
+  assert.deepEqual([mac.data.quedan, laura.data.quedan], [2, 1]);
+  assert.deepEqual([fila(a).estado, fila(a).intentos], ['procesando', 1]);
+  assert.equal(mac.data.filas[0].intentos, 1, 'devuelve los intentos, para la regla de más de 3');
+
+  assert.deepEqual(tomar().data.filas.map(f => f.id), [c]);
+  assert.deepEqual(tomar().data, { filas: [], quedan: 0 }, 'no queda nada');
+
+  // Una corrida que se cortó: a los 30 minutos, la fila se puede volver a tomar.
+  p.editar('Bandeja', b, { actualizado: new Date(Date.now() - 31 * 60 * 1000).toISOString() });
+  const otra = tomar({ limite: 5 });
+  assert.deepEqual(otra.data.filas.map(f => f.id), [b]);
+  assert.equal(fila(b).intentos, 2);
+
+  assert.equal(tomar({ limite: 0 }).error, 'limite_invalido');
+  assert.equal(tomar({ limite: 21 }).error, 'limite_invalido');
+  assert.equal(p.get({ action: 'bandeja.tomar', t: p.token }).error, 'metodo_incorrecto');
+});
+
+test('bandeja.tomar con id: reprocesar una fila, salvo que otra corrida la tenga', () => {
+  const p = proyecto();
+  const a = p.capturar('https://youtube.com/shorts/cyTOswdJ4TY').data.id;
+  const tomar = (datos = {}) => p.postJson(Object.assign({ action: 'bandeja.tomar', t: p.token }, datos));
+  p.editar('Bandeja', a, { estado: 'lista', receta_id: 'r_00001', intentos: 1 });
+
+  const r = tomar({ id: a });
+  assert.deepEqual(r.data.filas.map(f => [f.id, f.estado, f.intentos]), [[a, 'procesando', 2]]);
+  const otra = tomar({ id: a });
+  assert.deepEqual([otra.error, otra.status], ['procesando', 409], 'la tiene otra corrida');
+  assert.equal(tomar({ id: 'b_nada' }).error, 'no_encontrada');
+});
+
 test('receta.upsert crea la receta, sus ingredientes y pasos, y deja la bandeja en lista', () => {
   const p = proyecto();
   const bandejaId = p.capturar('https://youtube.com/shorts/a2qRJHVeJwk').data.id;

@@ -174,6 +174,7 @@ Dónde se compra cada cosa, compartido por los dos:
 | POST | `lugares.asignar` | `{por, clave, lugar}` | `{por, clave, lugar}` (por ingrediente, `lugar` vacío borra la regla) |
 | GET | `bandeja.pendientes` | — | filas `pendiente` (las usa `/recetas`) |
 | GET | `bandeja.fila` | `{id}` | `{fila}`: una fila cualquiera (`/recetas <id>`, para reprocesar) |
+| POST | `bandeja.tomar` | `{limite?, id?}` | `{filas, quedan}`: dentro del lock, pasa a `procesando` (y suma un intento) las próximas para procesar, o la del `id` (409 si otra corrida la tiene). `/recetas` la usa de a una: dos corridas a la vez nunca toman la misma fila |
 | POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?, desde?}` | `{id, estado, intentos}` (volver a `pendiente` desde `ayuda` o `descartada` reinicia los intentos). Con `desde` (la app): si la fila ya no está en ese estado, `409 estado_cambio` sin tocarla; si ya está en `estado`, ok sin escribir |
 | POST | `capturas.subir` | `{bandeja_id, lote, imagenes: [{base64, mime}]}` (hasta 6) | `{id, estado, capturas}`: las guarda en Drive, privadas, y deja la fila en `pendiente` (el `lote` evita duplicarlas al reintentar) |
 | GET | `capturas.bajar` | `{bandeja_id}` | `{imagenes: [{id, nombre, mime, base64}]}` (las usa `/recetas`) |
@@ -207,7 +208,7 @@ Las acciones que usa la app son **idempotentes**: la cola offline puede mandar d
 Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de Python del repo. Claude hace la **extracción y estructuración**; los scripts hacen la **descarga y la transcripción**.
 
 ### 6.1 Flujo por cada link pendiente
-1. `bandeja.actualizar → procesando`.
+1. `bandeja.tomar`: la fila más vieja que queda pasa a `procesando`, reservada (de a una, así otra corrida a la vez no la toma).
 2. **Capa 1: metadatos.** `yt-dlp --skip-download --write-info-json` → título, autor, descripción o caption, miniatura.
    - **Posts de fotos de Instagram** (`/p/…` sin video): `fetch meta` devuelve `sin_video: true`. No hay audio ni fotogramas: la receta sale del caption y, si no alcanza, se piden capturas.
    - **Comentarios del autor (YouTube):** si la descripción está vacía o remite al comentario fijado («receta en los comentarios»), `fetch comentarios` trae, entre los 30 más votados, los del autor o fijados. Se leen como parte de la descripción.

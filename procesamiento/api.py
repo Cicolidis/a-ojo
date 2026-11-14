@@ -2,7 +2,8 @@
 
 Uso (por medio de procesamiento/aojo):
   api ping
-  api pendientes [--limite N]            filas para procesar, de la más vieja a la más nueva
+  api pendientes [--limite N]            filas para procesar, de la más vieja a la más nueva (solo lee)
+  api tomar [--id X] [--dry-run]         reserva la próxima fila (o esa) y la deja en procesando
   api fila <bandeja_id>                  una fila cualquiera de la bandeja
   api capturar <url> [--quien camilo]
   api actualizar <bandeja_id> <estado> [--motivo "…"] [--dry-run]
@@ -12,8 +13,8 @@ Uso (por medio de procesamiento/aojo):
   api ingredientes <receta_id>           la receta guardada: ingredientes con id, pasos y notas
   api clasificar <receta_id> [--dry-run] manda trabajo/<receta_id>/clasificacion.json
 
-Con --dry-run (o A_OJO_DRY_RUN=1) no escribe nada en la Sheet: «actualizar» no
-llama a la API, «upsert» solo valida la receta y «clasificar» solo revisa el archivo.
+Con --dry-run (o A_OJO_DRY_RUN=1) no escribe nada en la Sheet: «tomar» solo lee
+(no reserva), «actualizar» no llama a la API, «upsert» solo valida la receta y «clasificar» solo revisa el archivo.
 El token nunca se imprime.
 """
 import argparse
@@ -99,18 +100,58 @@ def cmd_pendientes(args):
     salida({'ok': True, 'total': len(filas), 'filas': [{k: f.get(k) for k in RESUMEN_FILA} for f in filas[:limite]]})
 
 
-def cmd_fila(args):
+def leer_fila(bandeja_id):
     try:
-        fila = llamar('GET', 'bandeja.fila', {'id': args.bandeja_id})['fila']
+        return llamar('GET', 'bandeja.fila', {'id': bandeja_id})['fila']
     except ErrorApi as e:
         if e.codigo != 'accion_desconocida':
             raise
         # Una API desplegada antes de bandeja.fila: se busca en `todo`, como antes.
-        filas = [f for f in llamar('GET', 'todo')['bandeja'] if f.get('id') == args.bandeja_id]
+        filas = [f for f in llamar('GET', 'todo')['bandeja'] if f.get('id') == bandeja_id]
         if not filas:
-            fallar('no_encontrada', f'No encontré la fila «{args.bandeja_id}» en la bandeja.')
-        fila = filas[0]
+            fallar('no_encontrada', f'No encontré la fila «{bandeja_id}» en la bandeja.')
+        return filas[0]
+
+
+def cmd_fila(args):
+    fila = leer_fila(args.bandeja_id)
     salida({'ok': True, 'fila': {k: fila.get(k) for k in RESUMEN_FILA}})
+
+
+def tomar_sin_reservar(args):
+    """Lo que tomaría `tomar`, sin reservarlo: para --dry-run y para una API que todavía no tiene bandeja.tomar."""
+    if args.id:
+        return [leer_fila(args.id)], None
+    filas = llamar('GET', 'bandeja.pendientes')['filas']
+    return filas[:1], max(len(filas) - 1, 0)
+
+
+def cmd_tomar(args):
+    """Reserva la próxima fila (o la de --id): la deja en procesando y suma un intento.
+
+    Dentro del lock de la API, así dos corridas a la vez (la Mac y la computadora de
+    Laura) no toman la misma. /recetas la llama una vez por fila.
+    """
+    if dry_run(args):
+        filas, quedan = tomar_sin_reservar(args)
+        log(args.id, 'tomar', '(dry-run) ' + ', '.join(f.get('id') for f in filas))
+        salida({'ok': True, 'dry_run': True, 'filas': [{k: f.get(k) for k in RESUMEN_FILA} for f in filas], 'quedan': quedan})
+        return
+    datos = {'id': args.id} if args.id else {'limite': 1}
+    try:
+        r = llamar('POST', 'bandeja.tomar', datos)
+    except ErrorApi as e:
+        if e.codigo != 'accion_desconocida':
+            raise
+        # Una API desplegada antes de bandeja.tomar: como antes, sin reserva atómica.
+        filas, quedan = tomar_sin_reservar(args)
+        for f in filas:
+            f.update(llamar('POST', 'bandeja.actualizar', {'id': f['id'], 'estado': 'procesando'}))
+        r = {'filas': filas, 'quedan': quedan, 'sin_reserva': True}
+    for f in r['filas']:
+        log(f.get('id'), 'tomar', f'procesando (intento {f.get("intentos")})')
+    salida({'ok': True, 'filas': [{k: f.get(k) for k in RESUMEN_FILA} for f in r['filas']], 'quedan': r.get('quedan'),
+            **({'aviso': 'La API todavía no tiene bandeja.tomar: hay que desplegarla.'} if r.get('sin_reserva') else {})})
 
 
 def cmd_capturar(args):
@@ -236,6 +277,11 @@ def main(argv=None):
     s = sub.add_parser('pendientes')
     s.add_argument('--limite', type=int)
     s.set_defaults(fn=cmd_pendientes)
+
+    s = sub.add_parser('tomar')
+    s.add_argument('--id')
+    s.add_argument('--dry-run', action='store_true')
+    s.set_defaults(fn=cmd_tomar)
 
     s = sub.add_parser('fila')
     s.add_argument('bandeja_id')

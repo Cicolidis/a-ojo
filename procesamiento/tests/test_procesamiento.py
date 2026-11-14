@@ -411,6 +411,47 @@ class TestCapturas(unittest.TestCase):
             r, codigo = correr_api('fila', 'b_9')
         self.assertEqual((r['error'], codigo), ('no_encontrada', 1))
 
+    def test_tomar_reserva_la_proxima(self):
+        fila = {'id': 'b_1', 'estado': 'procesando', 'intentos': 2, 'otra': 'x'}
+        with mock.patch.object(api, 'llamar', return_value={'filas': [fila], 'quedan': 4}) as llamar:
+            r, _ = correr_api('tomar')
+        llamar.assert_called_once_with('POST', 'bandeja.tomar', {'limite': 1})
+        self.assertEqual((r['filas'][0]['id'], r['filas'][0]['intentos'], r['quedan']), ('b_1', 2, 4))
+        self.assertNotIn('otra', r['filas'][0])
+        self.assertNotIn('aviso', r)
+
+    def test_tomar_una_fila_por_id(self):
+        with mock.patch.object(api, 'llamar', return_value={'filas': [{'id': 'b_9', 'intentos': 1}], 'quedan': 0}) as llamar:
+            correr_api('tomar', '--id', 'b_9')
+        llamar.assert_called_once_with('POST', 'bandeja.tomar', {'id': 'b_9'})
+
+    def test_tomar_en_dry_run_no_reserva(self):
+        with mock.patch.object(api, 'llamar', return_value={'filas': [{'id': 'b_1'}, {'id': 'b_2'}]}) as llamar:
+            r, _ = correr_api('tomar', '--dry-run')
+        llamar.assert_called_once_with('GET', 'bandeja.pendientes')
+        self.assertEqual(([f['id'] for f in r['filas']], r['quedan'], r['dry_run']), (['b_1'], 1, True))
+
+    def test_tomar_con_una_api_vieja(self):
+        llamadas = []
+
+        def llamar(metodo, accion, datos=None):
+            llamadas.append(accion)
+            if accion == 'bandeja.tomar':
+                raise api.ErrorApi('accion_desconocida', 'No conozco la acción.', status=404)
+            if accion == 'bandeja.pendientes':
+                return {'filas': [{'id': 'b_1', 'estado': 'pendiente'}]}
+            return {'id': 'b_1', 'estado': 'procesando', 'intentos': 1}
+        with mock.patch.object(api, 'llamar', side_effect=llamar):
+            r, _ = correr_api('tomar')
+        self.assertEqual(llamadas, ['bandeja.tomar', 'bandeja.pendientes', 'bandeja.actualizar'])
+        self.assertEqual((r['filas'][0]['estado'], r['filas'][0]['intentos']), ('procesando', 1))
+        self.assertIn('desplegarla', r['aviso'])
+
+    def test_tomar_sin_filas(self):
+        with mock.patch.object(api, 'llamar', return_value={'filas': [], 'quedan': 0}):
+            r, codigo = correr_api('tomar')
+        self.assertEqual((r['ok'], r['filas'], codigo), (True, [], 0))
+
     def test_las_filas_dicen_si_tienen_capturas(self):
         with mock.patch.object(api, 'llamar', return_value={'filas': [{'id': 'b_1', 'url': 'u', 'capturas': 'x,y'}]}):
             r, _ = correr_api('pendientes')
