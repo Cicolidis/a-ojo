@@ -105,6 +105,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | origen_datos | texto | capas usadas: `descripcion,subtitulos,audio,web,frames,capturas` |
 | idioma_original | `es` · `en` · … | si no es `es`, la receta se tradujo |
 | creado · actualizado | fecha-hora ISO | |
+| notas_proceso | texto | nota interna de `/recetas` (§6.2): correcciones de transcripción, supuestos y de dónde salió cada dato. No se muestra en la app |
 | porciones_vistas | texto | vistas de porciones: con cuántas la cocinaron (`12,3,6`), la última primero; hasta 6 |
 
 ### `Ingredientes`
@@ -157,6 +158,7 @@ Dónde se compra cada cosa, compartido por los dos:
 
 | Método | `action` | Entrada | Salida |
 |---|---|---|---|
+| GET o POST | `ping` | — | `{version, ahora, hojas_faltantes, mensaje}` (prueba la conexión y el token: lo usan `setup.sh` y `npm run smoke`) |
 | POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
 | GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
 | POST | `receta.upsert` | receta completa (con ingredientes y pasos) | `{id}` |
@@ -206,7 +208,9 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 ### 6.1 Flujo por cada link pendiente
 1. `bandeja.actualizar → procesando`.
 2. **Capa 1: metadatos.** `yt-dlp --skip-download --write-info-json` → título, autor, descripción o caption, miniatura.
-   - Instagram: siempre con las cookies de la **cuenta secundaria de Instagram dedicada al procesamiento**, nunca las de la cuenta principal de Laura. Esas cookies viven en un **perfil de Chrome separado** ("A ojo – procesamiento") en la computadora donde se corra `/recetas`: `--cookies-from-browser "chrome:A ojo – procesamiento"`. La cuenta secundaria tiene que estar configurada como **mayor de 18** para poder ver Reels con restricción de audiencia.
+   - **Posts de fotos de Instagram** (`/p/…` sin video): `fetch meta` devuelve `sin_video: true`. No hay audio ni fotogramas: la receta sale del caption y, si no alcanza, se piden capturas.
+   - **Comentarios del autor (YouTube):** si la descripción está vacía o remite al comentario fijado («receta en los comentarios»), `fetch comentarios` trae, entre los 30 más votados, los del autor o fijados. Se leen como parte de la descripción.
+   - Instagram: siempre con las cookies de la **cuenta secundaria de Instagram dedicada al procesamiento**, nunca las de la cuenta principal de Laura. Esas cookies viven en un **perfil de Chrome separado** ("A ojo – procesamiento") en la computadora donde se corra `/recetas`: `--cookies-from-browser "chrome:A ojo – procesamiento"`. Como macOS no deja que Claude Code lea la carpeta de Chrome, las cookies se exportan desde la Terminal (`procesamiento/aojo fetch cookies`) a `~/.a-ojo/cookies-instagram.txt`, y ese archivo tiene prioridad. La cuenta secundaria tiene que estar configurada como **mayor de 18** para poder ver Reels con restricción de audiencia.
 3. **Capa 2: subtítulos** (solo YouTube). `--write-auto-subs --sub-langs "es.*,en.*"`.
 4. **Capa 3: link externo.** Si la descripción remite a una web con la receta (ej.: "RECIPE ⬇️ https://…"), se lee esa página.
 5. **Capa 4: audio.** Si con lo anterior faltan cantidades o pasos, se baja el audio y se transcribe con `faster-whisper` (modelo `small`, idioma autodetectado).
@@ -242,7 +246,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 6.4 Robustez
 - **Pausa de 2 a 5 segundos** entre links y **reintento con espera exponencial** ante `HTTP 429`: YouTube limitó las pruebas.
-- `yt-dlp` se actualiza (`-U`) al inicio de cada corrida.
+- `yt-dlp` se actualiza al inicio de cada corrida con `procesamiento/aojo fetch actualizar`. Como está instalado con pip dentro de `procesamiento/.venv`, `yt-dlp -U` no sirve: se actualiza el paquete en el venv (`uv pip install -U`, o pip si no hay uv). Sin conexión, sigue con la versión que hay.
 - Máximo 3 intentos por link; después pasa a `ayuda`.
 - Log local en `~/.a-ojo/log/AAAA-MM-DD.log`.
 - Modo `--dry-run` para probar sin escribir en la Sheet.
@@ -402,8 +406,10 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 #### 6.1 Correcciones y riesgos
 - **Cola offline: estado esperado en la bandeja.** `bandeja.actualizar` recibe un `desde` opcional (el estado que veía la app). Si la fila ya no está en ese estado, responde `409` y la cola descarta la edición con un aviso, igual que `ingredientes_cambiaron`. Así, «Descartar» o «Probar de nuevo» mandados sin conexión no pisan una fila que la Mac ya dejó en `lista`. (`Acciones.js`, `ediciones.js`, `vistas/bandeja.js`, con su caso en `aplicarEdicion()` y su test.)
 - **Timers del modo cocina con la app en segundo plano.** Hoy no suenan si se sale de la app: el chip del timer avisa «Suena con A ojo abierta». Investigar si Chrome en Android permite abrir el temporizador del sistema con un link `intent:`; si no, queda solo el aviso.
+  - *Investigado (14/11):* Chrome solo abre con `intent:` actividades marcadas `BROWSABLE`, y no hay indicios de que la del Reloj que atiende `SET_TIMER` lo esté (no se probó en un celular). **Queda solo el aviso.**
 - **Fotos sin conexión.** Medir en el celular, con `navigator.storage.estimate()`, cuánto ocupa la caché de fotos (las de Drive se guardan como respuestas opacas, que pueden contar mucho más de lo que pesan). Dejar preparada en `urlImagen_()` (`Drive.js`) la alternativa `https://lh3.googleusercontent.com/d/<id>=w1200` por si `drive.google.com/thumbnail` deja de andar.
 - **Links `/share/` de Instagram.** `Url.js` toma `share` como nombre de usuario: `/share/p/X` se normalizaría a `/p/X/` con un id que no es el del post. Probarlo con un link real; si aparece, no canonizarlo y resolver la redirección en `fetch meta`. Con su test en `tests/url.test.js`.
+  - *Revisado (14/11):* entre los 100 links procesados no hay ninguno `/share/`, y el Android de Laura comparte `/reel/<id>/`. **Queda pendiente** hasta que aparezca uno real.
 - **Dos corridas de `/recetas` a la vez** (la Mac y la computadora de Laura): `bandeja.pendientes` no reserva nada, así que las dos podrían tomar la misma fila. Sumar una acción `bandeja.tomar` que, dentro del lock, pase a `procesando` las filas que devuelve, y que `/recetas` la use en lugar de `pendientes` + `actualizar procesando`.
 - **Capturas que quedan en Drive.** Mandarlas a la papelera cuando la fila pasa a `lista` (en `receta.upsert`) o con una limpieza de las de más de 30 días.
 - **`procesamiento/aojo`:** validar el subcomando antes de buscar el `.venv`, así `test_aojo_sin_script_valido` pasa en cualquier máquina (también en CI).

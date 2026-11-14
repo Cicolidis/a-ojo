@@ -2,7 +2,7 @@
 
 App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
 
-**Estado: Fase 5 (pulido).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
+**Estado: Fase 6 (correcciones e infraestructura), en curso.** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
@@ -152,7 +152,7 @@ Los íconos de la app (`app/iconos/`) y de la extensión (`extension/icons/`) sa
 
 ## Procesamiento: `/recetas`
 
-Corre a mano, en la Mac donde esté el repo (la Mac Mini o la computadora de Laura). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
+Corre a mano, en la computadora donde esté el repo: hoy, la Mac Mini. La computadora de Laura es Windows: para correrlo ahí se va a usar WSL 2 (Fase 6.2, todavía no está). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
 
 ### Preparar la computadora (una sola vez)
 
