@@ -1,5 +1,6 @@
 # Publica la PWA (carpeta app/) en GitHub Pages cuando cambia en main.
 # Pages tiene que estar configurado con "Source: GitHub Actions".
+# Antes corre los tests (tests.yml): si alguno falla, no se publica.
 name: App en GitHub Pages
 
 on:
@@ -18,7 +19,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+
   publicar:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

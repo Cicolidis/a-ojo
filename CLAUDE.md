@@ -51,4 +51,5 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 
 - `npm test`: tests de Node, sin dependencias. `tests/fakes/apps-script.js` simula SpreadsheetApp, DriveApp y los demás servicios, incluida la conversión de fechas ISO que hace Sheets cuando una celda no tiene formato de texto.
 - `npm run test:py`: tests de `procesamiento/` (unittest, sin red: yt-dlp y el reloj se simulan).
+- Los dos corren en GitHub Actions (`tests.yml`) sin dependencias: Node sin `npm install` y Python sin el venv, solo la biblioteca estándar. Un test nuevo no puede necesitar yt-dlp, faster-whisper ni ffmpeg de verdad. `pages.yml` publica la app solo si pasan.
 - `npm run smoke`: prueba contra la API desplegada (necesita el `.env`).

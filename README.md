@@ -35,6 +35,8 @@ npm run test:py
 
 (`test:py` necesita el entorno de Python de `./setup.sh`; ver [Procesamiento](#procesamiento-recetas).)
 
+Los dos corren también en GitHub Actions (`.github/workflows/tests.yml`) en cada push y PR. La app se publica en Pages solo si pasan.
+
 ## Puesta en marcha (una sola vez)
 
 Todo lo de clasp pasa por `npm run clasp -- …`, que usa la cuenta indicada en `A_OJO_CLASP_USER` del `.env` (por defecto, `personal`). Así, la cuenta de A ojo convive con cualquier otra sesión de clasp que ya tengas.

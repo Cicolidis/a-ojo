@@ -1,0 +1,29 @@
+# Tests de todo el repo: los de Node (API, app, URLs) y los de procesamiento/.
+# Corren en cada push y PR, y los usa pages.yml antes de publicar la app.
+# No necesitan dependencias: Node sin npm install y Python solo con la biblioteca
+# estándar (yt-dlp y faster-whisper se simulan en los tests).
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Tests de Node
+        run: npm test
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Tests de procesamiento
+        run: python -m unittest discover -s procesamiento/tests
