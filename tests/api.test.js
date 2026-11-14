@@ -1093,3 +1093,43 @@ test('receta.upsert guarda los ingredientes de cada paso (posiciones) y los vali
   assert.equal(p.upsert(conPasos).error, 'falta_columna');
   assert.equal(p.upsert(receta()).ok, true);
 });
+
+test('nota.editar y nota.borrar: idempotentes, y el cambio llega en el delta', async () => {
+  const p = proyecto();
+  const recetaId = p.upsert(receta()).data.id;
+  const id = p.postJson({ action: 'nota.agregar', t: p.token, id: 'n_k3x9a0zq', receta_id: recetaId, quien: 'pareja', texto: 'Con menos azúcar.' }).data.id;
+  const otra = p.postJson({ action: 'nota.agregar', t: p.token, id: 'n_vieja000', receta_id: recetaId, quien: 'camilo', texto: 'La de siempre.' }).data.id;
+  assert.equal(p.filas('Notas').find(n => n.id === otra).borrada, false, 'la celda vacía de «borrada» es false');
+  const nota = () => p.filas('Notas').find(n => n.id === id);
+  const since = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+
+  let r = p.postJson({ action: 'nota.editar', t: p.token, id, texto: '  Con la mitad del azúcar.  ' });
+  assert.deepEqual(r.data, { id, texto: 'Con la mitad del azúcar.' });
+  const editada = nota().actualizado;
+  assert.ok(editada);
+  await new Promise(r => setTimeout(r, 5));
+  p.postJson({ action: 'nota.editar', t: p.token, id, texto: 'Con la mitad del azúcar.' });
+  assert.equal(nota().actualizado, editada, 'el mismo texto no escribe');
+  let delta = p.get({ action: 'todo', t: p.token, since }).data;
+  assert.deepEqual(delta.notas.map(n => [n.id, n.texto]), [[id, 'Con la mitad del azúcar.']],
+    'la editada llega en el delta; la que no se tocó (sin «actualizado»), no');
+
+  r = p.postJson({ action: 'nota.borrar', t: p.token, id });
+  assert.deepEqual(r.data, { id, borrada: true });
+  assert.equal(p.postJson({ action: 'nota.borrar', t: p.token, id }).ok, true, 'borrarla dos veces da lo mismo');
+  assert.equal(nota().borrada, true);
+  delta = p.get({ action: 'todo', t: p.token, since }).data;
+  assert.equal(delta.notas[0].borrada, true, 'la borrada también llega, para que el otro celular la saque');
+
+  r = p.postJson({ action: 'nota.editar', t: p.token, id, texto: 'otra' });
+  assert.deepEqual([r.status, r.error], [409, 'nota_borrada']);
+  assert.equal(p.postJson({ action: 'nota.editar', t: p.token, id: 'n_nohay00', texto: 'x' }).error, 'no_encontrada');
+  assert.equal(p.postJson({ action: 'nota.editar', t: p.token, id, texto: '  ' }).error, 'sin_texto');
+
+  // Sin las columnas nuevas (nadie corrió setup()), no se pierde en silencio.
+  const sh = p.planilla.getSheetByName('Notas');
+  const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  sh.getRange(1, enc.indexOf('borrada') + 1).setValues([['']]);
+  assert.equal(p.postJson({ action: 'nota.borrar', t: p.token, id }).error, 'falta_columna');
+});

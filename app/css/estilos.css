@@ -722,6 +722,10 @@ textarea:focus, input[type="text"]:focus, select:focus {
   font-weight: 500;
 }
 
+.nota-acciones { display: flex; gap: 16px; margin-top: 2px; }
+
+.nota-acciones .boton-texto { font-size: 14px; }
+
 .nota {
   padding: 12px 14px;
   border-radius: 14px;

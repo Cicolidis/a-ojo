@@ -941,3 +941,21 @@ test('textoReceta: la receta para WhatsApp, con las porciones que se están vien
   const sinLink = textoReceta(Object.assign({}, brownie, { fuente_url: 'javascript:alert(1)', autor: '' }));
   assert.doesNotMatch(sinLink, /javascript:/);
 });
+
+test('nota.editar y nota.borrar: como la API, idempotentes, y las borradas no se muestran', async () => {
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const { aplicarCola, nuevaEdicion } = await cargar('ediciones.js');
+  const datos = aplicarDelta(null, fixture());
+  const id = datos.notas.find(n => n.receta_id === 'r_vasca').id;
+  const editar = nuevaEdicion('nota.editar', { id, texto: '  Mejor con menos azúcar.  ' });
+  let d = aplicarCola(datos, [editar, editar]);
+  assert.equal(d.notas.find(n => n.id === id).texto, 'Mejor con menos azúcar.');
+  assert.equal(indexar(d).porId.get('r_vasca').notas[0].texto, 'Mejor con menos azúcar.');
+
+  const borrar = nuevaEdicion('nota.borrar', { id });
+  d = aplicarCola(d, [borrar, borrar]);
+  assert.equal(d.notas.find(n => n.id === id).borrada, true, 'queda en los datos, marcada');
+  assert.deepEqual(indexar(d).porId.get('r_vasca').notas, [], 'pero la ficha no la muestra');
+  d = aplicarCola(d, [nuevaEdicion('nota.editar', { id, texto: 'otra' })]);
+  assert.equal(d.notas.find(n => n.id === id).texto, 'Mejor con menos azúcar.', 'una borrada no se edita');
+});

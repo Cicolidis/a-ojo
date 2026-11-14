@@ -11,7 +11,7 @@ import { recetasEnLista } from '../compras.js';
 import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
-import { compartirTexto, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
+import { compartirTexto, confirmar, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
 const ESTADOS = [
   { valor: 'para_probar', nombre: 'Para probar' },
@@ -336,14 +336,90 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       notas ? h('p', { class: 'notas-proceso' }, notas) : null);
   }
 
+  // Editar una nota: el formulario abierto no se toca al repintar (no pierde lo escrito, el foco ni el
+  // teclado del celular); las demás notas sí se repintan. Se edita una por vez.
+  let editando = null; // { id, form, campo }
+  const cabezaNota = n => (nombreDe(n.quien) || 'Nuestra nota') + ' · ' + fechaCorta(n.fecha) + (n.actualizado ? ' · editada' : '');
+  // Para el lector de pantalla: «la nota de Laura del 12/10» o «nuestra nota del 12/10».
+  const cualNota = n => (nombreDe(n.quien) ? 'la nota de ' + nombreDe(n.quien) : 'nuestra nota') + ' del ' + fechaCorta(n.fecha);
+  // Si «Sumar una nota» está oculto (su formulario está abierto), el foco va a ese formulario.
+  const focoNotas = () => (abrirNota.hidden ? textoNota : abrirNota).focus();
+
+  function terminarEdicion(foco) {
+    editando = null;
+    pintar();
+    const el = foco && listaNotas.querySelector('[data-foco="' + foco + '"]');
+    if (el) el.focus();
+    else focoNotas();
+  }
+
+  async function borrarNota(n) {
+    const texto = n.texto.length > 140 ? n.texto.slice(0, 140) + '…' : n.texto;
+    const si = await confirmar({ titulo: '¿Borrar esta nota?', texto: cabezaNota(n) + ': «' + texto + '»', si: 'Borrar' });
+    if (!si) return;
+    editar(nuevaEdicion('nota.borrar', { id: n.id }));
+    pintar();
+    // La nota (y su botón) ya no están.
+    focoNotas();
+    avisar('Nota borrada.');
+  }
+
+  function empezarEdicion(n) {
+    if (editando) {
+      editando.campo.focus();
+      return avisar('Primero guardá o cancelá la nota que estás editando.');
+    }
+    const campo = h('textarea', { rows: String(Math.min(10, Math.max(3, Math.ceil(n.texto.length / 40)))),
+      maxlength: '2000', 'aria-label': 'Editar ' + cualNota(n) });
+    campo.value = n.texto;
+    const form = h('form', { class: 'nota form-nota', onsubmit: e => {
+      e.preventDefault();
+      const texto = campo.value.trim();
+      if (!texto) return campo.focus();
+      if (texto !== n.texto) editar(nuevaEdicion('nota.editar', { id: n.id, texto }));
+      terminarEdicion('editar:' + n.id);
+    } },
+    h('strong', null, cabezaNota(n)),
+    campo,
+    h('div', { class: 'form-botones' },
+      h('button', { type: 'button', class: 'boton-secundario', onclick: () => terminarEdicion('editar:' + n.id) }, 'Cancelar'),
+      h('button', { type: 'submit', class: 'boton-principal' }, 'Guardar')));
+    listaNotas.querySelector('[data-nota="' + n.id + '"]').replaceWith(form);
+    editando = { id: n.id, form, campo };
+    campo.focus();
+  }
+
+  function tarjetaNota(n) {
+    return h('div', { class: 'nota', 'data-nota': n.id },
+      // Quién la escribió («Laura · 12/10»); una nota sin `quien` queda como «Nuestra nota».
+      h('strong', null, cabezaNota(n)),
+      h('p', null, n.texto),
+      h('div', { class: 'nota-acciones' },
+        h('button', { type: 'button', class: 'boton-texto', 'data-foco': 'editar:' + n.id,
+          'aria-label': 'Editar ' + cualNota(n), onclick: () => empezarEdicion(n) }, 'Editar'),
+        h('button', { type: 'button', class: 'boton-texto alerta-texto', 'data-foco': 'borrar:' + n.id,
+          'aria-label': 'Borrar ' + cualNota(n), onclick: () => borrarNota(n) }, 'Borrar')));
+  }
+
   function pintarNotas() {
     tituloNotas.textContent = r.notas.length > 1 ? 'Nuestras notas' : r.notas.length ? 'Nuestra nota' : 'Notas';
-    rellenar(listaNotas, r.notas.length
-      ? r.notas.map(n => h('div', { class: 'nota' },
-        // Quién la escribió («Laura · 12/10»); una nota sin `quien` queda como «Nuestra nota».
-        h('strong', null, (nombreDe(n.quien) || 'Nuestra nota') + ' · ' + fechaCorta(n.fecha)),
-        h('p', null, n.texto)))
-      : h('p', { class: 'secundario' }, 'Todavía no hay notas. Cuando la cocinen, cuenten cómo salió.'));
+    const form = editando && editando.form.isConnected ? editando.form : null;
+    if (!form) {
+      editando = null;
+      // Si el foco estaba en un botón de una nota (una sincronización repinta), vuelve al mismo.
+      const enfocado = listaNotas.contains(document.activeElement) && document.activeElement.getAttribute('data-foco');
+      rellenar(listaNotas, r.notas.length ? r.notas.map(tarjetaNota)
+        : h('p', { class: 'secundario' }, 'Todavía no hay notas. Cuando la cocinen, cuenten cómo salió.'));
+      const el = enfocado && listaNotas.querySelector('[data-foco="' + enfocado + '"]');
+      if (el) el.focus({ preventScroll: true });
+      return;
+    }
+    // El formulario queda quieto: se repinta lo de alrededor. Si la borraron en el otro celular,
+    // queda arriba hasta guardar (la API avisa) o cancelar.
+    const i = r.notas.findIndex(n => n.id === editando.id);
+    [...listaNotas.children].forEach(c => { if (c !== form) c.remove(); });
+    form.before(...r.notas.slice(0, Math.max(i, 0)).map(tarjetaNota));
+    form.after(...r.notas.slice(i + 1).map(tarjetaNota));
   }
 
   function pintar() {
@@ -366,7 +442,8 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   return {
     actualizar: pintar,
     // Una nota a medio escribir: una versión nueva de la app espera para recargar.
-    ocupada: () => (!formNota.hidden && textoNota.value.trim() !== '') || (!formPedido.hidden && textoPedido.value.trim() !== ''),
+    ocupada: () => (!formNota.hidden && textoNota.value.trim() !== '') || (!formPedido.hidden && textoPedido.value.trim() !== '')
+      || !!editando,
   };
 }
 

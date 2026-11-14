@@ -127,10 +127,10 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 - `ingredientes`: los que usa el paso, como posiciones (`orden`) en la receta, «1,3». Los guarda `/recetas` (en `receta.json`, `"ingredientes": [1, 3]`); no se usan ids porque cambian al reprocesar. Si algún paso de la receta los tiene, un paso vacío no usa ninguno; si ninguno los tiene (las recetas de antes), la app los busca por nombre en el texto.
 
 ### `Notas`
-| id | receta_id | fecha | quien | texto | creado |
-|---|---|---|---|---|---|
+| id | receta_id | fecha | quien | texto | creado | actualizado | borrada |
+|---|---|---|---|---|---|---|---|
 
-Cada vez que cocinan algo, suman una nota: es el **historial de cocción**. `fecha` es la del celular (puede haberla escrito sin conexión) y `creado`, cuándo llegó a la Sheet: con eso se arma el delta de `todo`.
+Cada vez que cocinan algo, suman una nota: es el **historial de cocción**. `fecha` es la del celular (puede haberla escrito sin conexión) y `creado`, cuándo llegó a la Sheet: con eso se arma el delta de `todo`. Las notas se editan y se borran desde la ficha: `actualizado` dice cuándo, para que el cambio llegue en el delta, y una nota borrada queda en la Sheet con `borrada` (la app no la muestra). Si los dos editan la misma nota sin conexión, gana la que llega última a la Sheet. Una nota editada dice «· editada» al lado de la fecha.
 
 ### `Compras`
 | id | receta_id (o vacío si se agregó a mano) | nombre | cantidad | unidad | gondola | hecho (bool) | creado | rol | lugar | porciones |
@@ -171,6 +171,8 @@ Dónde se compra cada cosa, compartido por los dos:
 | POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
 | POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (`/recetas --clasificar`: todos los ingredientes) |
 | POST | `nota.agregar` | `{id?, receta_id, quien, texto, fecha?}` | `{id}` (con el id de la app, un reintento no la duplica) |
+| POST | `nota.editar` | `{id, texto}` | `{id, texto}` (con el mismo texto no escribe; una borrada da `409 nota_borrada`) |
+| POST | `nota.borrar` | `{id}` | `{id, borrada}` (la marca como borrada; idempotente) |
 | POST | `compras.agregar` | `{receta_id?, porciones?, items: [{id, nombre, cantidad, unidad, gondola, rol, lugar?}]}` | `{ids, nuevos, quitados}` (suma lo que no está; con `receta_id`, lo de esa receta que no vino se borra: volver a agregarla la reemplaza) |
 | POST | `compras.marcar` | `{ids, hecho}` | `{ids, hecho}` |
 | POST | `compras.mover` | `{ids, lugar}` | `{ids, lugar}` (`lugar` vacío: el de la regla) |
@@ -295,7 +297,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
 1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", buscador, chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota") y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
+2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota"), cada una con "Editar" y "Borrar" (pide confirmación; los dos pueden editar o borrar cualquiera) y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
    - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
@@ -470,6 +472,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 6. **Compartir una receta** por WhatsApp, como la lista de compras.
    - *Hecho (14/11):* botón sobre la foto de la ficha; el texto lo arma `textoReceta()` (`ingredientes.js`), con las porciones de la ficha.
 7. **Editar y borrar notas.**
+   - *Hecho (14/11):* `nota.editar` y `nota.borrar` (API 0.9.0), columnas `actualizado` y `borrada` en `Notas`. Decidido: los dos pueden editar o borrar cualquier nota; borrar pide confirmación.
 8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
 9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.
 

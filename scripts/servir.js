@@ -78,7 +78,7 @@ const datos = () => (datosFalsos ||= Object.assign(
 let cortadaHasta = 0;
 let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
-  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir'];
+  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir', 'nota.editar', 'nota.borrar'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -124,7 +124,7 @@ async function apiFalsa(req, url, res) {
       recetas,
       ingredientes: todo.ingredientes.filter(i => ids.has(i.receta_id)),
       pasos: todo.pasos.filter(p => ids.has(p.receta_id)),
-      notas: todo.notas.filter(n => cambio(n.creado || n.fecha)),
+      notas: todo.notas.filter(n => cambio(n.creado || n.fecha) || (n.actualizado && cambio(n.actualizado))),
       compras: todo.compras,
       lugares: todo.lugares || [],
       bandeja: todo.bandeja.filter(b => cambio(b.actualizado)),
@@ -154,6 +154,11 @@ async function editarFalsa(pedido, ahora) {
       return { ok: false, error: 'estado_cambio', mensaje: 'Ese link ya está «' + fila.estado + '»: no lo cambié.', status: 409 };
     }
   }
+  if (action === 'nota.editar' || action === 'nota.borrar') {
+    const nota = todo.notas.find(n => n.id === cuerpo.id);
+    if (!nota) return { ok: false, error: 'no_encontrada', mensaje: 'No encontré esa nota: puede que la hayan borrado.', status: 404 };
+    if (action === 'nota.editar' && nota.borrada) return { ok: false, error: 'nota_borrada', mensaje: 'Esa nota ya estaba borrada: no la cambié.', status: 409 };
+  }
   if (action === 'receta.corregir') {
     const suya = todo.bandeja.filter(b => b.receta_id === recetaId).sort((a, b) => String(b.creado).localeCompare(String(a.creado)))[0];
     if (suya && suya.estado === 'procesando') {
@@ -171,7 +176,9 @@ async function editarFalsa(pedido, ahora) {
     console.log('API falsa: receta.corregir ' + recetaId + ' → ' + (fila ? fila.id + ' ' + fila.estado + ' «' + (fila.pedido || '') + '»' : 'sin fila'));
     return { ok: true, data: { id: fila ? fila.id : null, receta_id: recetaId, estado: fila ? fila.estado : null, pedido: fila ? fila.pedido || '' : '' } };
   }
-  if (action === 'nota.agregar') {
+  if (action === 'nota.editar' || action === 'nota.borrar') {
+    datosFalsos.notas = tocar(datosFalsos.notas, cuerpo.id, { actualizado: ahora });
+  } else if (action === 'nota.agregar') {
     datosFalsos.notas = datosFalsos.notas.map(n => (n.id === cuerpo.id && !n.creado ? Object.assign({}, n, { creado: ahora }) : n));
   } else if (action.startsWith('receta.')) {
     datosFalsos.recetas = tocar(datosFalsos.recetas, recetaId, { actualizado: ahora });

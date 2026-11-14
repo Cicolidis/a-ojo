@@ -205,10 +205,13 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 | POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento; volver a `pendiente` desde `ayuda` o `descartada` los reinicia |
 | POST | `receta.upsert` | `{ receta, bandeja_id?, foto?, validar? }` | `{ id, nueva, foto_url, ingredientes, pasos }`. Ver abajo |
 | POST | `receta.estado` | `{ id, estado?, valoracion? }` | `{ id, estado, valoracion }` |
+| POST | `receta.corregir` | `{ id, texto, quien? }` | `{ id, receta_id, estado, pedido }`. «Algo está mal en esta receta»: deja el pedido en la fila de la receta, en `pendiente`. Sin `texto`, lo cancela |
 | POST | `receta.porciones` | `{ id, porciones, quitar? }` | `{ id, porciones_vistas }`: la vista pasa al frente (o se saca) |
 | POST | `receta.ingredientes` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Lo que cambian ellos: va a `rol_usuario` y `seccion_usuario` |
 | POST | `receta.clasificar` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Para `/recetas --clasificar`: tienen que venir todos |
 | POST | `nota.agregar` | `{ id?, receta_id, quien, texto, fecha? }` | `{ id, fecha }`. Con un `id` que ya existe responde `repetida: true` sin duplicarla |
+| POST | `nota.editar` | `{ id, texto }` | `{ id, texto }`. Con el mismo texto no escribe; una nota borrada responde `409 nota_borrada` |
+| POST | `nota.borrar` | `{ id }` | `{ id, borrada }`. La marca como borrada (queda en la Sheet, así llega en el delta) |
 | POST | `compras.agregar` | `{ receta_id?, porciones?, items: [{ id, nombre, cantidad, unidad, gondola, rol, lugar? }] }` | `{ ids, nuevos, quitados }`. Suma lo que no está (por id); con `receta_id`, lo de esa receta que no vino se borra |
 | POST | `compras.marcar` | `{ ids, hecho }` | `{ ids, hecho }` |
 | POST | `compras.mover` | `{ ids, lugar }` | `{ ids, lugar }`. `lugar`: uno de los 7, `revisar` o vacío (el de la regla) |

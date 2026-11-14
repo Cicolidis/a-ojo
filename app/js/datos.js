@@ -8,7 +8,8 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // 3: lugares, compras con rol y lugar, capturas de la bandeja (Fase 4b).
 // 4: pedidos de corrección en la bandeja (Fase 6.3).
 // 5: ingredientes de cada paso (Fase 6.3).
-export const VERSION_DATOS = 5;
+// 6: notas editadas y borradas (Fase 6.3).
+export const VERSION_DATOS = 6;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.
@@ -107,7 +108,8 @@ export function indexar(datos) {
   };
   const ingredientes = agrupar(datos?.ingredientes);
   const pasos = agrupar(datos?.pasos);
-  const notas = agrupar(datos?.notas);
+  // Las borradas quedan en los datos (así el delta las saca en el otro celular), pero no se muestran.
+  const notas = agrupar((datos?.notas || []).filter(n => !n.borrada));
 
   const lista = (datos?.recetas || []).map(r => {
     const ings = (ingredientes.get(r.id) || []).sort(porOrden);

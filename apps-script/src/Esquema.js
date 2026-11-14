@@ -137,6 +137,10 @@ const ESQUEMA = {
       col_('texto'),
       // Cuándo llegó a la Sheet. `fecha` es la del celular, que puede haberla escrito sin conexión.
       col_('creado', 'fecha'),
+      // Cuándo se editó o se borró por última vez (nota.editar, nota.borrar): así el cambio llega en el delta.
+      col_('actualizado', 'fecha'),
+      // Borrada desde la app: queda en la Sheet para que el otro celular se entere, y la app no la muestra.
+      col_('borrada', 'bool'),
     ],
   },
   Compras: {

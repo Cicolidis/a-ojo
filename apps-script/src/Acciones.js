@@ -103,7 +103,8 @@ function accionTodo_(req) {
       ingredientes = ingredientes.filter(i => ids.indexOf(i.receta_id) !== -1);
       pasos = pasos.filter(p => ids.indexOf(p.receta_id) !== -1);
       // Una nota escrita sin conexión llega con una `fecha` vieja: cuenta cuándo llegó.
-      notas = notas.filter(n => cambio(n.creado || n.fecha));
+      // Y una editada o borrada, cuándo cambió.
+      notas = notas.filter(n => cambio(n.creado || n.fecha) || (n.actualizado && cambio(n.actualizado)));
       bandeja = bandeja.filter(b => cambio(b.actualizado));
     }
 
@@ -803,6 +804,53 @@ function accionNotaAgregar_(req) {
     };
     agregarFila_('Notas', nota);
     return { id: nota.id, fecha: nota.fecha };
+  });
+}
+
+/** La nota del `id` de la petición, dentro del lock, o un error claro. */
+function filaNota_(req) {
+  const id = String(req.id || '').trim();
+  if (!id) throw errorApi_('sin_id', 400, 'Falta el «id» de la nota.');
+  const encontrada = leerFilas_('Notas').filter(f => f.datos.id === id)[0];
+  if (!encontrada) throw errorApi_('no_encontrada', 404, 'No encontré esa nota: puede que la hayan borrado.');
+  return encontrada;
+}
+
+/**
+ * POST nota.editar { id, texto }: cambia el texto de una nota. Idempotente: con el
+ * mismo texto no escribe. Una nota borrada no se edita (409, la cola avisa).
+ */
+function accionNotaEditar_(req) {
+  const texto = String(req.texto || '').trim();
+  if (!texto) throw errorApi_('sin_texto', 400, 'La nota está vacía.');
+  if (texto.length > 2000) throw errorApi_('texto_largo', 400, 'La nota es muy larga (máximo 2000 caracteres).');
+  return conLock_(() => {
+    exigirColumnas_('Notas', ['actualizado', 'borrada']);
+    const nota = filaNota_(req);
+    const d = nota.datos;
+    if (d.borrada) throw errorApi_('nota_borrada', 409, 'Esa nota ya estaba borrada: no la cambié.');
+    if (d.texto !== texto) {
+      Object.assign(d, { texto: texto, actualizado: ahoraIso_() });
+      escribirFila_('Notas', nota.fila, d);
+    }
+    return { id: d.id, texto: d.texto };
+  });
+}
+
+/**
+ * POST nota.borrar { id }: la marca como borrada (queda en la Sheet, así el otro celular
+ * se entera por el delta). Idempotente.
+ */
+function accionNotaBorrar_(req) {
+  return conLock_(() => {
+    exigirColumnas_('Notas', ['actualizado', 'borrada']);
+    const nota = filaNota_(req);
+    const d = nota.datos;
+    if (!d.borrada) {
+      Object.assign(d, { borrada: true, actualizado: ahoraIso_() });
+      escribirFila_('Notas', nota.fila, d);
+    }
+    return { id: d.id, borrada: true };
   });
 }
 

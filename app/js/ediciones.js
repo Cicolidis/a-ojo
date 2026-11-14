@@ -184,6 +184,16 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       if (pedido === fila.pedido && fila.estado === 'pendiente') return datos;
       return cambiar({ pedido, estado: 'pendiente', motivo: '', intentos: 0, receta_id: d.id, actualizado: creada });
     }
+    case 'nota.editar':
+      // Como la API: una borrada no se edita.
+      return Object.assign({}, datos, {
+        notas: datos.notas.map(n => (n.id === d.id && !n.borrada && n.texto !== String(d.texto || '').trim()
+          ? Object.assign({}, n, { texto: String(d.texto || '').trim(), actualizado: creada }) : n)),
+      });
+    case 'nota.borrar':
+      return Object.assign({}, datos, {
+        notas: datos.notas.map(n => (n.id === d.id ? Object.assign({}, n, { borrada: true }) : n)),
+      });
     case 'nota.agregar':
       if (datos.notas.some(n => n.id === d.id)) return datos;
       return Object.assign({}, datos, {
