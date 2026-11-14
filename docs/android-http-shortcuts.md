@@ -57,7 +57,7 @@ Volvé a la pantalla principal → **+** → atajo HTTP normal (*Regular HTTP Sh
   | Parámetro (*Parameter Name*) | Valor (*Value*) |
   |---|---|
   | `url` | la variable `texto_compartido` |
-  | `quien` | `pareja` |
+  | `quien` | `pareja` (es el valor interno de Laura: escribilo así) |
   | `t` | la variable `token_a_ojo` |
 
   Para poner una variable en un valor, tocá el botón **{ }** al lado del campo y elegila. Queda marcada con color.
@@ -85,7 +85,7 @@ Guardá el atajo (✓ arriba a la derecha).
    - Como hay un solo atajo que recibe texto compartido, se ejecuta directo. Si en el futuro hubiera más, la app pregunta cuál usar.
 2. Tiene que aparecer **"✓ Guardada"**.
 3. Compartí el mismo Reel otra vez: tiene que decir **"Ya estaba guardada"**.
-4. En la Sheet "A ojo — datos", hoja **Bandeja**: una sola fila `pendiente`, con `quien = pareja`.
+4. En la Sheet "A ojo — datos", hoja **Bandeja**: una sola fila `pendiente`, con `quien = pareja` (Laura).
 
 ## Si algo falla
 

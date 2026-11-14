@@ -1,6 +1,6 @@
 # A ojo — Spec v1
 
-> App personal de recetas para dos personas (Camilo y su pareja). Captura links de YouTube e Instagram, los convierte en recetas estructuradas en rioplatense y los muestra en una app instalable, cálida y editorial.
+> App personal de recetas para dos personas (Camilo y Laura). Captura links de YouTube e Instagram, los convierte en recetas estructuradas en rioplatense y los muestra en una app instalable, cálida y editorial.
 > Documento para llevar a Claude Code. Versión 1 · 27/09/2026.
 
 ---
@@ -52,11 +52,11 @@
 
 | Componente | Tecnología | Dónde vive |
 |---|---|---|
-| Base de datos | Google Sheets | Drive de Camilo, compartida con ella |
+| Base de datos | Google Sheets | Drive de Camilo, compartida con Laura |
 | API | Apps Script, web app (`doGet`/`doPost`) que devuelve JSON | Proyecto ligado a la Sheet |
 | App | PWA: HTML, CSS y JS, sin framework pesado (vanilla o Preact) | GitHub Pages |
 | Captura Mac | Extensión de Chrome MV3 (desempaquetada) | Chrome de Camilo |
-| Captura Android | HTTP Shortcuts (Play Store / F-Droid) | Celular de ella |
+| Captura Android | HTTP Shortcuts (Play Store / F-Droid) | Celular de Laura |
 | Procesamiento | Python + `yt-dlp` + `faster-whisper` + `ffmpeg` + Claude Code | Mac Mini M4 |
 | Fotos | Miniaturas copiadas a Drive (URL pública) o al repo | Drive |
 
@@ -75,7 +75,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | creado | fecha-hora ISO | |
 | url | texto | URL normalizada, sin `?si=`, `?stkn=` ni otros parámetros de tracking |
 | plataforma | `youtube` · `instagram` · `web` · `otro` | se detecta sola |
-| quien | `camilo` · `pareja` | según el origen: extensión o HTTP Shortcuts |
+| quien | `camilo` · `pareja` | según el origen: extensión o HTTP Shortcuts. `pareja` es el valor interno de Laura: en la interfaz y en los textos siempre se la nombra «Laura» |
 | estado | `pendiente` · `procesando` · `lista` · `ayuda` · `descartada` | |
 | motivo | texto | solo si `estado = ayuda` (ej.: "Instagram pide login") |
 | receta_id | texto | se completa cuando está `lista` |
@@ -206,7 +206,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 ### 6.1 Flujo por cada link pendiente
 1. `bandeja.actualizar → procesando`.
 2. **Capa 1: metadatos.** `yt-dlp --skip-download --write-info-json` → título, autor, descripción o caption, miniatura.
-   - Instagram: siempre con las cookies de la **cuenta secundaria de Instagram dedicada al procesamiento**, nunca las de la cuenta principal de ella. Esas cookies viven en un **perfil de Chrome separado** ("A ojo – procesamiento") en la computadora donde se corra `/recetas`: `--cookies-from-browser "chrome:A ojo – procesamiento"`. La cuenta secundaria tiene que estar configurada como **mayor de 18** para poder ver Reels con restricción de audiencia.
+   - Instagram: siempre con las cookies de la **cuenta secundaria de Instagram dedicada al procesamiento**, nunca las de la cuenta principal de Laura. Esas cookies viven en un **perfil de Chrome separado** ("A ojo – procesamiento") en la computadora donde se corra `/recetas`: `--cookies-from-browser "chrome:A ojo – procesamiento"`. La cuenta secundaria tiene que estar configurada como **mayor de 18** para poder ver Reels con restricción de audiencia.
 3. **Capa 2: subtítulos** (solo YouTube). `--write-auto-subs --sub-langs "es.*,en.*"`.
 4. **Capa 3: link externo.** Si la descripción remite a una web con la receta (ej.: "RECIPE ⬇️ https://…"), se lee esa página.
 5. **Capa 4: audio.** Si con lo anterior faltan cantidades o pasos, se baja el audio y se transcribe con `faster-whisper` (modelo `small`, idioma autodetectado).
@@ -234,11 +234,11 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 
 ### 6.3 bis Dónde corre y con qué cuenta
 - **Se corre a mano**, cuando alguno de los dos decide procesar la bandeja.
-- **Computadora:** la Mac Mini de Camilo o la computadora de ella. El repo tiene que ser **portable**: un `setup.sh` instala las dependencias (`yt-dlp`, `ffmpeg`, `faster-whisper`), la configuración va en `.env` (URL de la API, token, nombre del perfil de Chrome) y no hay rutas fijas a la carpeta de un usuario.
+- **Computadora:** la Mac Mini de Camilo o la computadora de Laura (Windows; ver Fase 6.2). El repo tiene que ser **portable**: un `setup.sh` instala las dependencias (`yt-dlp`, `ffmpeg`, `faster-whisper`), la configuración va en `.env` (URL de la API, token, nombre del perfil de Chrome) y no hay rutas fijas a la carpeta de un usuario.
 - **Cuentas de Instagram:**
-  - La **captura** se hace desde la cuenta principal de ella: solo se comparte el link, sin cookies ni scraping.
+  - La **captura** se hace desde la cuenta principal de Laura: solo se comparte el link, sin cookies ni scraping.
   - El **procesamiento** usa solo la **cuenta secundaria**, en su perfil de Chrome separado.
-- Como las cookies son de la cuenta secundaria, **no hace falta procesar en la computadora de ella**: alcanza con que el perfil "A ojo – procesamiento" exista en la computadora donde se corra.
+- Como las cookies son de la cuenta secundaria, **no hace falta procesar en la computadora de Laura**: alcanza con que el perfil "A ojo – procesamiento" exista en la computadora donde se corra.
 
 ### 6.4 Robustez
 - **Pausa de 2 a 5 segundos** entre links y **reintento con espera exponencial** ante `HTTP 429`: YouTube limitó las pruebas.
@@ -379,7 +379,7 @@ Cada fase termina con una demo funcionando y un commit.
 ### Fase 3: app (lectura y cocina)
 - PWA con Biblioteca, Ficha y Modo cocina, cache offline e instalación.
 - Configuración con un link.
-- **Listo cuando:** ella la instala en Android, la abre sin conexión y cocina una receta de punta a punta.
+- **Listo cuando:** Laura la instala en Android, la abre sin conexión y cocina una receta de punta a punta.
 
 ### Fase 4a: ficha
 - Secciones y roles de los ingredientes: los asigna `/recetas`; las recetas ya guardadas se completan con `/recetas --clasificar`.
@@ -396,6 +396,55 @@ Cada fase termina con una demo funcionando y un commit.
 - Logo e íconos (también los de la extensión), pantallas vacías y primera carga, microanimaciones, revisión de accesibilidad (AA) y modo oscuro.
 - **Listo cuando:** instalada de cero en Android, muestra el logo mientras baja las recetas; con el celular en modo oscuro, toda la app se ve en la paleta oscura; cada pantalla tiene su estado vacío; las pantallas cambian con un fundido y los avisos entran y salen, y con «quitar animaciones» del sistema nada se mueve; el test de contraste pasa en los dos modos; la extensión muestra el logo 2B.
 
+### Fase 6: correcciones, infraestructura y funciones nuevas
+Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 terminadas. Cada grupo puede ir en uno o más commits; el orden sugerido es 6.1 → 6.2 → 6.3.
+
+#### 6.1 Correcciones y riesgos
+- **Cola offline: estado esperado en la bandeja.** `bandeja.actualizar` recibe un `desde` opcional (el estado que veía la app). Si la fila ya no está en ese estado, responde `409` y la cola descarta la edición con un aviso, igual que `ingredientes_cambiaron`. Así, «Descartar» o «Probar de nuevo» mandados sin conexión no pisan una fila que la Mac ya dejó en `lista`. (`Acciones.js`, `ediciones.js`, `vistas/bandeja.js`, con su caso en `aplicarEdicion()` y su test.)
+- **Timers del modo cocina con la app en segundo plano.** Hoy no suenan si se sale de la app: el chip del timer avisa «Suena con A ojo abierta». Investigar si Chrome en Android permite abrir el temporizador del sistema con un link `intent:`; si no, queda solo el aviso.
+- **Fotos sin conexión.** Medir en el celular, con `navigator.storage.estimate()`, cuánto ocupa la caché de fotos (las de Drive se guardan como respuestas opacas, que pueden contar mucho más de lo que pesan). Dejar preparada en `urlImagen_()` (`Drive.js`) la alternativa `https://lh3.googleusercontent.com/d/<id>=w1200` por si `drive.google.com/thumbnail` deja de andar.
+- **Links `/share/` de Instagram.** `Url.js` toma `share` como nombre de usuario: `/share/p/X` se normalizaría a `/p/X/` con un id que no es el del post. Probarlo con un link real; si aparece, no canonizarlo y resolver la redirección en `fetch meta`. Con su test en `tests/url.test.js`.
+- **Dos corridas de `/recetas` a la vez** (la Mac y la computadora de Laura): `bandeja.pendientes` no reserva nada, así que las dos podrían tomar la misma fila. Sumar una acción `bandeja.tomar` que, dentro del lock, pase a `procesando` las filas que devuelve, y que `/recetas` la use en lugar de `pendientes` + `actualizar procesando`.
+- **Capturas que quedan en Drive.** Mandarlas a la papelera cuando la fila pasa a `lista` (en `receta.upsert`) o con una limpieza de las de más de 30 días.
+- **`procesamiento/aojo`:** validar el subcomando antes de buscar el `.venv`, así `test_aojo_sin_script_valido` pasa en cualquier máquina (también en CI).
+- **SPEC al día:** sumar `notas_proceso` a la hoja `Recetas` (§3) y `ping` a la tabla de la API (§4); describir en §6.1 los comentarios del autor en YouTube y los posts de fotos de Instagram (`sin_video`); aclarar en §6.4 que yt-dlp se actualiza con pip dentro del venv. Actualizar el estado del README.
+- **Detalles menores:**
+  - Los colores de relleno de las fotos (`RELLENOS`, `dom.js`) pasan a tokens de `estilos.css`, en los dos modos.
+  - El `confirm()` de «¿Salir sin guardar los cambios?» (`vistas/ingredientes.js`) se reemplaza por un diálogo con el estilo de la app.
+  - Una versión nueva no recarga la app mientras se escribe una nota (hoy solo se protege el modo cocina): espera, o avisa «Hay una versión nueva».
+  - `api fila` deja de bajar `todo` entero para leer una sola fila.
+  - `scripts/servir.js` escucha solo en `127.0.0.1`.
+
+#### 6.2 Infraestructura y proceso
+- **Tests en GitHub Actions:** un job `test` con `npm test` y los tests de Python (solo biblioteca estándar), y `needs: test` en el job que publica la app en Pages.
+- **`npm run deploy` más seguro:** corre `npm test` antes del push y `procesamiento/aojo api ping` después del deploy, para detectar enseguida un permiso nuevo de Google que todavía no se aceptó.
+- **Backup de la Sheet:** un trigger semanal de Apps Script que copia la planilla a «A ojo/backups» y conserva las últimas 8. Pide un permiso nuevo: correr `setup()` en el editor antes del deploy.
+- **Permisos de `/recetas` en el repo:** pasar los de `.claude/settings.local.json` a un `.claude/settings.json` versionado, con rutas `~/.a-ojo/**` en lugar de rutas fijas, y sumar `.claude/settings.local.json` al `.gitignore`. Así `/recetas` corre igual en la computadora de Laura.
+- **`/recetas` desde la computadora de Laura (Windows), con su propia cuenta de Claude Code.** Camino elegido: **WSL 2** (Ubuntu), donde los scripts de `procesamiento/` y `aojo` corren como en la Mac. Hace falta:
+  - Que `setup.sh` acepte Linux: `apt` en lugar de Homebrew para ffmpeg, y el mismo venv con uv.
+  - Cookies de la cuenta secundaria de Instagram desde **Firefox**: en Windows, Chrome cifra las cookies de forma que yt-dlp no las puede leer. Un perfil de Firefox «A ojo – procesamiento» y `fetch cookies` (o una exportación a `~/.a-ojo/cookies-instagram.txt`) reemplazan al perfil de Chrome. Actualizar `docs/perfil-instagram.md`.
+  - Su propio `.env` (misma URL de la API y mismo token, que se le pasan por privado; sin clasp ni `A_OJO_DEPLOYMENT_ID`, porque no despliega).
+  - Una guía `docs/procesar-en-windows.md`: instalar WSL 2, Claude Code adentro de WSL, clonar el repo en el disco de WSL (no en `/mnt/c`, que es lento), correr `./setup.sh` y probar con `/recetas --dry-run`.
+  - Alternativa descartada por ahora: Windows nativo (Claude Code con Git Bash), que pediría un `setup.ps1` y adaptar las rutas del venv (`Scripts\python.exe`).
+
+#### 6.3 Funciones nuevas (de más a menos valor)
+1. **Compartir directo a A ojo.** `share_target` en el manifest: en Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Además, un campo «Pegar un link» en la Bandeja (para iPhone, iPad o una computadora sin la extensión). `capturar` ya deduplica, así que puede ir por la cola.
+2. **«Algo está mal en esta receta».** Desde la ficha se pide reprocesarla con un texto («la harina son 300 g»). Queda en la bandeja y `/recetas` lo lee como instrucción.
+3. **Quién escribió cada nota.** Un mapa de nombres para mostrar en el código (`camilo` → Camilo, `pareja` → Laura), que usan las notas y cualquier otro texto que nombre a alguien.
+4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesDelPaso()` (`cocina.js`) queda como respaldo para las recetas viejas.
+5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
+6. **Compartir una receta** por WhatsApp, como la lista de compras.
+7. **Editar y borrar notas.**
+8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
+9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.
+
+#### 6.4 Forma de trabajo
+- Se implementa en Claude Code, un ítem por sesión y por commit, siguiendo `CLAUDE.md`.
+- Modelo de `/recetas`: probar `model: sonnet` en el frontmatter para las corridas de rutina y reprocesar con Opus las recetas de confianza media o baja. Comparar 3 o 4 recetas antes de dejarlo fijo.
+- Esfuerzo alto para lo que toca la API, la cola y `/recetas` a la vez (estado esperado en la bandeja, compartir directo, «Algo está mal»); bajo para la SPEC al día y los detalles menores.
+
+- **Listo cuando:** un «Descartar» mandado sin conexión sobre una fila que ya está `lista` vuelve con aviso y no la cambia; los tests corren en GitHub Actions y un test que falla frena la publicación; `npm run deploy` termina con un `ping` que responde; hay al menos un backup semanal en Drive; un Reel compartido desde Instagram a la app instalada aparece en la Bandeja; un pedido de «Algo está mal» se resuelve corriendo `/recetas`; las notas muestran quién las escribió («Laura», «Camilo»); Laura corre `/recetas` en su computadora y la receta llega a la app; dos corridas a la vez no toman la misma fila; y la SPEC describe lo que hace el código.
+
 ---
 
 ## 10. Riesgos y decisiones pendientes
@@ -403,7 +452,7 @@ Cada fase termina con una demo funcionando y un commit.
 | Riesgo | Mitigación |
 |---|---|
 | Instagram bloquea o cambia la descarga | Cookies del navegador, `yt-dlp` siempre actualizado y el plan B de las capturas |
-| Usar cookies para descargar va contra los términos de Instagram | **Decidido:** cuenta secundaria dedicada; la cuenta principal de ella nunca se usa para procesar. Volumen bajo |
+| Usar cookies para descargar va contra los términos de Instagram | **Decidido:** cuenta secundaria dedicada; la cuenta principal de Laura nunca se usa para procesar. Volumen bajo |
 | La cuenta secundaria no puede ver algún Reel (cuenta privada o restricción) | Plan B: las capturas, desde la pantalla Bandeja |
 | Límites de YouTube (429) | Pausas, reintentos, procesamiento en lote espaciado |
 | Cuotas de Apps Script | Uso personal: muy por debajo de los límites gratuitos |
@@ -414,8 +463,12 @@ Cada fase termina con una demo funcionando y un commit.
 **Decisiones tomadas (27/09):**
 - Nombre: **A ojo**. Estilo: **variante A** en todas las pantallas.
 - Procesamiento **siempre manual**. Puede correr en la computadora de cualquiera de los dos.
-- **Cuenta secundaria de Instagram** solo para el procesamiento; la captura sigue desde la cuenta principal de ella.
+- **Cuenta secundaria de Instagram** solo para el procesamiento; la captura sigue desde la cuenta principal de Laura.
 - Logo: **monograma «a» con pizca, versión 2B**, solo en crema y terracota.
 
 **Decisiones pendientes:**
-- Sistema operativo de la computadora de ella, si se va a procesar ahí (el `setup.sh` está pensado para macOS; en Windows convendría usar WSL).
+- Ninguna por ahora.
+
+**Decisiones tomadas (14/11):**
+- La computadora de Laura es **Windows**. Va a poder correr `/recetas` con su propia cuenta de Claude Code (Fase 6.2).
+- En la interfaz, los textos y la documentación se la nombra **Laura**; `pareja` queda solo como valor interno de `quien`.

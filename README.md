@@ -131,7 +131,7 @@ La app vive en `app/` y se publica sola en **<https://cicolidis.github.io/a-ojo/
 2. Generá el link de esa persona y mandáselo por privado (incluye el token):
 
 ```bash
-npm run link-config -- pareja
+npm run link-config -- laura
 ```
 
 3. En Android, abrilo con Chrome: la app queda configurada y el link se borra de la barra de direcciones. Después, menú ⋮ → **Instalar app** (o "Agregar a la pantalla principal").
@@ -152,7 +152,7 @@ Los íconos de la app (`app/iconos/`) y de la extensión (`extension/icons/`) sa
 
 ## Procesamiento: `/recetas`
 
-Corre a mano, en la Mac donde esté el repo (la Mac Mini o la computadora de ella). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
+Corre a mano, en la Mac donde esté el repo (la Mac Mini o la computadora de Laura). Los scripts de `procesamiento/` bajan y transcriben; Claude Code lee lo que haga falta y arma la receta.
 
 ### Preparar la computadora (una sola vez)
 

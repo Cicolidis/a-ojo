@@ -5,6 +5,7 @@ La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase
 ## Convenciones
 
 - Todo el texto visible va en **castellano rioplatense** con voseo ("Guardá", "Probá de nuevo"). El código también usa nombres en castellano.
+- Somos **Camilo y Laura**. En `quien`, Laura es `pareja`: ese valor interno no se cambia (está en la Sheet y en el atajo de su celular), pero en todo texto visible, mensaje o documentación se la nombra «Laura», nunca «pareja» ni «novia».
 - **Nunca emojis en la interfaz**: íconos SVG de trazo. Los caracteres "✓" y "…" están permitidos, como indica la spec.
 - **Ningún secreto en el repo**: probablemente sea público cuando se sume GitHub Pages. El token vive en Script Properties, `.env`, `chrome.storage.local` y el celular.
 - Colores y tipografía: §8 de la spec (variante A). **Todo color va como token** en `:root` de `estilos.css` y también en el bloque del modo oscuro; si se usa un par nuevo de texto y fondo, sumarlo al test de contraste (`tests/app.test.js`).

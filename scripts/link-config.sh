@@ -1,6 +1,6 @@
 #!/bin/sh
 # Imprime el link de configuración de la app para una persona:
-#   npm run link-config -- pareja
+#   npm run link-config -- laura   (o camilo)
 # Lee A_OJO_APP_URL, A_OJO_API_URL y A_OJO_TOKEN del .env. El link lleva el
 # token: mandalo solo por privado. Va en el fragmento (#), así no llega a GitHub.
 set -eu
@@ -9,7 +9,8 @@ cd "$(dirname "$0")/.."
 QUIEN="${1:-}"
 case "$QUIEN" in
   camilo|pareja) ;;
-  *) echo "Uso: npm run link-config -- <camilo|pareja>" >&2; exit 1 ;;
+  laura) QUIEN=pareja ;; # «pareja» es el valor interno de Laura
+  *) echo "Uso: npm run link-config -- <camilo|laura>" >&2; exit 1 ;;
 esac
 
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
@@ -23,6 +24,6 @@ LINK=$(node -e '
   console.log(app.replace(/#.*$/, "").replace(/\/?$/, "/") + "#/config?" + q);
 ' "$A_OJO_APP_URL" "$A_OJO_API_URL" "$A_OJO_TOKEN" "$QUIEN")
 
-echo "Link de configuración para $QUIEN (incluye el token: mandalo solo por privado):"
+echo "Link de configuración para ${1} (incluye el token: mandalo solo por privado):"
 echo
 echo "$LINK"
