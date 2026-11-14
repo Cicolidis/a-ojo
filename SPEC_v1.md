@@ -427,10 +427,13 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 
 #### 6.2 Infraestructura y proceso
 - **Tests en GitHub Actions:** un job `test` con `npm test` y los tests de Python (solo biblioteca estándar), y `needs: test` en el job que publica la app en Pages.
+  - *Hecho (14/11):* `.github/workflows/tests.yml`, que `pages.yml` llama antes de publicar.
 - **`npm run deploy` más seguro:** corre `npm test` antes del push y `procesamiento/aojo api ping` después del deploy, para detectar enseguida un permiso nuevo de Google que todavía no se aceptó.
+  - *Hecho (14/11):* el ping espera la `VERSION_API` de `Api.js`.
 - **Backup de la Sheet:** un trigger semanal de Apps Script que copia la planilla a «A ojo/backups» y conserva las últimas 8. Pide un permiso nuevo: correr `setup()` en el editor antes del deploy.
   - *Hecho (14/11):* `Backup.js`. `setup()` instala el trigger (domingos a las 4) sin duplicarlo y, si no hay ninguna copia, hace la primera.
 - **Permisos de `/recetas` en el repo:** pasar los de `.claude/settings.local.json` a un `.claude/settings.json` versionado, con rutas `~/.a-ojo/**` en lugar de rutas fijas, y sumar `.claude/settings.local.json` al `.gitignore`. Así `/recetas` corre igual en la computadora de Laura.
+  - *Hecho (14/11).*
 - **`/recetas` desde la computadora de Laura (Windows), con su propia cuenta de Claude Code.** Camino elegido: **WSL 2** (Ubuntu), donde los scripts de `procesamiento/` y `aojo` corren como en la Mac. Hace falta:
   - Que `setup.sh` acepte Linux: `apt` en lugar de Homebrew para ffmpeg, y el mismo venv con uv.
   - Cookies de la cuenta secundaria de Instagram desde **Firefox**: en Windows, Chrome cifra las cookies de forma que yt-dlp no las puede leer. Un perfil de Firefox «A ojo – procesamiento» y `fetch cookies` (o una exportación a `~/.a-ojo/cookies-instagram.txt`) reemplazan al perfil de Chrome. Actualizar `docs/perfil-instagram.md`.
