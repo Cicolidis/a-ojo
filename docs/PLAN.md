@@ -139,7 +139,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] «Nueva receta», «Receta nuestra», chip «Nuestras», «Escribir la receta» y «Editar»
 - [x] El caso `manual` en `/recetas`
 - [x] Demo con la API falsa (§8, Fase 10a)
-- [ ] Deploy de la API 0.12.0, `setup()` (columna `Bandeja.texto`) y smoke
+- [x] Deploy de la API 0.12.0, `setup()` (columna `Bandeja.texto`) y smoke
 
 ### Fase 10b: plan semanal
 
