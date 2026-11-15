@@ -4,11 +4,12 @@
 
 import { h, icono, rellenar } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
-import { LUGARES, REVISAR, armarLista, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
+import { unirConY } from '../ingredientes.js';
+import { LUGARES, REVISAR, armarLista, filaDeDespensa, lugarPorRegla, nombreLugar, paraDespensa, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { cargando, compartirTexto, navegacion, tocarAfueraCierra, vacio } from './controles.js';
 
-export function montar(contenedor, { app, editar }) {
+export function montar(contenedor, { app, editar, avisar }) {
   const sync = h('p', { class: 'estado-sync', role: 'status' });
   const zonaRecetas = h('div');
   const zonaLista = h('div', { class: 'compras-lista' });
@@ -44,9 +45,41 @@ export function montar(contenedor, { app, editar }) {
 
   const lista = () => armarLista(app.datos?.compras, app.datos?.lugares, app.datos?.despensa);
 
-  function marcar(fila, hecho) {
+  /** Suma esos nombres a la despensa y devuelve los ids nuevos ([] si ya estaba todo). */
+  function aLaDespensa(nombres) {
+    if (!nombres.length) return [];
+    const items = nombres.map(nombre => ({ id: idAzar('d'), nombre }));
+    editar(nuevaEdicion('despensa.sumar', { quien: app.config.quien, items }));
+    return items.map(i => i.id);
+  }
+
+  /**
+   * Marcar o desmarcar una fila. En «Revisá si tenés», tildar es «lo tengo»: pasa a la
+   * despensa; destildar lo saca (si está con ese mismo nombre).
+   */
+  function marcar(fila, hecho, revisar) {
     editar(nuevaEdicion('compras.marcar', { ids: fila.ids, hecho }));
+    if (revisar && hecho) aLaDespensa(paraDespensa(fila.items, app.datos.despensa));
+    if (revisar && !hecho) {
+      const enCasa = filaDeDespensa(fila.items[0].nombre, app.datos.despensa);
+      if (enCasa) editar(nuevaEdicion('despensa.quitar', { ids: [enCasa.id] }));
+    }
     pintar('c:' + fila.clave, hecho ? fila.clave : null);
+  }
+
+  /** «Limpiar marcados»: saca lo marcado de la lista y lo comprado pasa a la despensa, con «Deshacer». */
+  function limpiar(marcados) {
+    const nombres = paraDespensa(marcados, app.datos.despensa);
+    editar(nuevaEdicion('compras.quitar', { ids: marcados.map(c => c.id) }));
+    const ids = aLaDespensa(nombres);
+    pintar();
+    agregarReceta.focus();
+    if (ids.length) {
+      avisar('Pasé a la despensa: ' + unirConY(nombres) + '.', { texto: 'Deshacer', onclick: () => {
+        editar(nuevaEdicion('despensa.quitar', { ids }));
+        pintar();
+      } });
+    }
   }
 
   function mover(fila, lugar, siempre) {
@@ -84,9 +117,10 @@ export function montar(contenedor, { app, editar }) {
       h('label', null,
         h('input', { type: 'checkbox', checked: f.hecho, 'data-foco': 'c:' + f.clave,
           'aria-label': (revisar ? 'Lo tengo: ' : 'Comprado: ') + f.nombre,
-          onchange: e => marcar(f, e.target.checked) }),
+          onchange: e => marcar(f, e.target.checked, revisar) }),
         h('span', { class: 'compra-texto' },
-          h('span', null, f.nombre, f.opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null),
+          h('span', null, f.nombre, f.opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null,
+            f.enCasa ? h('span', { class: 'marca-en-casa' }, 'En casa') : null),
           f.desglose ? h('span', { class: 'compra-desglose' }, f.desglose) : null),
         f.cantidad ? h('span', { class: 'cantidad' }, f.cantidad) : null),
       revisar
@@ -136,24 +170,22 @@ export function montar(contenedor, { app, editar }) {
     } else {
       rellenar(zonaLista, grupos.map(g => h('section', { class: 'compras-grupo' },
         h('h2', { class: 'etiqueta-seccion' }, g.nombre),
-        g.lugar === REVISAR ? h('p', { class: 'secundario' }, 'Tildá lo que ya tenés; si falta algo, tocá «Comprar».') : null,
+        g.lugar === REVISAR ? h('p', { class: 'secundario' }, 'Tildá lo que ya tenés (pasa a la despensa); si falta algo, tocá «Comprar».') : null,
         h('ul', { class: 'lista-compras' }, g.filas.map(f => fila(f, g, recien))))));
     }
 
     const texto = textoWhatsApp(grupos);
     // Se limpian todos los ítems marcados; el número es el de filas tachadas, que es lo que se ve.
-    const marcados = (app.datos?.compras || []).filter(c => c.hecho === true || c.hecho === 'true').map(c => c.id);
+    const marcados = (app.datos?.compras || []).filter(c => c.hecho === true || c.hecho === 'true');
     const tachadas = grupos.reduce((n, g) => n + g.filas.filter(f => f.hecho).length, 0);
     const todoListo = grupos.length > 0 && grupos.every(g => g.filas.every(f => f.hecho));
     rellenar(zonaAcciones,
       todoListo ? h('p', { class: 'listo-todo' }, icono('check', 18), 'Ya está todo.') : null,
       texto ? h('button', { type: 'button', class: 'boton-principal', onclick: () => compartirTexto(texto) },
         icono('compartir', 20), 'Mandar por WhatsApp') : null,
-      marcados.length ? h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
-        editar(nuevaEdicion('compras.quitar', { ids: marcados }));
-        pintar();
-        agregarReceta.focus();
-      } }, 'Limpiar marcados' + (tachadas ? ' (' + tachadas + ')' : '')) : null,
+      marcados.length ? h('button', { type: 'button', class: 'boton-secundario', onclick: () => limpiar(marcados) },
+        'Limpiar marcados' + (tachadas ? ' (' + tachadas + ')' : '')) : null,
+      app.datos ? h('a', { class: 'boton-texto', href: '#/despensa' }, icono('casa', 18), 'Lo que hay en casa') : null,
       h('a', { class: 'boton-texto', href: '#/lugares' }, icono('mover', 18), 'Dónde compramos cada cosa'),
     );
 

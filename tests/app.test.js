@@ -713,6 +713,18 @@ test('despensa: «En casa» vale para lo que empieza igual; para sumar o sacar, 
   assert.deepEqual(c.enCasaDeReceta(receta, despensa).map(d => d.id), ['d_1', 'd_3'], 'una vez cada fila, solo principales');
 });
 
+test('«Con lo que tengo» arranca con la despensa: queCocino recibe sus nombres más lo escrito', async () => {
+  const { aplicarDelta, indexar, queCocino, tengoConDespensa } = await cargar('datos.js');
+  const despensa = [{ nombre: 'zapallo' }, { nombre: 'cebolla' }];
+  assert.equal(tengoConDespensa(' caldo de verduras ', despensa), 'zapallo, cebolla, caldo de verduras');
+  assert.equal(tengoConDespensa('', despensa), 'zapallo, cebolla');
+  assert.equal(tengoConDespensa('caldo', despensa, false), 'caldo', 'con el chip apagado, solo lo escrito');
+  assert.equal(tengoConDespensa('', []), '');
+  const { lista } = indexar(aplicarDelta(null, fixture()));
+  const sopa = queCocino(lista, { tengo: tengoConDespensa('caldo de verduras', despensa) }).find(x => x.receta.id === 'r_sopa');
+  assert.deepEqual(sopa.faltan, [], 'con la despensa y el caldo, la sopa tiene todo lo principal');
+});
+
 test('despensa: la ruta, el título y lo escrito a mano separado por coma', async () => {
   const { leerRuta, tituloDe } = await cargar('rutas.js');
   const { nombresEscritos } = await cargar('compras.js');

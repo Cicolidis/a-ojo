@@ -190,6 +190,14 @@ function loTengo(ing, tengo) {
 }
 
 /**
+ * Lo que tienen para «Con lo que tengo»: los nombres de la despensa (si `usar`) más lo
+ * escrito, en el formato que lee queCocino() («sal, harina, zapallo y crema»).
+ */
+export function tengoConDespensa(tengo, despensa, usar = true) {
+  return (usar ? (despensa || []).map(d => d.nombre) : []).concat(String(tengo || '').trim() ? [String(tengo).trim()] : []).join(', ');
+}
+
+/**
  * Las recetas que usan algo de lo que tienen, de las que más se acercan a las que menos:
  * primero las que tienen menos ingredientes principales por comprar, después las que usan
  * más de lo que hay. Los condimentos y lo opcional no cuentan (se supone que hay o se saltean).

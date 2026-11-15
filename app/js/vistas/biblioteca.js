@@ -1,7 +1,7 @@
 // Biblioteca (#/): buscador, filtros, aviso de la bandeja y grilla de recetas.
 
 import { h, icono, foto } from '../dom.js';
-import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja } from '../datos.js';
+import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja, tengoConDespensa } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
 import { unirConY } from '../ingredientes.js';
 import { cargando, navegacion, segmentado, vacio } from './controles.js';
@@ -41,6 +41,7 @@ export function montar(contenedor, { app, sincronizar }) {
     estado.modo, valor => {
       estado.modo = valor;
       pintarCampo();
+      pintarTengo();
       pintarGrilla();
       buscador.focus();
     }, 'modo-biblioteca');
@@ -48,12 +49,28 @@ export function montar(contenedor, { app, sincronizar }) {
 
   const campoBuscar = h('label', { class: 'buscador' }, icono('buscar', 18), buscador);
 
+  // «Con lo que tengo» arranca con la despensa (SPEC_v2 §5.3): un chip para usarla o no.
+  const chipDespensa = h('button', { type: 'button', class: 'chip', onclick: () => {
+    estado.usarDespensa = !estado.usarDespensa;
+    pintarTengo();
+    pintarGrilla();
+  } }, 'Usar lo de la despensa');
+  const tengo = h('div', { class: 'tengo-despensa' }, chipDespensa,
+    h('a', { class: 'boton-texto', href: '#/despensa' }, icono('casa', 18), 'Lo que hay en casa'));
+  const despensa = () => app.datos?.despensa || [];
+  function pintarTengo() {
+    tengo.hidden = estado.modo !== 'tengo' || !app.indice.lista.length;
+    chipDespensa.hidden = !despensa().length;
+    chipDespensa.setAttribute('aria-pressed', String(estado.usarDespensa));
+  }
+
   contenedor.append(h('div', { class: 'biblioteca con-navegacion' },
     h('div', { class: 'encabezado' }, h('span', { class: 'marca' }, 'A ojo'), cuenta),
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, '¿Qué cocinamos hoy?'),
     sync,
     modo,
     campoBuscar,
+    tengo,
     chips,
     aviso,
     grilla,
@@ -106,14 +123,17 @@ export function montar(contenedor, { app, sincronizar }) {
 
   function pintarGrilla() {
     // «Con lo que tengo»: de la receta más cercana a la más lejana, con lo que falta.
-    if (estado.modo === 'tengo' && estado.tengo.trim()) {
-      const cercanas = queCocino(app.indice.lista, estado);
+    const tengoTexto = estado.modo === 'tengo' ? tengoConDespensa(estado.tengo, despensa(), estado.usarDespensa) : '';
+    if (tengoTexto) {
+      const cercanas = queCocino(app.indice.lista, Object.assign({}, estado, { tengo: tengoTexto }));
       if (cercanas.length) {
         grilla.replaceChildren(h('div', { class: 'grilla' }, cercanas.map(x => tarjeta(x.receta, x.faltan))));
         return;
       }
+      // Si no escribieron nada (solo cuenta la despensa), no hay nada para borrar.
       grilla.replaceChildren(vacio({ figura: 'buscar', titulo: 'Con eso no encontramos ninguna receta',
-        texto: 'Probá con otros ingredientes, separados por comas.', acciones: [{ texto: 'Borrar', onclick: borrarBusqueda }] }));
+        texto: 'Probá con otros ingredientes, separados por comas.',
+        acciones: estado.tengo.trim() ? [{ texto: 'Borrar', onclick: borrarBusqueda }] : [] }));
       return;
     }
     const recetas = buscar(app.indice.lista, estado.modo === 'tengo' ? Object.assign({}, estado, { texto: '' }) : estado);
@@ -166,6 +186,7 @@ export function montar(contenedor, { app, sincronizar }) {
     sync.classList.toggle('error', app.sync.estado === 'error');
     nav.actualizar();
     pintarChips();
+    pintarTengo();
     pintarAviso();
     pintarGrilla();
   }

@@ -9,6 +9,7 @@ import { ingredientesDePaso } from '../cocina.js';
 import { capitalizar, formatearReloj, formatearTimer, porcionesTexto } from '../formato.js';
 import { avisoCoccion, avisoMolde, pasoDeHorno, porcionesBase, porcionesIniciales, textoCantidad } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
+import { enCasaDeReceta } from '../compras.js';
 import { estrellas, sinReceta } from './controles.js';
 
 const clave = id => 'a-ojo:cocina:' + id;
@@ -169,12 +170,23 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
     let valoracion = antes;
     const nota = h('textarea', { rows: '3', maxlength: '2000', 'aria-label': 'Nota',
       placeholder: 'Qué cambiarían, cuánto tardó, qué le sumarían…' });
+    // «¿Se terminó algo?»: lo de la despensa que usa la receta (los principales), para sacarlo.
+    const terminados = new Set();
+    const enCasa = enCasaDeReceta(receta, app.datos?.despensa);
+    const seTermino = enCasa.length ? h('fieldset', { class: 'se-termino' },
+      h('legend', null, '¿Se terminó algo?'),
+      h('p', { class: 'secundario' }, 'Lo que marques sale de la despensa.'),
+      h('ul', { class: 'lista-casillas' }, enCasa.map(d => h('li', null,
+        h('label', { class: 'casilla' },
+          h('input', { type: 'checkbox', onchange: e => (e.target.checked ? terminados.add(d.id) : terminados.delete(d.id)) }),
+          h('span', { class: 'casilla-texto' }, capitalizar(d.nombre))))))) : null;
     const guardarSalida = () => {
       const cambios = {};
       if (receta.estado !== 'probada' && receta.estado !== 'favorita') cambios.estado = 'probada';
       if (valoracion !== antes) cambios.valoracion = valoracion;
       if (Object.keys(cambios).length) editar(nuevaEdicion('receta.estado', Object.assign({ id }, cambios)));
       if (nota.value.trim()) editar(nuevaNota(id, app.config.quien, nota.value));
+      if (terminados.size) editar(nuevaEdicion('despensa.quitar', { ids: [...terminados] }));
     };
     raiz.replaceChildren(
       h('div', { class: 'cocina-arriba' },
@@ -185,6 +197,7 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
         h('h2', null, '¿Cómo salió?'),
         estrellas(valoracion, v => { valoracion = v; }, '¿Cómo salió? De 1 a 5 estrellas'),
         nota,
+        seTermino,
         h('button', { type: 'button', class: 'boton-principal', onclick: () => {
           guardarSalida();
           salir();

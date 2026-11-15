@@ -35,7 +35,7 @@ const app = {
   // Ediciones que todavía no llegaron a la API (ver ediciones.js).
   cola: [],
   // modo: buscar · tengo («¿Qué cocino hoy?»: lo que hay en casa).
-  biblioteca: { texto: '', filtro: 'todas', scroll: 0, modo: 'buscar', tengo: '' },
+  biblioteca: { texto: '', filtro: 'todas', scroll: 0, modo: 'buscar', tengo: '', usarDespensa: true },
   // Porciones elegidas en cada ficha, mientras la app está abierta: id → número.
   porciones: new Map(),
 };
@@ -167,7 +167,9 @@ function avisarYaEstaba(fila) {
 }
 
 // Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
-// Pueden traer un link: avisar('✓ Agregada a compras', { texto: 'Ver la lista', href: '#/compras' }).
+// Pueden traer un link: avisar('✓ Agregada a compras', { texto: 'Ver la lista', href: '#/compras' }),
+// o un botón: avisar('Lo pasé a la despensa.', { texto: 'Deshacer', onclick }). El botón se va con el
+// aviso: el foco vuelve al título de la pantalla.
 // La zona (role=status) está siempre en la página, así el lector de pantalla lee cada aviso
 // nuevo. Uno nuevo reemplaza al anterior; mientras su link tiene el foco, no se va.
 const zonaAviso = h('div', { class: 'zona-aviso', role: 'status' });
@@ -175,8 +177,15 @@ document.body.append(zonaAviso);
 
 function avisar(texto, link) {
   zonaAviso.querySelectorAll('.aviso').forEach(a => clearTimeout(a.timer));
-  const aviso = h('div', { class: 'aviso' }, h('span', null, texto),
-    link ? h('a', { href: link.href, onclick: () => sacarAviso(aviso) }, link.texto) : null);
+  const accion = !link ? null : link.href
+    ? h('a', { href: link.href, onclick: () => sacarAviso(aviso) }, link.texto)
+    : h('button', { type: 'button', onclick: () => {
+      sacarAviso(aviso);
+      link.onclick();
+      const titulo = contenedor.querySelector('h1');
+      if (titulo) titulo.focus({ preventScroll: true });
+    } }, link.texto);
+  const aviso = h('div', { class: 'aviso' }, h('span', null, texto), accion);
   const programar = ms => {
     clearTimeout(aviso.timer);
     aviso.timer = setTimeout(() => sacarAviso(aviso), ms);

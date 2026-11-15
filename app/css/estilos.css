@@ -120,7 +120,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 h1:focus, .paso-texto:focus, .vacio-titulo:focus, h2[tabindex]:focus, .ok-texto:focus { outline: none; }
 
 /* Sobre fondos oscuros (el aviso, los timers) el anillo va del color del texto. */
-.aviso a:focus-visible, .timer-chip button:focus-visible { outline-color: currentColor; }
+.aviso a:focus-visible, .aviso button:focus-visible, .timer-chip button:focus-visible { outline-color: currentColor; }
 
 ::placeholder { color: var(--tinta-2); opacity: 1; }
 
@@ -397,6 +397,9 @@ textarea:focus, input[type="text"]:focus, select:focus {
 /* Área tocable de 44 px aunque el chip mida 36. */
 .chip::after { content: ''; position: absolute; inset: -4px 0; }
 
+/* «Con lo que tengo»: usar la despensa y el link para verla. */
+.tengo-despensa { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
 .chip[aria-pressed="true"] {
   border-color: var(--tinta);
   background: var(--tinta);
@@ -637,7 +640,7 @@ textarea:focus, input[type="text"]:focus, select:focus {
 
 .lista-ingredientes li.opcional { color: var(--tinta-2); }
 
-.marca-opcional {
+.marca-opcional, .marca-en-casa {
   margin-left: 8px;
   padding: 1px 7px;
   border: 1px solid var(--borde-control);
@@ -942,6 +945,11 @@ textarea:focus, input[type="text"]:focus, select:focus {
 .cocina-fin .boton-principal, .cocina-fin .boton-secundario { min-height: 60px; }
 
 .cocina-fin-otros { display: flex; justify-content: space-between; }
+
+/* «¿Se terminó algo?»: lo de la despensa que usa la receta. */
+.se-termino { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; border: none; }
+
+.se-termino legend { padding: 0; margin-bottom: 2px; font: 500 22px var(--serif); }
 
 /* Editor de ingredientes */
 
@@ -1370,9 +1378,9 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 
 .aviso { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
-.aviso:has(a) { padding-top: 0; padding-bottom: 0; }
+.aviso:has(a), .aviso:has(button) { padding-top: 0; padding-bottom: 0; }
 
-.aviso a {
+.aviso a, .aviso button {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -1380,6 +1388,15 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
   color: var(--superficie);
   font-weight: 600;
   text-decoration: underline;
+}
+
+.aviso button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .tarjeta-reciente > .icono { color: var(--tinta-2); }
