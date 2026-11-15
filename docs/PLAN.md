@@ -130,7 +130,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Pantalla `#/despensa`
 - [x] Entradas desde Compras, «Revisá si tenés», «Limpiar marcados», «¿Cómo salió?» y «Con lo que tengo»
 - [x] Demo con la API falsa (§8, Fase 9)
-- [ ] Deploy de la API 0.11.0, `setup()` (hoja `Despensa`) y smoke
+- [x] Deploy de la API 0.11.0, `setup()` (hoja `Despensa`) y smoke
 
 ### Fase 10a: recetas propias
 
