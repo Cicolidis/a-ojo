@@ -62,7 +62,7 @@ Las dos hojas nuevas son chicas: `todo` las manda **siempre enteras**, como `Com
 | actualizado | fecha-hora ISO | |
 
 - Un nombre se compara con los ingredientes igual que las reglas de `Lugares`: sin tildes ni mayúsculas, tolerando el plural, y valiendo para lo que empieza igual («yogur» vale para «yogur griego»). La función es la misma (`compras.js`).
-- No hay dos filas con el mismo nombre comparado así: sumar uno que ya está no hace nada.
+- No hay dos filas con el mismo nombre: sumar uno que ya está no hace nada. Para eso se compara el nombre entero (sin tildes ni mayúsculas, tolerando el plural): «harina» y «harina 0000» son dos filas. Lo que empieza igual vale solo para leer («En casa», «¿Se terminó algo?»), no para sumar ni sacar.
 
 ### Recetas propias (cambios en hojas que ya existen)
 - `Recetas.plataforma` suma el valor `manual`: sin `fuente_url`, con `autor` vacío. `origen_datos` suma la capa `texto` (la receta escrita por ellos) y `confianza` puede quedar vacía mientras no tenga ingredientes.
@@ -79,7 +79,7 @@ Todas idempotentes, con su caso en `aplicarEdicion()` y su test, como pide `CLAU
 |---|---|---|---|
 | POST | `plan.poner` | `{items: [{id, semana, fecha?, comida?, receta_id, porciones}]}` (hasta 50) | `{ids}`. Crea o reemplaza cada entrada por id: sirve para sumar, mover (a un día, a la otra comida o a «Sin día») y copiar una semana entera de una vez |
 | POST | `plan.quitar` | `{ids}` | `{quitados}` |
-| POST | `despensa.sumar` | `{items: [{id, nombre}]}` | `{ids, nuevos}`. Los que ya estaban (por id o por nombre) no se tocan |
+| POST | `despensa.sumar` | `{items: [{id, nombre}], quien}` | `{ids, nuevos}`. Los que ya estaban (por id o por nombre, también dentro del mismo pedido) no se tocan |
 | POST | `despensa.quitar` | `{ids}` | `{quitados}` |
 | POST | `receta.crear` | `{id, titulo, tipo, porciones?, texto?, bandeja_id?, quien}` | `{id, bandeja_id?}`. Crea una receta propia (`plataforma = manual`). Con `texto`, también la fila de la bandeja (`pendiente`) para que `/recetas` la ordene. Los ids los genera la app |
 | POST | `receta.editar` | `{id, titulo?, tipo?, porciones?}` | `{id}`. Solo para recetas propias: las demás las cambia `/recetas` |
@@ -132,8 +132,8 @@ Dos botones arriba de la semana, **«Repetir una semana»** y **«Usar como mode
 
 ### 5.2 Cómo se llena y cómo se vacía
 - **A mano**, en la pantalla de la despensa.
-- **Desde la lista de compras:** «Limpiar marcados» pasa a la despensa lo que se compró (salvo los utensilios), con el aviso «Lo pasé a la despensa» y «Deshacer».
-- **Desde «Revisá si tenés»:** marcar «lo tengo» lo suma a la despensa.
+- **Desde la lista de compras:** «Limpiar marcados» pasa a la despensa lo que se compró (salvo los utensilios y lo que ya estaba), con el aviso «Pasé a la despensa: …» y «Deshacer». «Deshacer» saca de la despensa lo que se acaba de sumar; los marcados se van de la lista igual. Si no queda nada para pasar, no hay aviso.
+- **Desde «Revisá si tenés»:** marcar «lo tengo» lo suma a la despensa; desmarcarlo lo saca (si está con ese mismo nombre).
 - **Al terminar de cocinar:** «¿Cómo salió?» suma una pregunta opcional, «¿Se terminó algo?», con los principales de la receta que están en la despensa como casillas. Lo marcado sale de la despensa.
 - La despensa no lleva cantidades ni fechas de vencimiento en la v2.
 
@@ -269,13 +269,13 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - **Copiar semanas:** «Repetir una semana» (igual) y «Usar como modelo» (a «Sin día», para repartir), desde cualquier semana guardada, hacia la semana que se está mirando.
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
+- **Despensa (Fase 9):** «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa.
 - **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
 **Supuestos de este borrador, para revisar antes de empezar:**
 - La semana empieza el lunes, y solo hay almuerzo y cena (sin desayuno ni merienda).
 - La navegación pasa a cuatro pestañas, con Semana en segundo lugar.
 - La despensa no lleva cantidades y no se descuenta sola al cocinar: se pregunta en «¿Cómo salió?».
-- «Limpiar marcados» pasa lo comprado a la despensa (con «Deshacer»), en lugar de preguntar cada vez.
 - El historial del plan se guarda 26 semanas (medio año).
 - Al repetir sobre una semana que ya tiene algo, se pregunta si reemplazar o sumar.
 - «Usar como modelo» trae todos los platos, aunque alguno ya esté en la semana de destino.
