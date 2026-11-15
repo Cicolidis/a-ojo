@@ -111,6 +111,8 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   // Los chips de los timers se arman solo cuando cambia cuáles hay; cada segundo
   // se actualiza el texto en el lugar, así un toque nunca cae en un botón que se reemplazó.
   const zonaTimers = h('div', { class: 'timers' });
+  // Un timer suena solo con la app abierta (el celular la suspende en segundo plano): se avisa abajo de los chips.
+  const notaTimers = h('p', { class: 'timers-nota', hidden: true });
   const anuncio = h('p', { class: 'solo-lector', role: 'status' });
   let chips = new Map(); // id del paso → { chip, texto, vencido }
   let activosAntes = '';
@@ -137,6 +139,8 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
         return [p.id, { chip, texto, n, vencido: false }];
       }));
       zonaTimers.replaceChildren(...[...chips.values()].map(c => c.chip));
+      notaTimers.hidden = !chips.size;
+      notaTimers.textContent = chips.size > 1 ? 'Suenan con A ojo abierta.' : 'Suena con A ojo abierta.';
     }
     let suena = false;
     chips.forEach((c, pid) => {
@@ -239,6 +243,7 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
         class: (i <= actual ? 'hecho' : '') + (desde === 'derecha' && i === actual ? ' recien' : ''),
       }))),
       zonaTimers,
+      notaTimers,
       anuncio,
       h('div', { class: 'cocina-paso' + (desde ? ' desde-' + desde : '') },
         titulo,

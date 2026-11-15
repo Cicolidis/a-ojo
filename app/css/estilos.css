@@ -840,6 +840,8 @@ textarea:focus, input[type="text"]:focus, select:focus {
 
 .timer-chip.sono { background: var(--alerta); }
 
+.timers-nota { margin-top: 6px; font-size: 13px; color: var(--tinta-2); }
+
 .cocina-paso {
   flex: 1;
   margin-top: 24px;
