@@ -107,3 +107,62 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [ ] Laura corre `/recetas` en su computadora y la receta llega a la app
 - [ ] Dos corridas a la vez no toman la misma fila
 - [ ] La SPEC describe lo que hace el código
+
+## v2 (`SPEC_v2.md`)
+
+### Fase 7: arrastre de la v1
+
+- [ ] Backup sin script: hojas copiadas con `sheet.copyTo()` a una planilla nueva
+- [ ] Test de paridad entre `obsidian.py` y `formato.js` / `ingredientes.js`
+- [ ] Una sola lista de pendientes: sacar los estados de §9 de `SPEC_v1.md`
+
+### Fase 8: escalado con conversión
+
+- [ ] Familias de unidades y reglas al escalar (§7.1 y §7.2)
+- [ ] Avisos de molde y de cocción (§7.3)
+- [ ] Sumas de compras entre unidades de la misma familia (§7.4)
+- [ ] Demo con la API falsa: 6 porciones llevadas a 2 y a 15
+
+### Fase 9: despensa
+
+- [ ] Hoja `Despensa`, `despensa.sumar`, `despensa.quitar` y `todo` con `despensa`
+- [ ] Pantalla `#/despensa`
+- [ ] Entradas desde Compras, «Revisá si tenés», «Limpiar marcados», «¿Cómo salió?» y «Con lo que tengo»
+- [ ] Demo con la API falsa (§8, Fase 9)
+
+### Fase 10a: recetas propias
+
+- [ ] `plataforma = manual`, capa `texto`, `Bandeja.texto`; `receta.crear`, `receta.editar`, `receta.escribir`
+- [ ] `receta.upsert` y `receta.corregir` con recetas propias
+- [ ] «Nueva receta», «Receta nuestra», chip «Nuestras», «Escribir la receta» y «Editar»
+- [ ] El caso `manual` en `/recetas`
+- [ ] Demo con la API falsa (§8, Fase 10a)
+
+### Fase 10b: plan semanal
+
+- [ ] Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` en lote, `plan.quitar` y `todo` con `plan`
+- [ ] Limpieza de las entradas de más de 26 semanas en el backup
+- [ ] Pantalla `#/semana` y la pestaña nueva
+- [ ] «Sumar a la semana» desde la ficha
+- [ ] Compra de la semana
+- [ ] «Repetir una semana» y «Usar como modelo», con el selector de semanas
+- [ ] Demo con la API falsa (§8, Fase 10b)
+
+### Fase 11: pruebas en dispositivos
+
+- [ ] Compartir un Reel desde Instagram a la app instalada (también volviendo enseguida a Instagram)
+- [ ] Un «Algo está mal» resuelto con `/recetas`
+- [ ] Ingredientes por paso con una receta nueva
+- [ ] Laura corre `/recetas` en su computadora y la receta llega a la app
+- [ ] Dos corridas a la vez no toman la misma fila
+- [ ] Un «Descartar» sin conexión sobre una fila `lista` vuelve con aviso
+- [ ] El primer backup semanal, sin script, está en Drive
+- [ ] `navigator.storage.estimate()`: cuánto ocupa la caché de fotos
+- [ ] Una fila en «Necesita ayuda» resuelta con capturas desde el celular (4b)
+- [ ] Demo de Android de la Fase 5: de cero, modo oscuro y «quitar animaciones»
+- [ ] `/recetas` con Sonnet comparado con Opus en 3 o 4 recetas
+- [ ] Sin conexión, un celular arma la semana y suma a la despensa; el otro lo ve al volver
+- [ ] La compra de la semana aparece en el otro celular y se manda por WhatsApp
+- [ ] Cocinar desde «Hoy» con las porciones del día y vaciar algo de la despensa en «¿Cómo salió?»
+- [ ] Una receta propia escrita en un celular, ordenada por `/recetas` y vista en el otro
+- [ ] «Usar como modelo» en un celular y el reparto de «Sin día» terminado en el otro

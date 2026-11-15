@@ -1,6 +1,6 @@
 # A ojo — notas para Claude Code
 
-La spec es `SPEC_v1.md`; el desarrollo avanza por las fases de su §9. Cada fase termina con una demo y un commit.
+Las specs son `SPEC_v1.md` (el MVP, fases 1 a 6, en su §9) y `SPEC_v2.md` (fases 7 en adelante, en su §8); lo que la v2 no cambia sigue como dice la v1. Las casillas de cada fase están en `docs/PLAN.md`. Cada fase termina con una demo y un commit.
 
 ## Convenciones
 

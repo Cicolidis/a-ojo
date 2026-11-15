@@ -20,6 +20,8 @@
 - Lista de compras consolidada por lugar (supermercado, verdulería…), exportable a WhatsApp.
 
 ### Queda para después (v2+)
+La v2 está en `SPEC_v2.md`: plan semanal, despensa y escalado con conversión. «¿Qué cocino hoy?» (la versión simple) y la exportación a Obsidian se hicieron en la Fase 6.
+
 - Plan semanal.
 - "¿Qué cocino hoy?" a partir de lo que hay en casa.
 - Escalado inteligente de porciones con conversión de unidades (en v1 solo se multiplican las cantidades numéricas).
