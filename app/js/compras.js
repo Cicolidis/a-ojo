@@ -150,6 +150,20 @@ export function elegidosIniciales(receta, compras) {
   return elegidos;
 }
 
+/**
+ * Lo que arranca marcado en la compra de la semana (SPEC_v2 §4.2). Si la receta ya está en la lista,
+ * lo que está ahí (elegidosIniciales). Si no, los principales, salvo lo que hay en la despensa (la
+ * comparación de lectura, enDespensa: «yogur» vale para «yogur griego»), que arranca desmarcado.
+ * Devuelve { elegidos: Set de ids de ingredientes, enCasa: Set de los que están en la despensa, enLista }.
+ */
+export function elegidosDeSemana(receta, compras, despensa) {
+  const enCasa = new Set(receta.ingredientes.filter(i => !vaARevisar(i) && enDespensa(i.nombre, despensa)).map(i => i.id));
+  const enLista = deLaReceta(compras, receta.id).length > 0;
+  if (enLista) return { elegidos: elegidosIniciales(receta, compras), enCasa, enLista };
+  const principales = receta.ingredientes.filter(i => rolDe(i) === 'principal' && !enCasa.has(i.id));
+  return { elegidos: new Set(principales.map(i => i.id)), enCasa, enLista };
+}
+
 /** ¿La receta cambió desde que se agregó a la lista? Algo de la lista ya no corresponde a ningún ingrediente. */
 export function recetaCambio(receta, compras) {
   const usados = new Set(emparejar(receta, compras).values());

@@ -111,3 +111,32 @@ export function platosQueFaltan(plan, hoy) {
 export function nuevaEntrada({ semana, fecha = '', comida = '', receta_id, porciones = null }) {
   return { id: idAzar('s'), semana, fecha: fecha || '', comida: fecha ? comida : '', receta_id, porciones: porciones || null };
 }
+
+/**
+ * La compra de la semana (SPEC_v2 §4.2): las recetas de los días que todavía no pasaron (desde `hoy`) y
+ * las de «Sin día», en el orden de la semana, con las porciones sumadas si una receta está más de una
+ * vez (si alguna entrada no tiene porciones, cuentan las que sí). Las que no tienen ingredientes van
+ * aparte. Las entradas cuya receta ya no está se saltean. Devuelve { recetas: [{ receta, porciones }], sinIngredientes }.
+ */
+export function compraDeLaSemana(plan, semana, hoy, porId) {
+  const orden = e => (e.fecha || '9999') + (e.comida === 'cena' ? '2' : '1');
+  const juntas = new Map();
+  (plan || [])
+    .filter(e => e.semana === semana && (!e.fecha || e.fecha >= hoy) && porId.has(e.receta_id))
+    .sort((a, b) => orden(a).localeCompare(orden(b)))
+    .forEach(e => {
+      const x = juntas.get(e.receta_id) || { receta: porId.get(e.receta_id), porciones: 0 };
+      x.porciones += Number(e.porciones) || 0;
+      juntas.set(e.receta_id, x);
+    });
+  const todas = [...juntas.values()].map(x => ({ receta: x.receta, porciones: x.porciones || null }));
+  return {
+    recetas: todas.filter(x => x.receta.ingredientes.length),
+    sinIngredientes: todas.filter(x => !x.receta.ingredientes.length).map(x => x.receta),
+  };
+}
+
+/** ¿Hay algo para comprar de esa semana, de hoy en adelante (o en «Sin día»)? */
+export function hayCompra(plan, semana, hoy) {
+  return (plan || []).some(e => e.semana === semana && (!e.fecha || e.fecha >= hoy)) && sumarDias(semana, 6) >= hoy;
+}

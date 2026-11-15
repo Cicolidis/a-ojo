@@ -1634,3 +1634,26 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 
 /* Al lado de «Empezar a cocinar»: el ícono arriba y «Semana» abajo, como las pestañas. */
 .boton-semana-ficha.corto { flex-direction: column; gap: 2px; padding: 0 12px; font-size: 13px; }
+
+/* Compra de la semana (SPEC_v2 §4.2): una sección plegable por receta. */
+.compra-semana { display: flex; flex-direction: column; gap: 12px; }
+
+.compra-semana-receta { padding: 4px 14px 12px; border: 1px solid var(--borde); border-radius: 16px; background: var(--superficie); }
+
+.compra-semana-receta summary { display: flex; align-items: center; gap: 10px; min-height: 52px; cursor: pointer; list-style: none; }
+
+.compra-semana-receta summary::-webkit-details-marker { display: none; }
+
+.compra-semana-receta summary:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 8px; }
+
+.compra-semana-receta summary .icono { margin-left: auto; color: var(--tinta-2); }
+
+.compra-semana-receta[open] summary .icono { transform: rotate(90deg); }
+
+.compra-semana-titulo { display: flex; flex-direction: column; min-width: 0; }
+
+.compra-semana-titulo strong { font: 500 18px/1.2 var(--serif); }
+
+.compra-semana-cuerpo { display: flex; flex-direction: column; gap: 10px; }
+
+.armar-compra { align-self: stretch; }

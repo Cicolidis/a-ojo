@@ -39,6 +39,7 @@ const ARCHIVOS = [
   'js/vistas/biblioteca.js',
   'js/vistas/bienvenida.js',
   'js/vistas/cocina.js',
+  'js/vistas/compra-semana.js',
   'js/vistas/compras.js',
   'js/vistas/controles.js',
   'js/vistas/despensa.js',

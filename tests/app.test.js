@@ -1677,3 +1677,46 @@ test('vistas de la semana: textoLugar y la dirección del «+»', async () => {
   assert.equal(direccionElegir('2026-11-16', '2026-11-17', 'almuerzo'), '#/semana/2026-11-16/elegir?fecha=2026-11-17&comida=almuerzo');
   assert.equal(direccionElegir('2026-11-16'), '#/semana/2026-11-16/elegir');
 });
+
+test('compraDeLaSemana: desde hoy y Sin día, porciones sumadas, y aparte las que no tienen ingredientes', async () => {
+  const p = await cargar('plan.js');
+  const r = (id, ings = 1) => ({ id, titulo: id, ingredientes: Array.from({ length: ings }, (_, i) => ({ id: id + i })) });
+  const porId = new Map([['r_pollo', r('r_pollo')], ['r_sopa', r('r_sopa')], ['r_milan', r('r_milan', 0)]]);
+  const e = (fecha, comida, receta_id, porciones) => ({ semana: '2026-11-16', fecha, comida, receta_id, porciones });
+  const plan = [
+    e('2026-11-16', 'cena', 'r_sopa', 2),
+    e('2026-11-18', 'cena', 'r_pollo', 4),
+    e('', '', 'r_pollo', 2),
+    e('2026-11-17', 'almuerzo', 'r_milan', 2),
+    e('2026-11-19', 'cena', 'r_borrada', 2),
+    e('2026-11-20', 'cena', 'r_sopa', null),
+    Object.assign(e('2026-11-24', 'cena', 'r_sopa', 6), { semana: '2026-11-23' }),
+  ];
+  const c = p.compraDeLaSemana(plan, '2026-11-16', '2026-11-17', porId);
+  assert.deepEqual(c.recetas.map(x => [x.receta.id, x.porciones]), [['r_pollo', 6], ['r_sopa', null]],
+    'el lunes ya pasó; el pollo suma 4 + 2; la sopa del viernes sin porciones');
+  assert.deepEqual(c.sinIngredientes.map(x => x.id), ['r_milan']);
+  assert.equal(p.hayCompra(plan, '2026-11-16', '2026-11-17'), true);
+  assert.equal(p.hayCompra(plan, '2026-11-16', '2026-11-23'), false, 'una semana que ya pasó');
+  assert.equal(p.hayCompra([], '2026-11-16', '2026-11-17'), false);
+});
+
+test('elegidosDeSemana: lo de la despensa arranca desmarcado (En casa); si ya está en la lista, lo de la lista', async () => {
+  const { elegidosDeSemana } = await cargar('compras.js');
+  const receta = { id: 'r_tarta', porciones: 4, ingredientes: [
+    { id: 'i1', nombre: 'tapas de tarta', rol: 'principal', unidad: 'u', cantidad: 2 },
+    { id: 'i2', nombre: 'huevos', rol: 'principal', unidad: 'u', cantidad: 3 },
+    { id: 'i3', nombre: 'yogur griego', rol: 'principal', unidad: 'g', cantidad: 100 },
+    { id: 'i4', nombre: 'queso', rol: 'opcional', unidad: 'a ojo' },
+    { id: 'i5', nombre: 'sal', rol: 'condimento', unidad: 'a ojo' },
+  ] };
+  const despensa = [{ id: 'd1', nombre: 'Huevo' }, { id: 'd2', nombre: 'yogur' }, { id: 'd3', nombre: 'sal' }];
+  const nueva = elegidosDeSemana(receta, [], despensa);
+  assert.deepEqual([...nueva.elegidos], ['i1']);
+  assert.deepEqual([...nueva.enCasa].sort(), ['i2', 'i3'], 'los condimentos no se marcan: van a «Revisá si tenés»');
+  assert.equal(nueva.enLista, false);
+  const compras = [{ id: 'c1', receta_id: 'r_tarta', nombre: 'huevos', rol: 'principal', unidad: 'u', cantidad: 3, porciones: 4 }];
+  const ya = elegidosDeSemana(receta, compras, despensa);
+  assert.equal(ya.enLista, true);
+  assert.deepEqual([...ya.elegidos], ['i2'], 'lo que ya está en la lista, aunque esté en la despensa');
+});

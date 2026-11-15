@@ -21,6 +21,7 @@ import * as elegir from './vistas/elegir.js';
 import * as propia from './vistas/propia.js';
 import * as semana from './vistas/semana.js';
 import * as poner from './vistas/poner.js';
+import * as compraSemana from './vistas/compra-semana.js';
 import * as bienvenida from './vistas/bienvenida.js';
 
 const CINCO_MIN_MS = 5 * 60 * 1000;
@@ -109,6 +110,7 @@ function mostrar({ enfocar = false } = {}) {
   else if (ruta.nombre === 'semana') vista = semana.montar(contenedor, ctx, ruta.semana);
   else if (ruta.nombre === 'semana-elegir') vista = elegir.montar(contenedor, ctx, ruta);
   else if (ruta.nombre === 'semana-poner') vista = poner.montar(contenedor, ctx, ruta);
+  else if (ruta.nombre === 'semana-compra') vista = compraSemana.montar(contenedor, ctx, ruta.semana);
   else if (ruta.nombre === 'nueva') vista = propia.montar(contenedor, ctx, null, ruta);
   else if (ruta.nombre === 'editar') vista = propia.montar(contenedor, ctx, ruta.id);
   else vista = biblioteca.montar(contenedor, ctx);

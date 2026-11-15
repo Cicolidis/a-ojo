@@ -7,7 +7,7 @@
 import { h, icono, foto, rellenar } from '../dom.js';
 import { nuevaEdicion } from '../ediciones.js';
 import { hayQueGuardarVista } from '../ingredientes.js';
-import { COMIDAS, armarSemana, diaCorto, diasDe, hoyIso, lunesDe, sumarDias, textoDia, textoSemana } from '../plan.js';
+import { COMIDAS, armarSemana, diaCorto, diasDe, hayCompra, hoyIso, lunesDe, sumarDias, textoDia, textoSemana } from '../plan.js';
 import { cargando, contadorPorciones, navegacion, segmentado, tocarAfueraCierra, vacio } from './controles.js';
 
 /** «Lunes 16 · Cena» o «Sin día». */
@@ -31,6 +31,8 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
   const cual = h('p', { class: 'secundario' });
   const sync = h('p', { class: 'estado-sync', role: 'status' });
   const zona = h('div', { class: 'semana-dias' });
+  // «Armar la compra de la semana» (SPEC_v2 §4.2), abajo: solo si queda algo por cocinar.
+  const compra = h('a', { class: 'boton-principal armar-compra', href: '#/semana/' + semana + '/compra' }, icono('compras', 20), 'Armar la compra de la semana');
   const dialogo = tocarAfueraCierra(h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-entrada' }));
   const nav = navegacion('semana', app);
   const ir = destino => reemplazar(destino, history.state && history.state.desde);
@@ -47,6 +49,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
     volverAHoy,
     sync,
     zona,
+    compra,
     dialogo,
   ), nav);
 
@@ -179,6 +182,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
   /** Repinta y deja el foco en el control equivalente (data-foco): el pedido o el que lo tenía; si no está, el título. */
   function pintar(foco) {
     foco = foco || (document.activeElement && document.activeElement.getAttribute('data-foco'));
+    compra.hidden = true;
     if (!app.datos) {
       return rellenar(zona, app.sync.estado === 'sincronizando' ? cargando('Bajando la semana…')
         : vacio({ figura: 'aviso', titulo: 'Todavía no se bajó la semana', texto: 'Cuando haya conexión, aparece sola.' }));
@@ -189,6 +193,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
         acciones: [{ texto: 'Nueva receta', href: '#/nueva' }] }));
     }
     const s = armarSemana(app.datos.plan, semana, app.indice.porId);
+    compra.hidden = !hayCompra(app.datos.plan, semana, hoy);
     rellenar(zona,
       !s.total ? vacio({ figura: 'calendario', titulo: 'Todavía no hay nada para esta semana',
         acciones: [{ texto: 'Elegir una receta', href: direccionElegir(semana) }] }) : null,

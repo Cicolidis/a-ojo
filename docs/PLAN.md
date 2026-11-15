@@ -149,7 +149,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Pantalla `#/semana` y la pestaña nueva
 - [x] Elegir, porciones, mover y quitar
 - [x] «Sumar a la semana» desde la ficha y la Biblioteca
-- [ ] Compra de la semana
+- [x] Compra de la semana
 - [ ] «Repetir una semana» y «Usar como modelo», con el selector de semanas
 - [ ] Demo con la API falsa (§8, Fase 10b)
 - [ ] Deploy de la API 0.13.0, `setup()` (hoja `Plan`) y smoke
