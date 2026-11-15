@@ -8,13 +8,24 @@ import { cuantasFilas, resumenBandeja } from '../datos.js';
 import { COMIDAS, diaCorto, diaYMes, diasDe, hoyIso, lunesDe, nuevaEntrada, platosQueFaltan, sumarDias, textoDia } from '../plan.js';
 import { nuevaEdicion } from '../ediciones.js';
 
-/** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
+/**
+ * Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores: con
+ * `closedby="any"` donde existe y, si no (Safari), a mano, solo si el toque empieza y termina afuera.
+ */
 export function tocarAfueraCierra(dialogo) {
-  dialogo.addEventListener('click', e => {
-    const r = dialogo.getBoundingClientRect();
-    const afuera = e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right;
-    if (e.target === dialogo && afuera) dialogo.close();
-  });
+  dialogo.setAttribute('closedby', 'any');
+  if (!('closedBy' in HTMLDialogElement.prototype)) {
+    const afuera = e => {
+      const r = dialogo.getBoundingClientRect();
+      return e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right;
+    };
+    let empezoAfuera = false;
+    dialogo.addEventListener('pointerdown', e => { empezoAfuera = afuera(e); });
+    dialogo.addEventListener('pointerup', e => {
+      if (empezoAfuera && afuera(e)) dialogo.close();
+      empezoAfuera = false;
+    });
+  }
   return dialogo;
 }
 
