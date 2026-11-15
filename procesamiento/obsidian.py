@@ -193,7 +193,9 @@ def nota_markdown(receta, ingredientes, pasos, notas):
                          minutos(receta.get('tiempo_min')),
                          f'Molde {receta["molde"]}' if receta.get('molde') else '') if x]
     fuente = receta.get('fuente_url') or ''
-    if fuente.startswith(('http://', 'https://')):
+    if receta.get('plataforma') == 'manual':
+        datos.append('Receta nuestra')
+    elif fuente.startswith(('http://', 'https://')):
         datos.append(f'[Ver el video]({fuente})' + (f' de {receta["autor"]}' if receta.get('autor') else ''))
     if datos:
         lineas += [' · '.join(datos), '']

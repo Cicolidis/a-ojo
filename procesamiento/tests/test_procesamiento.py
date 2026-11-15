@@ -448,6 +448,28 @@ class TestCorregir(unittest.TestCase):
             r, codigo = correr_api('receta', 'b_sin')
         self.assertEqual((r['error'], codigo), ('sin_receta', 1))
 
+    def test_receta_propia_baja_la_guardada_y_su_texto(self):
+        todo = {
+            'recetas': [{'id': 'r_milan', 'titulo': 'Milanesas con puré', 'tipo': 'salado', 'porciones': 2, 'plataforma': 'manual',
+                         'fuente_url': '', 'autor': '', 'confianza': '', 'origen_datos': '', 'etiquetas': ''}],
+            'ingredientes': [], 'pasos': [],
+            'bandeja': [{'id': 'b_milanesa', 'receta_id': 'r_milan', 'estado': 'procesando', 'plataforma': 'manual', 'url': '',
+                         'pedido': '', 'texto': '4 milanesas, 1 kg de papa,\nmanteca y leche.'}],
+        }
+        with mock.patch.object(api, 'llamar', return_value=todo):
+            r, codigo = correr_api('receta', 'b_milanesa')
+        self.assertEqual((codigo, r['plataforma'], r['pedido']), (0, 'manual', ''))
+        self.assertEqual(r['texto'], '4 milanesas, 1 kg de papa,\nmanteca y leche.')
+        d = comun.dir_trabajo('b_milanesa')
+        self.assertEqual((d / 'texto.txt').read_text(encoding='utf-8'), '4 milanesas, 1 kg de papa,\nmanteca y leche.\n')
+        receta = comun.leer_json(d / 'receta.json')
+        self.assertEqual((receta['titulo'], receta['porciones'], receta['fuente_url'], receta['ingredientes']),
+                         ('Milanesas con puré', 2, '', []))
+
+        with mock.patch.object(api, 'llamar', return_value={'filas': [todo['bandeja'][0]], 'quedan': 0}):
+            r, _ = correr_api('tomar')
+        self.assertEqual((r['filas'][0]['plataforma'], r['filas'][0]['texto'][:12]), ('manual', '4 milanesas,'), '/recetas ve el texto')
+
     def test_upsert_sin_foto_no_la_manda(self):
         d = comun.dir_trabajo('b_foto')
         comun.escribir_json(d / 'receta.json', {'titulo': 'Brownie'})
@@ -517,6 +539,13 @@ class TestObsidian(unittest.TestCase):
         self.assertNotIn('Borrada', texto)
         self.assertIn('## Cómo se armó\n\nSalió de la descripción del video y los subtítulos.', texto)
         self.assertIn('El tiempo es estimado.', texto)
+
+    def test_una_receta_propia_dice_receta_nuestra(self):
+        texto = obsidian.nota_markdown({'id': 'r_milan', 'titulo': 'Milanesas', 'porciones': 2, 'plataforma': 'manual',
+                                        'fuente_url': '', 'origen_datos': 'texto'}, [], [], [])
+        self.assertIn('Para 2 porciones · Receta nuestra\n', texto)
+        self.assertNotIn('Ver el video', texto)
+        self.assertIn('Salió de la receta que escribieron.', texto)
 
     def test_una_porcion_en_singular(self):
         texto = obsidian.nota_markdown({'id': 'r_1', 'titulo': 'Huevo frito', 'porciones': 1}, [], [], [])

@@ -12,7 +12,7 @@ Argumentos: `$ARGUMENTS`
 
 - Un número `N`: procesá hasta N filas. Sin número, **hasta 10** (YouTube corta con HTTP 429 si se le pide mucho seguido).
 - Un id de la bandeja (ej.: `b_e3cgj`): procesá solo esa fila, esté en el estado que esté (sirve para reprocesar).
-- `--dry-run`: no escribe nada en la Sheet. Pasá `--dry-run` a todos los `api actualizar` y `api upsert` (este último solo valida la receta contra la API). En lugar de `api tomar`, que reserva, procesá en orden las filas de `api pendientes --limite N` (o la de `api fila <id>`).
+- `--dry-run`: no escribe nada en la Sheet (para probar una sola fila, pasá también su id). Pasá `--dry-run` a todos los `api actualizar` y `api upsert` (este último solo valida la receta contra la API). En lugar de `api tomar`, que reserva, procesá en orden las filas de `api pendientes --limite N` (o la de `api fila <id>`).
 - `--sin-cookies`: pasáselo a `fetch meta` (para probar Instagram sin la cuenta secundaria).
 - `--clasificar`: no procesa la bandeja. Completa la sección y el rol de los ingredientes de las recetas ya guardadas que no los tienen. Seguí §5 y no hagas nada más.
 
@@ -36,8 +36,9 @@ Procesá las filas **de a una**. Después de cada una, contá en una línea cóm
 - Si `filas` viene vacía, no queda nada (o lo tomó otra corrida): terminá y andá a §4.
 - Si responde `procesando` (con un id), la tiene otra corrida: decilo y terminá.
 - Si trae `aviso`, la API todavía no tiene `bandeja.tomar`: seguí igual y mencionalo al final (hay que desplegarla).
-- La fila trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» (si trae `pedido`: «Intenté corregirla 3 veces y no pude. Cancelá el pedido y escribilo de nuevo.») y tomá la próxima.
+- La fila trae `intentos`: si es **mayor que 3**, pasala a `ayuda` con el motivo «Lo intenté 3 veces y no pude. Mandá 2 o 3 capturas.» (si trae `pedido`: «Intenté corregirla 3 veces y no pude. Cancelá el pedido y escribilo de nuevo.»; si es una receta propia sin pedido: «Lo intenté 3 veces y no pude ordenarla. Cambiá el texto desde la receta.») y tomá la próxima.
 - Si la fila trae `pedido`, es un **pedido de corrección** que hicieron desde la ficha («Algo está mal en esta receta»): seguí §1.5 en lugar de §1.2 y §1.3.
+- Si la fila trae `plataforma = manual` (y `url` vacía), es una **receta propia**: un plato que ya hacen, que escribieron en la app (`texto`). Sin pedido, seguí §1.6 en lugar de §1.2 y §1.3; con pedido, §1.5, con el texto como fuente.
 
 Cuando termines una fila, volvé a §1.1 hasta procesar N (sin número, 10).
 
@@ -91,7 +92,7 @@ La fila ya es una receta y ellos pidieron corregirla: `pedido` dice qué está m
 
 1. **Bajarla:** `procesamiento/aojo api receta <id>`. Deja la receta guardada en `<dir>/receta.json` (`~/.a-ojo/trabajo/<id>`), en el formato de §2, y devuelve el `pedido`. Si ya había un `receta.json` de otra corrida, queda como `receta.anterior.json`.
 2. **Capturas:** si la fila trae `capturas` (las subieron desde la app para este pedido), bajalas con `api capturas <id>` y leelas: son parte del pedido («la cantidad está en esta captura»).
-3. **Verificar contra la fuente:** buscá en la fuente el dato que piden cambiar. Primero lo que ya esté en `<dir>` (lo que dejó la primera corrida: `subtitulos.txt`, `transcripcion.txt`, `web.json`, `comentarios.json`; nunca `info.json` entero). La descripción o el caption salen de `fetch meta`. Si no hay nada (por ejemplo, la primera vez se procesó en la otra computadora), corré solo las capas que hagan falta para chequear ese dato (§1.2), empezando por `fetch meta`. Si la fuente no se puede leer (`login`, `privado`, `no_disponible`), **aplicá el pedido igual** y anotá en `notas_proceso` que no se pudo verificar; no la mandes a `ayuda` por eso. Con `limite` o `red`, §1.4 como siempre.
+3. **Verificar contra la fuente:** buscá en la fuente el dato que piden cambiar. En una receta propia la fuente es lo que escribieron (`texto.txt`, que deja `api receta`): no bajes nada. Primero lo que ya esté en `<dir>` (lo que dejó la primera corrida: `subtitulos.txt`, `transcripcion.txt`, `web.json`, `comentarios.json`; nunca `info.json` entero). La descripción o el caption salen de `fetch meta`. Si no hay nada (por ejemplo, la primera vez se procesó en la otra computadora), corré solo las capas que hagan falta para chequear ese dato (§1.2), empezando por `fetch meta`. Si la fuente no se puede leer (`login`, `privado`, `no_disponible`), **aplicá el pedido igual** y anotá en `notas_proceso` que no se pudo verificar; no la mandes a `ayuda` por eso. Con `limite` o `red`, §1.4 como siempre.
 4. **Corregir:** editá `receta.json` con Write y cambiá **solo** lo que pide el pedido, con las reglas de §3. Cuidá lo que depende del cambio: si cambia un ingrediente, revisá los pasos que lo nombran (y al revés).
    - Si sumás, sacás o reordenás ingredientes, **renumerá** los `ingredientes` de todos los pasos: son posiciones en la lista.
    - **Excepción a «solo lo que pide»:** si la receta guardada no tiene `ingredientes` en ningún paso (es de antes), agregalos en todos con las reglas de §3, aunque el pedido no hable de eso (también cuando el pedido ya estaba aplicado).
@@ -104,6 +105,22 @@ La fila ya es una receta y ellos pidieron corregirla: `pedido` dice qué está m
 6. **Si no se entiende nada o no se puede aplicar** (habla de otra receta, pide algo que no está en ninguna parte y no se puede deducir): no cambies nada y `api actualizar <id> ayuda --motivo "No entendí el pedido: <por qué, en una línea>. Cancelalo y escribilo de nuevo desde la receta."`
 
 En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va qué cambió, en pocas palabras.
+
+### 1.6 Recetas propias
+
+La receta ya existe (la crearon en la app, con nombre, tipo y porciones) y tiene el texto que escribieron, como les salió («4 milanesas, 1 kg de papa, manteca y leche. Freír las milanesas…»). No hay nada para bajar: **no corras `fetch`** ni busques fotos.
+
+1. **Bajarla:** `procesamiento/aojo api receta <id>`. Deja la receta guardada en `<dir>/receta.json` (sin ingredientes ni pasos, o con los de la vez anterior si la reescribieron) y el texto en `<dir>/texto.txt`; los dos vienen también en la respuesta. Si el texto viene vacío, pasala a `ayuda` con «La receta está vacía. Escribila desde la receta.» y seguí con la próxima.
+2. **Ordenarla:** reescribí `receta.json` con Write a partir del texto, con todas las reglas de §3: rioplatense, voseo en los pasos, roles, secciones e ingredientes por paso. **Nunca inventes cantidades**: lo que el texto no dice («manteca y leche») queda `cantidad: null`, `unidad: "a ojo"`. Pasos que el texto no cuenta pero son obvios para que el plato salga (pelar las papas antes de hervirlas) se pueden sumar, y se cuentan en `notas_proceso`.
+   - `titulo`, `tipo` y `porciones`: dejalos **vacíos** (`""` o `null`), salvo que el texto diga otros («para 6», «la tarta de la abuela»). La API conserva los que pusieron ellos.
+   - `fuente_url` y `autor` vacíos, `foto` no hay. `origen_datos: ["texto"]`. `idioma_original`: el del texto (casi siempre `es`).
+   - `confianza`: `alta` si el texto trae las cantidades de lo importante; si no, `media` (lo que falta es de los que se hacen a ojo, como la leche de un puré) o `baja` (faltan cantidades importantes).
+   - `notas_proceso`, para ellos: qué se dedujo o se completó («Las cantidades de la leche y la manteca no estaban: quedaron a ojo.»).
+3. **Relectura:** como en §1.3.3, pero contra el texto: cada dato del texto tiene que estar en `receta.json`.
+4. **Guardar:** `procesamiento/aojo api upsert <id> --sin-foto`. Si responde `reescrita: true`, la reescribieron mientras la ordenabas: la receta quedó guardada, pero la fila vuelve a `pendiente` para ordenar el texto nuevo en la próxima corrida. Contalo en la tabla.
+5. Si el texto **no es una receta** o no se entiende qué lleva: `api actualizar <id> ayuda --motivo "No entendí la receta: <por qué, en una línea>. Cambiá el texto desde la receta."`
+
+En la tabla de §4, el resultado es `lista` y las capas, `texto`.
 
 ## 2. Formato de `receta.json`
 
@@ -139,7 +156,7 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
 
 - `tipo`: `dulce` · `salado` · `sopa` · `bebida` · `otro`.
 - `confianza`: `alta` · `media` · `baja` (§3 abajo).
-- `origen_datos`: las capas que **aportaron datos**, de `descripcion` (incluye los comentarios del autor) · `subtitulos` · `web` · `audio` · `frames` · `capturas`.
+- `origen_datos`: las capas que **aportaron datos**, de `descripcion` (incluye los comentarios del autor) · `subtitulos` · `web` · `audio` · `frames` · `capturas` · `texto` (lo que escribieron en una receta propia, §1.6).
 - `idioma_original`: código de 2 letras del video (`es`, `en`, `it`…).
 - `unidad`: `g` · `kg` · `ml` · `l` · `u` · `cda` · `cdita` · `taza` · `pizca` · `a ojo` · `lata` · `paquete` · `diente` · `ramo`.
 - `cantidad` es un número (`0.5`, no «1/2») y va `null` **si y solo si** la unidad es `a ojo`.

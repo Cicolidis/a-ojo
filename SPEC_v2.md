@@ -165,7 +165,7 @@ Los platos que ya hacemos, sin video ni web: se cargan rápido para ponerlos en 
 ### 6.3 En `/recetas`
 - Una fila con `plataforma = manual` no baja nada: su única capa es `texto`. Se estructura con las mismas reglas de §6.2 de la v1 (rioplatense, voseo en los pasos, **nunca inventar cantidades**, roles, secciones e ingredientes por paso) y se manda con `receta.upsert` sobre la receta que ya existe.
 - Lo que el texto no dice queda «a ojo» y la confianza, en `media` o `baja`, como siempre. `notas_proceso` cuenta qué se dedujo («Las cantidades de la leche y la manteca no estaban: quedaron a ojo»).
-- Va en `.claude/commands/recetas.md`, como un caso más de §1.2.
+- Va en `.claude/commands/recetas.md`, en su propia sección (§1.6): `api receta <id>` deja el texto en `texto.txt` y la receta guardada en `receta.json`.
 
 ---
 

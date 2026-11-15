@@ -87,8 +87,9 @@ def dry_run(args):
 
 ROLES = ('principal', 'condimento', 'opcional', 'utensilio')
 
+# `texto`: la receta que escribieron en la app (una receta propia, plataforma manual).
 RESUMEN_FILA = ('id', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'creado', 'actualizado',
-                'capturas', 'pedido')
+                'capturas', 'pedido', 'texto')
 EXTENSIONES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
 
 
@@ -240,7 +241,8 @@ def receta_guardada(todo, bandeja_id):
 
 
 def cmd_receta(args):
-    """Deja la receta guardada en trabajo/<id>/receta.json, para corregirla (pedidos de «Algo está mal»)."""
+    """Deja la receta guardada en trabajo/<id>/receta.json, para corregirla (pedidos de «Algo está mal»)
+    o, si es una receta propia, para ordenarla: su texto queda en trabajo/<id>/texto.txt."""
     fila, receta = receta_guardada(llamar('GET', 'todo'), args.bandeja_id)
     d = comun.dir_trabajo(args.bandeja_id)
     archivo = d / 'receta.json'
@@ -248,9 +250,14 @@ def cmd_receta(args):
     if archivo.exists():
         archivo.replace(d / 'receta.anterior.json')
     comun.escribir_json(archivo, receta)
-    log(args.bandeja_id, 'receta', f'{fila.get("receta_id")} bajada para corregir')
-    salida({'ok': True, 'id': args.bandeja_id, 'receta_id': fila.get('receta_id'), 'pedido': fila.get('pedido') or '',
-            'archivo': str(archivo), 'receta': receta})
+    texto = fila.get('texto') or ''
+    if texto:
+        (d / 'texto.txt').write_text(texto + '\n', encoding='utf-8')
+    propia = fila.get('plataforma') == 'manual'
+    log(args.bandeja_id, 'receta', f'{fila.get("receta_id")} bajada para ' + ('corregir' if fila.get('pedido') or not propia else 'ordenar'))
+    salida({'ok': True, 'id': args.bandeja_id, 'receta_id': fila.get('receta_id'), 'plataforma': fila.get('plataforma') or '',
+            'pedido': fila.get('pedido') or '', 'texto': texto, 'archivo': str(archivo),
+            **({'archivo_texto': str(d / 'texto.txt')} if texto else {}), 'receta': receta})
 
 
 def cmd_capturas(args):
