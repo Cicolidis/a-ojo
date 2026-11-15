@@ -230,6 +230,27 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       }
       return Object.assign({}, datos, { despensa });
     }
+    case 'plan.poner': {
+      // Como la API: si alguna receta no está, rechaza el lote entero (y no quita nada). Si no, quita
+      // `quitar` (salvo lo que viene en el lote) y crea o reemplaza cada entrada por id, con quién y cuándo.
+      const items = d.items || [];
+      const recetas = new Set((datos.recetas || []).map(r => r.id));
+      if (items.some(i => !recetas.has(i.receta_id))) return datos;
+      const cuando = creada || new Date().toISOString();
+      const porId = new Map(items.map(i => [i.id, i]));
+      const quitar = new Set(d.quitar || []);
+      const campos = i => ({ semana: i.semana, fecha: i.fecha || '', comida: i.fecha ? i.comida || '' : '', receta_id: i.receta_id,
+        porciones: i.porciones === '' || i.porciones === undefined || i.porciones === null ? null : Number(i.porciones) });
+      const quedan = (datos.plan || []).filter(e => !quitar.has(e.id) || porId.has(e.id));
+      const ya = new Set(quedan.map(e => e.id));
+      return Object.assign({}, datos, {
+        plan: quedan.map(e => (porId.has(e.id) ? Object.assign({}, e, campos(porId.get(e.id)), { actualizado: cuando }) : e))
+          .concat(items.filter(i => !ya.has(i.id)).map(i => Object.assign({ id: i.id }, campos(i),
+            { quien: d.quien || '', creado: cuando, actualizado: cuando }))),
+      });
+    }
+    case 'plan.quitar':
+      return Object.assign({}, datos, { plan: (datos.plan || []).filter(e => !d.ids.includes(e.id)) });
     case 'despensa.quitar':
       return Object.assign({}, datos, { despensa: (datos.despensa || []).filter(x => !d.ids.includes(x.id)) });
     case 'bandeja.actualizar':

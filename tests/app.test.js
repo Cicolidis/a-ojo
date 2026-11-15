@@ -1556,3 +1556,38 @@ test('la fila de una receta escrita es provisoria (local) hasta que la trae la A
   const reescrita = aplicarEdicion(despues, nuevoTexto(crear.datos.id, 'Masa, acelga y huevos', 'b_deLaura1', 'camilo'));
   assert.equal(reescrita.bandeja[0].quien, 'camilo');
 });
+
+// Plan semanal (SPEC_v2 §4).
+
+test('plan.poner y plan.quitar, como la API: crea o reemplaza por id, quita en el mismo lote y no duplica', async () => {
+  const { aplicarEdicion, nuevaEdicion } = await cargar('ediciones.js');
+  const { aplicarDelta } = await cargar('datos.js');
+  const base = { recetas: [{ id: 'r_pollo' }, { id: 'r_sopa' }], plan: [] };
+  const lunes = { id: 's_entrada1', semana: '2026-11-16', fecha: '2026-11-16', comida: 'cena', receta_id: 'r_pollo', porciones: 4 };
+  const sinDia = { id: 's_entrada2', semana: '2026-11-16', receta_id: 'r_sopa', porciones: '' };
+  const poner = nuevaEdicion('plan.poner', { items: [lunes, sinDia], quien: 'pareja' }, new Date('2026-11-15T12:00:00Z'));
+  let d = aplicarEdicion(aplicarEdicion(base, poner), poner);
+  assert.equal(d.plan.length, 2, 'aplicarla dos veces no duplica');
+  assert.deepEqual(d.plan[1], { id: 's_entrada2', semana: '2026-11-16', fecha: '', comida: '', receta_id: 'r_sopa', porciones: null,
+    quien: 'pareja', creado: '2026-11-15T12:00:00.000Z', actualizado: '2026-11-15T12:00:00.000Z' });
+
+  // Mover: conserva quién y cuándo se puso.
+  d = aplicarEdicion(d, nuevaEdicion('plan.poner', { items: [Object.assign({}, lunes, { fecha: '2026-11-18', comida: 'almuerzo' })], quien: 'camilo' }));
+  assert.deepEqual([d.plan[0].fecha, d.plan[0].comida, d.plan[0].quien, d.plan[0].creado], ['2026-11-18', 'almuerzo', 'pareja', '2026-11-15T12:00:00.000Z']);
+
+  // Reemplazar una semana: quita y pone de una vez; con una receta que no está, no hace nada (como el 404 de la API).
+  const nueva = { id: 's_entrada3', semana: '2026-11-16', fecha: '2026-11-17', comida: 'cena', receta_id: 'r_sopa', porciones: 2 };
+  const mal = aplicarEdicion(d, nuevaEdicion('plan.poner', { items: [Object.assign({}, nueva, { receta_id: 'r_nada' })], quitar: ['s_entrada1', 's_entrada2'], quien: 'camilo' }));
+  assert.equal(mal, d);
+  d = aplicarEdicion(d, nuevaEdicion('plan.poner', { items: [nueva], quitar: ['s_entrada1', 's_entrada2'], quien: 'camilo' }));
+  assert.deepEqual(d.plan.map(e => e.id), ['s_entrada3']);
+  d = aplicarEdicion(d, nuevaEdicion('plan.quitar', { ids: ['s_entrada3', 's_nadanada'] }));
+  assert.deepEqual(d.plan, []);
+
+  // El plan viene siempre entero en el delta; una API de antes de la Fase 10b no lo manda.
+  const datos = aplicarDelta(null, { ahora: 'x', completo: true, recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [], plan: [lunes] });
+  assert.deepEqual(datos.plan, [lunes]);
+  const vacio = { ahora: 'y', completo: false, recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] };
+  assert.deepEqual(aplicarDelta(datos, vacio).plan, [lunes]);
+  assert.deepEqual(aplicarDelta(datos, Object.assign({}, vacio, { plan: [] })).plan, []);
+});

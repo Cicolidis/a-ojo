@@ -50,7 +50,9 @@ Las dos hojas nuevas son chicas: `todo` las manda **siempre enteras**, como `Com
 - En una misma comida puede haber más de una receta (un guiso y una ensalada).
 - La misma receta puede estar en varios días.
 - «Sin día» (`fecha` y `comida` vacías): un plato que se va a hacer esa semana, sin día decidido. Ahí caen también los platos de «Usar como modelo» (§4.3).
-- Los días pasados quedan en la hoja: son el historial del que se copian las semanas (§4.3). El backup semanal borra las entradas de más de **26 semanas**.
+- Los días pasados quedan en la hoja: son el historial del que se copian las semanas (§4.3). El backup semanal borra las entradas de más de **8 semanas** (las de las últimas 8 y las futuras quedan; el backup las conserva).
+- `semana` y `fecha` son días del calendario del celular (`AAAA-MM-DD`), sin hora ni zona: la app los calcula partiendo el texto, nunca con `new Date(texto)` (en Buenos Aires daría el día anterior).
+- `porciones` puede quedar vacía si la receta no las dice: la entrada se muestra sin número y la compra usa las cantidades tal cual.
 
 ### `Despensa`
 | Columna | Tipo | Notas |
@@ -77,7 +79,7 @@ Todas idempotentes, con su caso en `aplicarEdicion()` y su test, como pide `CLAU
 
 | Método | `action` | Entrada | Salida |
 |---|---|---|---|
-| POST | `plan.poner` | `{items: [{id, semana, fecha?, comida?, receta_id, porciones}]}` (hasta 50) | `{ids}`. Crea o reemplaza cada entrada por id: sirve para sumar, mover (a un día, a la otra comida o a «Sin día») y copiar una semana entera de una vez |
+| POST | `plan.poner` | `{items: [{id, semana, fecha?, comida?, receta_id, porciones?}], quitar?: [ids], quien}` (hasta 50) | `{ids, nuevos, actualizados, quitados}`. Crea o reemplaza cada entrada por id: sirve para sumar, mover (a un día, a la otra comida o a «Sin día»), cambiar las porciones y copiar una semana entera de una vez. Al reemplazar conserva quién la puso. `quitar` se borra en el mismo lote, después de validar todo (para «Reemplazar lo que hay»): si algo falla, no se quita nada |
 | POST | `plan.quitar` | `{ids}` | `{quitados}` |
 | POST | `despensa.sumar` | `{items: [{id, nombre}], quien}` | `{ids, nuevos}`. Los que ya estaban (por id o por nombre, también dentro del mismo pedido) no se tocan |
 | POST | `despensa.quitar` | `{ids}` | `{quitados}` |
@@ -98,13 +100,16 @@ Cambios en acciones que ya existen:
 ## 4. Plan semanal
 
 ### 4.1 Pantalla `#/semana`
-- Nueva pestaña en la navegación inferior: **Recetas · Semana · Compras · Bandeja**. La cuenta de la pestaña: cuántas comidas tiene la semana.
+- Nueva pestaña en la navegación inferior: **Recetas · Semana · Compras · Bandeja**. La cuenta de la pestaña: los platos que faltan de la semana en curso (de hoy en adelante), más los de «Sin día».
+- La semana va en la dirección (`#/semana/2026-11-16`): una versión nueva de la app no cambia de semana. Cada día lleva «Almuerzo» y «Cena» apilados (en 360 px no entran lado a lado).
 - Arriba, «Semana del 16/11» con flechas para la anterior y la siguiente. La semana va de lunes a domingo y abre en la actual; hoy se destaca.
 - Arriba de los días, la fila **«Sin día»**: los platos de esa semana sin día decidido. Si está vacía, no se muestra (salvo como destino al mover).
 - Cada día, en una fila, con **almuerzo** y **cena**. Cada receta muestra su foto chica, el título y las porciones («Pollo marroquí · 4»); tocarla abre la ficha.
 - En cada comida (y en «Sin día»), «+» abre el buscador de recetas (el de «Agregar una receta» en Compras: `elegir.js`), que arriba ofrece **«Una receta nuestra»** (§6), y después un paso para elegir las porciones (las de la última vista de esa receta, con −/+).
 - Cada entrada se puede **mover** (a otro día, a la otra comida o a «Sin día», con una hoja como la de mover en Compras), **cambiar las porciones** o **quitar**.
-- Desde la ficha: **«Sumar a la semana»** (elige día, comida y porciones).
+- **«Sumar a la semana»**, desde la ficha (en la barra fija de abajo, al lado de «Empezar a cocinar») y desde cada tarjeta de la Biblioteca (un calendario con «+»; no en las descartadas): una hoja con «Esta semana (del 16/11)» y «La que viene (del 23/11)» que pone la receta en «Sin día» con las porciones que se están viendo (o las de su última vista). Desde la ficha, la hoja también ofrece «Elegir día y comida» (la semana, el día, la comida y las porciones).
+- «Mover» elige primero el día (Sin día, Lu…Do) y después la comida.
+- Una entrada cuya receta ya no está se muestra «Receta que ya no está», con solo «Quitar». Una descartada se muestra con la marca «Descartada» y entra en la compra.
 - Si una receta de hoy tiene pasos, su entrada ofrece «Empezar a cocinar» con esas porciones.
 
 ### 4.2 Compra de la semana
@@ -117,7 +122,7 @@ Cambios en acciones que ya existen:
 Dos botones arriba de la semana, **«Repetir una semana»** y **«Usar como modelo»**. Los dos abren primero un selector con las semanas anteriores que tienen algo, de la más nueva a la más vieja, cada una con un resumen («Semana del 2/11 · 6 platos: Croquetas, Pollo marroquí…»). El destino es **la semana que se está mirando** (abre en la actual; así también se puede planificar la próxima).
 - **Repetir una semana:** copia las entradas tal cual: el mismo día de la semana, la misma comida y las mismas porciones (las de «Sin día» siguen sin día). Si la semana de destino ya tiene algo, pregunta antes: «Reemplazar lo que hay» o «Sumar a lo que hay».
 - **Usar como modelo:** trae los platos de esa semana, con sus porciones, a la fila **«Sin día»** de la semana de destino, sin tocar lo que ya tiene. Después se reparten con «Mover», de a uno y cuando quieran: la fila se guarda y se sincroniza.
-- Las dos copias se arman en la app y van en un solo `plan.poner` con ids nuevos (y, al reemplazar, antes un `plan.quitar`): un reintento no duplica nada. Las recetas descartadas desde entonces no se copian; se avisa cuáles quedaron afuera.
+- Las dos copias se arman en la app y van en un solo `plan.poner` con ids nuevos (al reemplazar, con su `quitar`): un reintento no duplica nada. Las recetas descartadas desde entonces no se copian; se avisa cuáles quedaron afuera.
 
 ### 4.4 Estados vacíos
 - Semana vacía: «Todavía no hay nada para esta semana» con «Elegir una receta» y, si hay semanas anteriores, «Repetir una semana».
@@ -235,8 +240,8 @@ Cada fase termina con un commit y su tilde en `docs/PLAN.md`. **Las pruebas en d
 - **Listo cuando:** con la API falsa, una receta propia creada sin conexión aparece en la Biblioteca con «Receta nuestra»; con el texto escrito, `/recetas --dry-run` la valida contra la API con ingredientes y pasos, sin inventar cantidades.
 
 ### Fase 10b: plan semanal
-- Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` (en lote) y `plan.quitar`, `todo` con `plan`, y la limpieza de las 26 semanas en el backup.
-- Pantalla `#/semana`, la pestaña nueva, «Sumar a la semana» en la ficha y la compra de la semana (§4.1 y §4.2).
+- Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` (en lote) y `plan.quitar`, `todo` con `plan`, y la limpieza de las 8 semanas en el backup.
+- Pantalla `#/semana`, la pestaña nueva, «Sumar a la semana» en la ficha y en la Biblioteca, y la compra de la semana (§4.1 y §4.2).
 - «Repetir una semana» y «Usar como modelo», con el selector de semanas (§4.3).
 - **Listo cuando:** con la API falsa, se arma una semana con 4 comidas (una receta repetida, una entrada movida de día y una receta propia creada desde «+»); «Repetir una semana» la copia igual a la siguiente y «Usar como modelo» deja sus platos en «Sin día» de otra; y la compra de la semana suma las porciones de la repetida, deja desmarcado lo que está en la despensa y avisa de la receta propia sin ingredientes.
 
@@ -274,13 +279,9 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
 - **Despensa (Fase 9):** «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa.
+- **Plan semanal (Fase 10b, 15/11):** lunes a domingo, almuerzo y cena; cuatro pestañas con Semana segunda; historial de 8 semanas; al repetir sobre una semana con algo se pregunta «Sumar» o «Reemplazar»; «Usar como modelo» trae todos los platos; «Sumar a la semana» también desde las tarjetas de la Biblioteca, a esta semana o a la que viene.
 - **Recetas propias (Fase 10a, 15/11):** arrancan en 2 porciones y como saladas, sin foto. En «Editar», las porciones se llaman «Rinde». No se borran: se descartan.
 - **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
 **Supuestos de este borrador, para revisar antes de empezar:**
-- La semana empieza el lunes, y solo hay almuerzo y cena (sin desayuno ni merienda).
-- La navegación pasa a cuatro pestañas, con Semana en segundo lugar.
 - La despensa no lleva cantidades y no se descuenta sola al cocinar: se pregunta en «¿Cómo salió?».
-- El historial del plan se guarda 26 semanas (medio año).
-- Al repetir sobre una semana que ya tiene algo, se pregunta si reemplazar o sumar.
-- «Usar como modelo» trae todos los platos, aunque alguno ya esté en la semana de destino.

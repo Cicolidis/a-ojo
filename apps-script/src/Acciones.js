@@ -72,7 +72,7 @@ function claveDe_(url) {
 /**
  * GET todo { since? }
  * Sin `since`: todo. Con `since`: solo lo cambiado después de esa fecha, salvo
- * Compras, Lugares y Despensa, que van siempre completas (son chicas y así cubren los borrados).
+ * Compras, Lugares, Despensa y Plan, que van siempre completas (son chicas y así cubren los borrados).
  * `ahora` es el valor a usar como próximo `since`.
  */
 function accionTodo_(req) {
@@ -98,6 +98,8 @@ function accionTodo_(req) {
     const lugares = planilla_().getSheetByName('Lugares') ? leerDatos_('Lugares') : [];
     // Siempre entera, como Compras y Lugares: así los borrados llegan al otro celular.
     const despensa = planilla_().getSheetByName('Despensa') ? leerDatos_('Despensa') : [];
+    // El plan semanal, también entero (el backup lo poda: son pocas semanas).
+    const plan = planilla_().getSheetByName('Plan') ? leerDatos_('Plan') : [];
 
     if (since) {
       recetas = recetas.filter(r => cambio(r.actualizado));
@@ -120,6 +122,7 @@ function accionTodo_(req) {
       compras: compras,
       lugares: lugares,
       despensa: despensa,
+      plan: plan,
       bandeja: bandeja,
     };
   });
@@ -1309,6 +1312,132 @@ function accionDespensaQuitar_(req) {
   return conLock_(() => {
     const filas = leerFilas_('Despensa').filter(f => ids.indexOf(f.datos.id) !== -1);
     borrarFilas_('Despensa', filas.map(f => f.fila));
+    return { quitados: filas.length };
+  });
+}
+
+// Plan semanal (SPEC_v2 §2 y §4). Los ids s_… los genera la app: un reintento no duplica nada.
+
+const ID_PLAN_ = /^s_[0-9a-z]{5,12}$/;
+const MAX_PLAN_ = 50;
+const DIA_MS_ = 24 * 60 * 60 * 1000;
+
+/**
+ * Un día del calendario («2026-11-16») como número de días desde el 1/1/1970, o NaN si no es
+ * una fecha de verdad. Se calcula en UTC: el texto es un día, sin hora ni zona.
+ */
+function diaNumero_(texto) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(texto || ''));
+  if (!m) return NaN;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) return NaN;
+  return d.getTime() / DIA_MS_;
+}
+
+/** ¿Ese número de día es un lunes? (El 1/1/1970 fue jueves.) */
+function esLunes_(dia) {
+  return (dia + 4) % 7 === 1;
+}
+
+/**
+ * Valida y normaliza las entradas del plan (las de plan.poner). Junta todos los errores en uno solo
+ * (items_invalidos, con `detalles`). Cada una: { id, semana, fecha?, comida?, receta_id, porciones? }.
+ * `semana` es un lunes; `fecha`, un día de esa semana o vacía («Sin día»); `comida` va si y solo si
+ * hay `fecha`; `porciones`, vacía (la receta no las dice) o un entero desde 1. No mira la planilla.
+ */
+function validarPlan_(lista) {
+  const items = Array.isArray(lista) ? lista : [];
+  if (!items.length) throw errorApi_('sin_items', 400, 'Falta «items».');
+  if (items.length > MAX_PLAN_) throw errorApi_('demasiados', 400, 'Son demasiadas entradas de una vez (hasta ' + MAX_PLAN_ + ').');
+  const errores = [];
+  const vistos = {};
+  const salida = items.map((it, i) => {
+    const donde = 'entrada ' + (i + 1);
+    it = it || {};
+    const id = String(it.id || '').trim();
+    if (!ID_PLAN_.test(id)) errores.push(donde + ': «' + id + '» no es un id del plan');
+    else if (vistos[id]) errores.push(donde + ': «' + id + '» está repetido');
+    vistos[id] = true;
+    const semana = String(it.semana || '').trim();
+    const lunes = diaNumero_(semana);
+    if (isNaN(lunes)) errores.push(donde + ': «semana» tiene que ser una fecha AAAA-MM-DD');
+    else if (!esLunes_(lunes)) errores.push(donde + ': «semana» tiene que ser un lunes');
+    const fecha = vacio_(it.fecha) ? '' : String(it.fecha).trim();
+    if (fecha) {
+      const dia = diaNumero_(fecha);
+      if (isNaN(dia)) errores.push(donde + ': «fecha» tiene que ser una fecha AAAA-MM-DD');
+      else if (!isNaN(lunes) && (dia < lunes || dia > lunes + 6)) errores.push(donde + ': la fecha no es de esa semana');
+    }
+    const comida = vacio_(it.comida) ? '' : String(it.comida).trim();
+    if (fecha && ENUMS.comida.indexOf(comida) === -1) errores.push(donde + ': con día, «comida» tiene que ser ' + ENUMS.comida.join(' o '));
+    if (!fecha && comida) errores.push(donde + ': sin día («Sin día»), va sin comida');
+    const recetaId = String(it.receta_id || '').trim();
+    if (!recetaId) errores.push(donde + ': falta «receta_id»');
+    let porciones = null;
+    if (!vacio_(it.porciones)) {
+      porciones = Number(it.porciones);
+      if (!Number.isInteger(porciones) || porciones < 1 || porciones > 999) errores.push(donde + ': «porciones» tiene que ser un número entero desde 1');
+    }
+    return { id: id, semana: semana, fecha: fecha, comida: comida, receta_id: recetaId, porciones: porciones };
+  });
+  if (errores.length) {
+    const err = errorApi_('items_invalidos', 400, 'Revisá el plan: ' + errores.join('; ') + '.');
+    err.detalles = errores;
+    throw err;
+  }
+  return salida;
+}
+
+/**
+ * POST plan.poner { items: [{ id, semana, fecha?, comida?, receta_id, porciones? }], quitar?: [ids], quien }
+ * Crea o reemplaza cada entrada por id: sirve para sumar, mover (a otro día, a la otra comida o a
+ * «Sin día»), cambiar las porciones y copiar una semana entera. Al reemplazar, conserva quién la puso
+ * y cuándo. `quitar` (al reemplazar una semana) se borra en el mismo lock, después de validar todo:
+ * si algo falla, no se quita nada. Idempotente. Devuelve { ids, nuevos, actualizados, quitados }.
+ */
+function accionPlanPoner_(req) {
+  const items = validarPlan_(req.items);
+  const quitar = Array.isArray(req.quitar) && req.quitar.length ? idsValidos_({ ids: req.quitar }, ID_PLAN_, 'el plan') : [];
+  const quien = String(req.quien || '').trim().toLowerCase();
+  if (ENUMS.quien.indexOf(quien) === -1) throw errorApi_('quien_invalido', 400, '«quien» tiene que ser ' + ENUMS.quien.join(' o ') + '.');
+
+  return conLock_(() => {
+    // Antes de leer nada: sin setup(), la hoja no existe (la cola reintenta).
+    exigirColumnas_('Plan', ESQUEMA.Plan.columnas.map(c => c.nombre));
+    const recetas = leerDatos_('Recetas').map(r => r.id);
+    const faltan = items.map(it => it.receta_id).filter((id, i, l) => recetas.indexOf(id) === -1 && l.indexOf(id) === i);
+    if (faltan.length) throw errorApi_('no_encontrada', 404, 'No encontré la receta «' + faltan.join('», «') + '».');
+
+    const filas = leerFilas_('Plan');
+    const ahora = ahoraIso_();
+    const campos = ['semana', 'fecha', 'comida', 'receta_id', 'porciones'];
+    const comoTexto = v => (v === null || v === undefined ? '' : String(v));
+    // Primero las que ya están (antes de borrar, que corre los números de fila).
+    let actualizados = 0;
+    filas.forEach(f => {
+      const it = items.filter(x => x.id === f.datos.id)[0];
+      if (!it || !campos.some(k => comoTexto(f.datos[k]) !== comoTexto(it[k]))) return;
+      campos.forEach(k => { f.datos[k] = it[k]; });
+      f.datos.actualizado = ahora;
+      escribirFila_('Plan', f.fila, f.datos);
+      actualizados++;
+    });
+    const sobran = filas.filter(f => quitar.indexOf(f.datos.id) !== -1 && !items.some(it => it.id === f.datos.id));
+    borrarFilas_('Plan', sobran.map(f => f.fila));
+    const existentes = filas.map(f => f.datos.id);
+    const nuevos = items.filter(it => existentes.indexOf(it.id) === -1)
+      .map(it => Object.assign({}, it, { quien: quien, creado: ahora, actualizado: ahora }));
+    agregarFilas_('Plan', nuevos);
+    return { ids: items.map(it => it.id), nuevos: nuevos.length, actualizados: actualizados, quitados: sobran.length };
+  });
+}
+
+/** POST plan.quitar { ids }: saca entradas del plan. Las que ya no están se ignoran. */
+function accionPlanQuitar_(req) {
+  const ids = idsValidos_(req, ID_PLAN_, 'el plan');
+  return conLock_(() => {
+    const filas = leerFilas_('Plan').filter(f => ids.indexOf(f.datos.id) !== -1);
+    borrarFilas_('Plan', filas.map(f => f.fila));
     return { quitados: filas.length };
   });
 }

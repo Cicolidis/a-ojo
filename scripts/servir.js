@@ -75,14 +75,33 @@ function dentroDe(raiz, ruta) {
 // Los datos de la API falsa, en memoria: las ediciones los cambian.
 let datosFalsos = null;
 // Con --vacia quedan solo las reglas de Lugares, que setup() siembra siempre.
-const VACIOS = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], despensa: [], bandeja: [] };
+const VACIOS = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], despensa: [], plan: [], bandeja: [] };
 const datos = () => (datosFalsos ||= Object.assign(
-  JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8')), VACIA ? VACIOS : {}));
+  correrPlan(JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8'))), VACIA ? VACIOS : {}));
+
+/**
+ * El plan del fixture es de una semana fija: se corre para que sea la semana pasada (la anterior a la
+ * de hoy), así «Repetir una semana» y «Usar como modelo» tienen de dónde copiar. Fechas como días del
+ * calendario, en UTC (sin zonas).
+ */
+function correrPlan(todo) {
+  const dia = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  const texto = ms => new Date(ms).toISOString().slice(0, 10);
+  const hoy = new Date();
+  const hoyMs = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const lunesPasado = hoyMs - ((new Date(hoyMs).getUTCDay() + 6) % 7) * 86400000 - 7 * 86400000;
+  const base = (todo.plan || []).reduce((m, e) => Math.min(m, dia(e.semana)), Infinity);
+  if (!isFinite(base)) return todo;
+  const corrimiento = lunesPasado - base;
+  todo.plan = todo.plan.map(e => Object.assign({}, e, { semana: texto(dia(e.semana) + corrimiento),
+    fecha: e.fecha ? texto(dia(e.fecha) + corrimiento) : '' }));
+  return todo;
+}
 let cortadaHasta = 0;
 let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
   'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir', 'nota.editar', 'nota.borrar',
-  'despensa.sumar', 'despensa.quitar', 'receta.crear', 'receta.editar', 'receta.escribir'];
+  'despensa.sumar', 'despensa.quitar', 'receta.crear', 'receta.editar', 'receta.escribir', 'plan.poner', 'plan.quitar'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -143,6 +162,7 @@ async function apiFalsa(req, url, res) {
       compras: todo.compras,
       lugares: todo.lugares || [],
       despensa: todo.despensa || [],
+      plan: todo.plan || [],
       bandeja: todo.bandeja.filter(b => cambio(b.actualizado)),
     },
   });
@@ -173,6 +193,18 @@ async function editarFalsa(pedido, ahora) {
       console.log('API falsa: bandeja.actualizar ' + fila.id + ' rechazada (está ' + fila.estado + ')');
       return { ok: false, error: 'estado_cambio', mensaje: 'Ese link ya está «' + fila.estado + '»: no lo cambié.', status: 409 };
     }
+  }
+  if (action === 'plan.poner') {
+    // Con las reglas de verdad (validarPlan_ de Acciones.js) y las recetas que tiene la API falsa.
+    try {
+      apiDeVerdad().validarPlan_(cuerpo.items);
+    } catch (err) {
+      console.log('API falsa: plan.poner rechazado → ' + err.message);
+      return { ok: false, error: err.codigo || 'error_interno', mensaje: err.message, detalles: err.detalles, status: err.status || 500 };
+    }
+    if (!['camilo', 'pareja'].includes(cuerpo.quien)) return { ok: false, error: 'quien_invalido', mensaje: '«quien» tiene que ser camilo o pareja.', status: 400 };
+    const faltan = cuerpo.items.map(i => i.receta_id).filter(id => !todo.recetas.some(r => r.id === id));
+    if (faltan.length) return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la receta «' + faltan.join('», «') + '».', status: 404 };
   }
   if (action === 'nota.editar' || action === 'nota.borrar') {
     const nota = todo.notas.find(n => n.id === cuerpo.id);
@@ -224,7 +256,7 @@ async function editarFalsa(pedido, ahora) {
   } else if (action === 'compras.agregar') {
     datosFalsos.compras = datosFalsos.compras.map(c => (c.creado ? c : Object.assign({}, c, { creado: ahora })));
   }
-  const detalle = recetaId || cuerpo.id || (cuerpo.ids || []).join(',') || cuerpo.clave || (cuerpo.items || []).map(i => i.nombre).join(', ');
+  const detalle = recetaId || cuerpo.id || (cuerpo.ids || []).join(',') || cuerpo.clave || (cuerpo.items || []).map(i => i.nombre || i.receta_id + (i.fecha ? ' ' + i.fecha + ' ' + i.comida : ' sin día')).join(', ');
   console.log('API falsa: ' + action + ' ' + detalle);
   return { ok: true, data: { id: cuerpo.id || recetaId } };
 }

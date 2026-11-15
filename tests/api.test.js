@@ -78,10 +78,12 @@ function receta(cambios = {}) {
 // Un JPEG mínimo en base64 (solo importa que decodifique).
 const FOTO = { base64: Buffer.from('foto de prueba').toString('base64'), mime: 'image/jpeg' };
 
-test('setup crea las 8 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
+test('setup crea las 9 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
   const p = proyecto();
   assert.deepEqual(p.planilla.getSheets().map(h => h.getName()),
-    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras', 'Lugares', 'Despensa']);
+    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras', 'Lugares', 'Despensa', 'Plan']);
+  assert.deepEqual(p.planilla.getSheetByName('Plan').getRange(1, 1, 1, 9).getValues()[0],
+    ['id', 'semana', 'fecha', 'comida', 'receta_id', 'porciones', 'quien', 'creado', 'actualizado']);
   const enc = p.planilla.getSheetByName('Bandeja').getRange(1, 1, 1, 11).getValues()[0];
   assert.deepEqual(enc, ['id', 'creado', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'actualizado', 'capturas']);
   assert.deepEqual(p.planilla.getSheetByName('Compras').getRange(1, 9, 1, 3).getValues()[0], ['rol', 'lugar', 'porciones']);
@@ -1525,4 +1527,108 @@ test('receta.corregir de una propia: usa su fila (o la crea sin link), nunca la 
   const nueva = p.filas('Bandeja').find(b => b.id === m.data.id);
   assert.deepEqual([nueva.url, nueva.plataforma, nueva.receta_id, nueva.pedido, nueva.quien], ['', 'manual', 'r_milanesa', 'La leche es una taza', 'pareja']);
   assert.equal(corregir('r_milanesa', '').data.pedido, '', 'se cancela como siempre');
+});
+
+// Plan semanal (SPEC_v2 §2 y §4).
+
+const SEMANAS = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'semanas.json'), 'utf8'));
+
+test('validarPlan_: lunes, días de esa semana, comida solo con día y porciones opcionales (los casos de semanas.json)', () => {
+  const p = proyecto();
+  const entrada = cambios => Object.assign({ id: 's_prueba01', semana: '2026-11-16', receta_id: 'r_x' }, cambios);
+  const errores = items => {
+    try {
+      p.ctx.validarPlan_(items);
+      return [];
+    } catch (err) {
+      return err.detalles || [err.message];
+    }
+  };
+  for (const c of SEMANAS.lunes) {
+    assert.deepEqual(errores([entrada({ semana: c.lunes, fecha: c.fecha, comida: 'cena' })]), [], c.fecha + ' es de la semana del ' + c.lunes);
+  }
+  for (const f of SEMANAS.no_son_lunes) assert.match(errores([entrada({ semana: f })]).join(), /lunes/, f);
+  for (const f of SEMANAS.invalidas) assert.match(errores([entrada({ semana: f })]).join(), /AAAA-MM-DD/, JSON.stringify(f));
+  assert.match(errores([entrada({ fecha: '2026-11-23', comida: 'cena' })]).join(), /no es de esa semana/);
+  assert.match(errores([entrada({ fecha: '2026-11-15', comida: 'cena' })]).join(), /no es de esa semana/);
+  assert.match(errores([entrada({ fecha: '2026-11-17' })]).join(), /almuerzo o cena/);
+  assert.match(errores([entrada({ comida: 'cena' })]).join(), /sin comida/);
+  assert.match(errores([entrada({ porciones: 0 })]).join(), /porciones/);
+  assert.match(errores([entrada(), entrada()]).join(), /repetido/);
+  assert.equal(errores([entrada({ id: 'x', semana: 'x', receta_id: '' })]).length, 3, 'junta todos los errores');
+  const [ok] = JSON.parse(JSON.stringify(p.ctx.validarPlan_([entrada({ porciones: '' })])));
+  assert.deepEqual(ok, { id: 's_prueba01', semana: '2026-11-16', fecha: '', comida: '', receta_id: 'r_x', porciones: null }, 'Sin día y sin porciones');
+});
+
+test('plan.poner crea, mueve y no duplica al reintentar; plan.quitar saca; todo lo manda siempre entero', async () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const id = p.upsert(receta()).data.id;
+  accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado' });
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+
+  const poner = (items, extra = {}) => accion('plan.poner', Object.assign({ items, quien: 'pareja' }, extra));
+  const lunes = { id: 's_brownie1', semana: '2026-11-16', fecha: '2026-11-16', comida: 'cena', receta_id: id, porciones: 6 };
+  const sinDia = { id: 's_tarta001', semana: '2026-11-16', receta_id: 'r_tarta001' };
+  const r = poner([lunes, sinDia]);
+  assert.equal(r.ok, true, r.mensaje);
+  assert.deepEqual([r.data.nuevos, r.data.actualizados, r.data.quitados], [2, 0, 0]);
+  assert.equal(poner([lunes, sinDia]).data.nuevos, 0, 'un reintento no duplica');
+  let filas = p.filas('Plan');
+  assert.equal(filas.length, 2);
+  const tarta = filas.find(f => f.id === 's_tarta001');
+  assert.deepEqual([tarta.fecha, tarta.comida, tarta.porciones, tarta.quien], ['', '', '', 'pareja'], 'Sin día y sin porciones');
+
+  // Mover a otro día y cambiar las porciones: conserva quién la puso y cuándo.
+  const creado = filas.find(f => f.id === 's_brownie1').creado;
+  const movida = accion('plan.poner', { items: [Object.assign({}, lunes, { fecha: '2026-11-19', comida: 'almuerzo', porciones: 4 })], quien: 'camilo' });
+  assert.equal(movida.data.actualizados, 1);
+  const brownie = p.filas('Plan').find(f => f.id === 's_brownie1');
+  assert.deepEqual([brownie.fecha, brownie.comida, brownie.porciones, brownie.quien, brownie.creado], ['2026-11-19', 'almuerzo', 4, 'pareja', creado]);
+
+  const delta = p.get({ action: 'todo', t: p.token, since: desde }).data;
+  assert.equal(delta.plan.length, 2, 'siempre entero, como la despensa');
+  assert.equal(p.get({ action: 'todo', t: p.token }).data.plan.length, 2);
+
+  assert.deepEqual(accion('plan.quitar', { ids: ['s_tarta001', 's_nadanada'] }).data, { quitados: 1 });
+  assert.deepEqual(accion('plan.quitar', { ids: ['s_tarta001'] }).data, { quitados: 0 }, 'idempotente');
+  assert.equal(accion('plan.quitar', { ids: ['c_noesplan'] }).error, 'id_invalido');
+
+  assert.equal(poner([Object.assign({}, lunes, { receta_id: 'r_nada0' })]).error, 'no_encontrada');
+  assert.equal(poner([lunes], { quien: 'otra' }).error, 'quien_invalido');
+  assert.equal(poner([Object.assign({}, lunes, { semana: '2026-11-17' })]).error, 'items_invalidos');
+});
+
+test('plan.poner con quitar reemplaza una semana de una vez; si el lote falla, no quita nada', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const id = p.upsert(receta()).data.id;
+  const entrada = (n, fecha) => ({ id: 's_entrada' + n, semana: '2026-11-16', fecha, comida: fecha ? 'cena' : '', receta_id: id, porciones: 2 });
+  accion('plan.poner', { items: [entrada(1, '2026-11-16'), entrada(2, '2026-11-17')], quien: 'camilo' });
+
+  // Falla (una receta que no existe): no se quita nada.
+  const mal = accion('plan.poner', { items: [Object.assign(entrada(3, ''), { receta_id: 'r_nada0' })], quitar: ['s_entrada1', 's_entrada2'], quien: 'camilo' });
+  assert.equal(mal.error, 'no_encontrada');
+  assert.equal(p.filas('Plan').length, 2);
+
+  const r = accion('plan.poner', { items: [entrada(3, '2026-11-18'), entrada(2, '2026-11-20')], quitar: ['s_entrada1', 's_entrada2'], quien: 'camilo' });
+  assert.deepEqual([r.data.nuevos, r.data.actualizados, r.data.quitados], [1, 1, 1], 'la que viene en items no se quita: se reemplaza');
+  assert.deepEqual(p.filas('Plan').map(f => f.id + ':' + f.fecha).sort(), ['s_entrada2:2026-11-20', 's_entrada3:2026-11-18']);
+  const otra = accion('plan.poner', { items: [entrada(3, '2026-11-18'), entrada(2, '2026-11-20')], quitar: ['s_entrada1', 's_entrada2'], quien: 'camilo' });
+  assert.deepEqual([otra.data.nuevos, otra.data.quitados], [0, 0], 'un reintento deja todo igual');
+});
+
+test('el plan sin la hoja: todo anda y plan.poner pide setup() (la cola reintenta)', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  p.planilla.deleteSheet(p.planilla.getSheetByName('Plan'));
+  assert.deepEqual(p.get({ action: 'todo', t: p.token }).data.plan, []);
+  const r = p.postJson({ action: 'plan.poner', t: p.token, quien: 'camilo',
+    items: [{ id: 's_entrada1', semana: '2026-11-16', receta_id: id }] });
+  assert.equal(r.status, 500);
+  assert.equal(r.error, 'falta_hoja');
+  // Lo que usa el smoke: sobre una receta que no existe, primero avisa de la hoja.
+  assert.equal(p.postJson({ action: 'plan.poner', t: p.token, quien: 'camilo',
+    items: [{ id: 's_entrada1', semana: '2026-11-16', receta_id: 'r_nada0' }] }).error, 'falta_hoja');
 });

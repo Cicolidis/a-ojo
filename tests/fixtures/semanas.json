@@ -1,0 +1,15 @@
+{
+  "_comentario": "Días del calendario y el lunes de su semana. Los leen tests/api.test.js (validarPlan_) y tests/app.test.js (plan.js): si un lado calcula distinto, falla.",
+  "lunes": [
+    { "fecha": "2026-11-16", "lunes": "2026-11-16", "dia": "Lunes 16" },
+    { "fecha": "2026-11-22", "lunes": "2026-11-16", "dia": "Domingo 22" },
+    { "fecha": "2026-11-19", "lunes": "2026-11-16", "dia": "Jueves 19" },
+    { "fecha": "2026-01-01", "lunes": "2025-12-29", "dia": "Jueves 1" },
+    { "fecha": "2025-12-28", "lunes": "2025-12-22", "dia": "Domingo 28" },
+    { "fecha": "2024-02-29", "lunes": "2024-02-26", "dia": "Jueves 29" },
+    { "fecha": "2026-03-02", "lunes": "2026-03-02", "dia": "Lunes 2" },
+    { "fecha": "2026-10-04", "lunes": "2026-09-28", "dia": "Domingo 4" }
+  ],
+  "no_son_lunes": ["2026-11-15", "2026-11-17", "2026-11-22"],
+  "invalidas": ["2026-02-30", "2026-13-01", "16/11/2026", "2026-11-16T00:00:00Z", ""]
+}

@@ -74,7 +74,7 @@ npm run push
 
 `setup()` se puede correr de nuevo cuando quieras: solo agrega lo que falte. `verToken()` muestra el token y `rotarToken()` genera uno nuevo.
 
-`setup()` también instala el **backup semanal**: los domingos a las 4, una copia de la planilla en «A ojo/backups», con las últimas 8 (las viejas van a la papelera de Drive). Si todavía no hay ninguna, hace la primera en el momento. Para una copia a mano, corré `hacerBackup` desde el editor. Para volver a un backup, abrilo desde Drive y copiá las hojas que hagan falta.
+`setup()` también instala el **backup semanal**: los domingos a las 4, una copia de la planilla en «A ojo/backups», con las últimas 8 (las viejas van a la papelera de Drive). Después de copiar, borra del plan semanal las entradas de más de 8 semanas. Si todavía no hay ninguna, hace la primera en el momento. Para una copia a mano, corré `hacerBackup` desde el editor. Para volver a un backup, abrilo desde Drive y copiá las hojas que hagan falta.
 
 ### 4. Publicar el web app
 

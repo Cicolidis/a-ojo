@@ -130,6 +130,11 @@ revisar "receta.editar responde no_encontrada" "$(echo "$R" | campo error)" "no_
 # Mira la columna Bandeja.texto antes de buscar la receta: con falta_columna, falta correr setup().
 R=$(api_post "{\"action\":\"receta.escribir\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"r_nada0\",\"texto\":\"x\",\"bandeja_id\":\"b_nada0\"}")
 revisar "receta.escribir responde no_encontrada (corré setup() si dice falta_columna)" "$(echo "$R" | campo error)" "no_encontrada"
+# Plan semanal (Fase 10b): existe y valida, sin escribir nada.
+R=$(api_post "{\"action\":\"plan.poner\",\"t\":\"$A_OJO_TOKEN\",\"quien\":\"camilo\",\"items\":[{\"id\":\"s_humo0\",\"semana\":\"2026-11-16\",\"receta_id\":\"r_nada0\"}]}")
+revisar "plan.poner responde no_encontrada (corré setup() si dice falta_hoja)" "$(echo "$R" | campo error)" "no_encontrada"
+R=$(api_post "{\"action\":\"plan.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"s_humo0\"]}")
+revisar "plan.quitar ignora lo que no está" "$(echo "$R" | campo data.quitados)" "0"
 R=$(api_post "{\"action\":\"lugares.asignar\",\"t\":\"$A_OJO_TOKEN\",\"por\":\"nada\",\"clave\":\"x\",\"lugar\":\"feria\"}")
 revisar "lugares.asignar valida" "$(echo "$R" | campo error)" "por_invalido"
 

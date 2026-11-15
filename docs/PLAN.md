@@ -143,13 +143,16 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 
 ### Fase 10b: plan semanal
 
-- [ ] Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` en lote, `plan.quitar` y `todo` con `plan`
-- [ ] Limpieza de las entradas de más de 26 semanas en el backup
+- [x] Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` en lote, `plan.quitar` y `todo` con `plan`
+- [ ] Limpieza de las entradas de más de 8 semanas en el backup
+- [ ] Lógica del plan (`plan.js`): fechas, semanas y la cuenta de la pestaña
 - [ ] Pantalla `#/semana` y la pestaña nueva
-- [ ] «Sumar a la semana» desde la ficha
+- [ ] Elegir, porciones, mover y quitar
+- [ ] «Sumar a la semana» desde la ficha y la Biblioteca
 - [ ] Compra de la semana
 - [ ] «Repetir una semana» y «Usar como modelo», con el selector de semanas
 - [ ] Demo con la API falsa (§8, Fase 10b)
+- [ ] Deploy de la API 0.13.0, `setup()` (hoja `Plan`) y smoke
 
 ### Fase 11: pruebas en dispositivos
 

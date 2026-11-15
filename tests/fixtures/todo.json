@@ -1138,6 +1138,74 @@
       "actualizado": "2026-10-10T10:00:00.000Z"
     }
   ],
+  "plan": [
+    {
+      "id": "s_fixture1",
+      "semana": "2026-11-09",
+      "fecha": "2026-11-09",
+      "comida": "cena",
+      "receta_id": "r_pollo",
+      "porciones": 4,
+      "quien": "pareja",
+      "creado": "2026-11-08T21:01:00.000Z",
+      "actualizado": "2026-11-08T21:01:00.000Z"
+    },
+    {
+      "id": "s_fixture2",
+      "semana": "2026-11-09",
+      "fecha": "2026-11-10",
+      "comida": "almuerzo",
+      "receta_id": "r_sopa",
+      "porciones": 2,
+      "quien": "camilo",
+      "creado": "2026-11-08T21:02:00.000Z",
+      "actualizado": "2026-11-08T21:02:00.000Z"
+    },
+    {
+      "id": "s_fixture3",
+      "semana": "2026-11-09",
+      "fecha": "2026-11-11",
+      "comida": "cena",
+      "receta_id": "r_milan",
+      "porciones": 2,
+      "quien": "pareja",
+      "creado": "2026-11-08T21:03:00.000Z",
+      "actualizado": "2026-11-08T21:03:00.000Z"
+    },
+    {
+      "id": "s_fixture4",
+      "semana": "2026-11-09",
+      "fecha": "2026-11-13",
+      "comida": "cena",
+      "receta_id": "r_pollo",
+      "porciones": 4,
+      "quien": "camilo",
+      "creado": "2026-11-08T21:04:00.000Z",
+      "actualizado": "2026-11-08T21:04:00.000Z"
+    },
+    {
+      "id": "s_fixture5",
+      "semana": "2026-11-09",
+      "fecha": "2026-11-14",
+      "comida": "almuerzo",
+      "receta_id": "r_desc",
+      "porciones": 2,
+      "quien": "pareja",
+      "creado": "2026-11-08T21:05:00.000Z",
+      "actualizado": "2026-11-08T21:05:00.000Z"
+    },
+    {
+      "id": "s_fixture6",
+      "semana": "2026-11-09",
+      "fecha": "",
+      "comida": "",
+      "receta_id": "r_torti",
+      "porciones": 2,
+      "quien": "pareja",
+      "creado": "2026-11-08T21:06:00.000Z",
+      "actualizado": "2026-11-08T21:06:00.000Z"
+    }
+  ],
   "bandeja": [
     {
       "id": "b_00066",

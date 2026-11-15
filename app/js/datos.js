@@ -13,13 +13,14 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // 6: notas editadas y borradas (Fase 6.3).
 // 7: la despensa (Fase 9).
 // 8: recetas propias, con el texto de su fila de la bandeja (Fase 10a).
-export const VERSION_DATOS = 8;
+// 9: el plan semanal (Fase 10b).
+export const VERSION_DATOS = 9;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.
  * Completa: reemplaza todo. Delta: si una receta cambió, vienen todos sus
  * ingredientes y pasos y reemplazan a los anteriores; notas y bandeja se
- * actualizan por id; compras, lugares y la despensa vienen siempre enteras.
+ * actualizan por id; compras, lugares, la despensa y el plan vienen siempre enteros.
  */
 export function aplicarDelta(datos, resp) {
   if (resp.completo || !datos) {
@@ -34,6 +35,7 @@ export function aplicarDelta(datos, resp) {
       compras: resp.compras,
       lugares: resp.lugares || [],
       despensa: resp.despensa || [],
+      plan: resp.plan || [],
       bandeja: resp.bandeja,
     };
   }
@@ -52,6 +54,8 @@ export function aplicarDelta(datos, resp) {
     lugares: resp.lugares || datos.lugares || [],
     // Una API de antes de la Fase 9 no la manda.
     despensa: resp.despensa || datos.despensa || [],
+    // Una API de antes de la Fase 10b no lo manda.
+    plan: resp.plan || datos.plan || [],
     // Las filas provisorias (`local`, de un link guardado en este celular) se sacan: si la
     // captura sigue en la cola, aplicarCola() la vuelve a sumar; si ya llegó, viene la de verdad.
     bandeja: porId(datos.bandeja.filter(b => !b.local), resp.bandeja),
@@ -81,7 +85,8 @@ export function trajoCambios(datos, resp) {
   return resp.recetas.length > 0 || resp.notas.length > 0 || resp.bandeja.length > 0 ||
     JSON.stringify(resp.compras) !== JSON.stringify(datos.compras) ||
     (resp.lugares !== undefined && JSON.stringify(resp.lugares) !== JSON.stringify(datos.lugares)) ||
-    (resp.despensa !== undefined && JSON.stringify(resp.despensa) !== JSON.stringify(datos.despensa || []));
+    (resp.despensa !== undefined && JSON.stringify(resp.despensa) !== JSON.stringify(datos.despensa || [])) ||
+    (resp.plan !== undefined && JSON.stringify(resp.plan) !== JSON.stringify(datos.plan || []));
 }
 
 /** Para ordenar textos: alfabético en castellano, sin distinguir tildes ni mayúsculas, y «Paso 2» antes que «Paso 10». */

@@ -27,6 +27,8 @@ const ENUMS = {
   lugarCompra: ['supermercado', 'verdulería', 'carnicería', 'panadería', 'almacenata', 'dietética', 'feria', 'revisar'],
   // Las reglas de la hoja Lugares son por tipo de producto (la góndola) o por ingrediente.
   porLugar: ['tipo', 'ingrediente'],
+  // Plan.comida (SPEC_v2 §2): vacía si la entrada está en «Sin día».
+  comida: ['almuerzo', 'cena'],
 };
 
 // En Ingredientes.seccion_usuario: los usuarios sacaron el ingrediente de la sección que le puso /recetas.
@@ -187,6 +189,26 @@ const ESQUEMA = {
       col_('nombre'),
       col_('desde', 'fecha'),
       col_('quien', 'texto', { enum: 'quien' }),
+      col_('actualizado', 'fecha'),
+    ],
+  },
+  // El plan semanal (SPEC_v2 §2): una fila por plato puesto en la semana. Los ids s_… los genera la app.
+  // `semana` y `fecha` son días del calendario («2026-11-16»), como texto: sin horas ni zonas.
+  Plan: {
+    prefijo: 's',
+    columnas: [
+      col_('id'),
+      // El lunes de esa semana.
+      col_('semana'),
+      // El día; vacía: «Sin día» (un plato de esa semana sin día decidido).
+      col_('fecha'),
+      col_('comida', 'texto', { enum: 'comida' }),
+      col_('receta_id'),
+      // Para cuántas se va a cocinar. Vacía si la receta no dice porciones.
+      col_('porciones', 'numero'),
+      // Quién la puso.
+      col_('quien', 'texto', { enum: 'quien' }),
+      col_('creado', 'fecha'),
       col_('actualizado', 'fecha'),
     ],
   },
