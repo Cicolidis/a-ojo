@@ -5,7 +5,7 @@
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { capitalizar, fechaCorta, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
-import { agrupar, chipsPorciones, enUnaLinea, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoCantidad, textoReceta, vistasDe } from '../ingredientes.js';
+import { agrupar, avisoCoccion, avisoMolde, chipsPorciones, enUnaLinea, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoCantidad, textoReceta, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
 import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
@@ -236,6 +236,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       utensilios.length ? h('p', { class: 'utensilios' },
         h('span', { class: 'etiqueta-seccion' }, 'También vas a necesitar'), enUnaLinea(utensilios, factor)) : null,
       factor !== 1 ? h('p', { class: 'secundario' }, 'Ojo: los pasos dicen las cantidades para ' + base + '.') : null,
+      avisoMolde(r, n) ? h('p', { class: 'alerta' }, icono('aviso', 18), avisoMolde(r, n)) : null,
       !enCompras
         ? h('a', { class: 'boton-secundario boton-chico', href: '#/compras/agregar/' + id }, icono('compras', 18), 'Agregar a compras')
         : h('div', { class: 'en-compras' },
@@ -252,6 +253,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       if (m < 1 || m > MAX_PORCIONES || m === n) return;
       app.porciones.set(id, m);
       conFoco(zonaIngredientes, pintarIngredientes);
+      pintarPasos();
       anuncio.textContent = m === 1 ? '1 porción' : m + ' porciones';
     };
     const chips = chipsPorciones(r);
@@ -284,8 +286,11 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       return rellenar(zonaPasos, h('h2', null, 'Pasos'),
         h('p', { class: 'secundario' }, 'Esta receta no tiene pasos. Mirá el video para cocinarla.'));
     }
+    const base = porcionesBase(r);
+    const coccion = base ? avisoCoccion(r, (app.porciones.get(id) || base) / base) : '';
     rellenar(zonaPasos,
       h('h2', null, 'Pasos'),
+      coccion ? h('p', { class: 'alerta' }, icono('aviso', 18), coccion) : null,
       h('ol', { class: 'lista-pasos' }, r.pasos.map((p, i) => h('li', null,
         h('span', { class: 'paso-numero', 'aria-hidden': 'true' }, i + 1),
         h('div', { class: 'paso-cuerpo' },

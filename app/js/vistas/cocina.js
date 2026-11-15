@@ -7,7 +7,7 @@
 import { h, icono } from '../dom.js';
 import { ingredientesDePaso } from '../cocina.js';
 import { capitalizar, formatearReloj, formatearTimer, porcionesTexto } from '../formato.js';
-import { porcionesBase, porcionesIniciales, textoCantidad } from '../ingredientes.js';
+import { avisoCoccion, avisoMolde, pasoDeHorno, porcionesBase, porcionesIniciales, textoCantidad } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { estrellas, sinReceta } from './controles.js';
 
@@ -40,6 +40,8 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   const base = porcionesBase(r);
   const porciones = porcionesIniciales(r);
   const factor = base ? porciones / base : 1;
+  const molde = base ? avisoMolde(r, porciones) : '';
+  const coccion = avisoCoccion(r, factor);
   const guardado = leerProgreso(id) || { paso: 0, timers: {} };
   let actual = Math.min(Math.max(guardado.paso, 0), pasos.length - 1);
   const timers = guardado.timers; // { idDelPaso: fin en ms }
@@ -225,6 +227,9 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
       anuncio,
       h('div', { class: 'cocina-paso' + (desde ? ' desde-' + desde : '') },
         titulo,
+        // Los avisos de las porciones: los dos en el primer paso; el de la cocción, también en los de horno.
+        actual === 0 && molde ? h('p', { class: 'alerta' }, icono('aviso', 18), molde) : null,
+        coccion && (actual === 0 || pasoDeHorno(p)) ? h('p', { class: 'alerta' }, icono('aviso', 18), coccion) : null,
         h('p', { class: 'paso-texto' + (p.texto.length > 180 ? ' largo' : '') }, p.texto),
         ingredientes.length ? h('div', { class: 'chips-ingredientes', 'aria-label': 'Ingredientes de este paso' },
           ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + textoCantidad(i.cantidad, i.unidad, factor)))) : null,

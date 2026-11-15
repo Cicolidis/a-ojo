@@ -224,6 +224,72 @@ export function paraComprar(cantidad, unidad, factor = 1) {
   return escalar(cantidad, unidad, f);
 }
 
+// Avisos al escalar (SPEC_v2 §7.3).
+
+const NUMERO = '(\\d+(?:[.,]\\d+)?)';
+const MOLDE_RECTANGULAR = new RegExp(NUMERO + '\\s*[x×]\\s*' + NUMERO, 'i');
+const MOLDE_REDONDO = new RegExp(NUMERO + '\\s*cm\\b', 'i');
+const aNumero = s => Number(s.replace(',', '.'));
+
+/**
+ * Las medidas de un molde escrito como venga: «20×30 cm» o «20 x 30» → { lados: [20, 30] };
+ * «budinera de 25 cm» o «18 cm» → { diametro: 25 }; si no se puede leer («12 pirotines»), null.
+ */
+export function leerMolde(texto) {
+  const t = String(texto || '');
+  const rect = t.match(MOLDE_RECTANGULAR);
+  if (rect) return { lados: [aNumero(rect[1]), aNumero(rect[2])] };
+  const redondo = t.match(MOLDE_REDONDO);
+  return redondo ? { diametro: aNumero(redondo[1]) } : null;
+}
+
+const NUMEROS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'];
+const enLetras = n => NUMEROS[n] || String(n);
+
+/**
+ * Si cambian las porciones y la receta tiene molde: qué molde usar, con el área
+ * escalada (cada lado por √factor). '' si no hace falta avisar.
+ */
+export function avisoMolde(receta, porciones) {
+  const base = porcionesBase(receta);
+  if (!base || !String(receta.molde || '').trim() || !(porciones > 0) || porciones === base) return '';
+  const factor = porciones / base;
+  const molde = leerMolde(receta.molde);
+  if (!molde) return 'Revisá el tamaño del molde.';
+  const medidas = (escala, redondear) => {
+    const f = x => (redondear ? String(Math.round(x * escala)) : formatearNumero(x, { fracciones: false }));
+    return (molde.lados ? molde.lados.map(f).join('×') : f(molde.diametro)) + ' cm';
+  };
+  const actual = medidas(1, false);
+  const otro = medidas(Math.sqrt(factor), true);
+  const para = 'Para ' + porcionesTexto(porciones);
+  if (factor < 1) return para + ' alcanza un molde de unos ' + otro + ' (la receta usa uno de ' + actual + ').';
+  const noAlcanza = para + ', el molde de ' + actual + ' no alcanza: ';
+  const cerca = Math.round(factor);
+  if (factor >= 2 && Math.abs(factor - cerca) < 0.15) return noAlcanza + 'usá ' + enLetras(cerca) + ', o uno de unos ' + otro + '.';
+  if (factor >= 2) {
+    const mas = enLetras(Math.ceil(factor));
+    return noAlcanza + 'usá ' + enLetras(Math.floor(factor)) + (/^o/.test(mas) ? ' u ' : ' o ') + mas + ' del mismo tamaño.';
+  }
+  return noAlcanza + 'usá uno de unos ' + otro + '.';
+}
+
+// «horno», «horneá», «Hornear», pero no «hornalla».
+const HORNO = /\bhorn(?!al)/i;
+const CON_TIEMPO = /\d+\s*(min|h\b|hora)/i;
+
+/** ¿El paso es de horno con un tiempo (timer o «23 minutos»)? */
+export function pasoDeHorno(paso) {
+  const texto = String(paso?.texto || '');
+  return HORNO.test(texto) && (Number(paso.timer_min) > 0 || CON_TIEMPO.test(texto));
+}
+
+/** Con otras porciones y algún paso de horno con tiempo: que controlen la cocción. '' si no. */
+export function avisoCoccion(receta, factor) {
+  if (!(factor > 0) || factor === 1 || !(receta.pasos || []).some(pasoDeHorno)) return '';
+  return 'Los tiempos de cocción no se escalan: controlá la cocción.';
+}
+
 /** Porciones originales de la receta, o null si no las dice (entonces no se escala). */
 export function porcionesBase(receta) {
   const n = Number(receta.porciones);
@@ -308,6 +374,8 @@ export function textoReceta(receta, porciones) {
     '*' + String(receta.titulo || '').trim() + '*' + (datos ? '\n' + datos : ''),
     ingredientes.length ? '*Ingredientes*\n' + ingredientes.join('\n\n') : '',
     factor !== 1 ? 'Ojo: los pasos dicen las cantidades para ' + base + '.' : '',
+    avisoMolde(receta, n),
+    avisoCoccion(receta, factor),
     pasos.length ? '*Pasos*\n' + pasos.join('\n') : '',
     fuente ? (receta.autor ? 'De ' + String(receta.autor).trim() + ': ' : 'El video: ') + fuente : '',
   ].filter(Boolean).join('\n\n');

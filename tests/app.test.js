@@ -341,6 +341,69 @@ test('paraComprar: lo que se cuenta va para arriba; lo demás, en la unidad de l
   assert.equal(paraComprar(3, 'u', 1), 3);
 });
 
+test('leerMolde: las medidas del molde, escrito como venga', async () => {
+  const { leerMolde } = await cargar('ingredientes.js');
+  assert.deepEqual(leerMolde('20×30 cm'), { lados: [20, 30] });
+  assert.deepEqual(leerMolde('20 x 30'), { lados: [20, 30] });
+  assert.deepEqual(leerMolde('Placa de 20 X 30,5 cm'), { lados: [20, 30.5] });
+  assert.deepEqual(leerMolde('20×30×5 cm'), { lados: [20, 30] }, 'la altura no cuenta');
+  assert.deepEqual(leerMolde('18 cm'), { diametro: 18 });
+  assert.deepEqual(leerMolde('budinera de 25 cm'), { diametro: 25 });
+  assert.equal(leerMolde('12 pirotines'), null);
+  assert.equal(leerMolde(''), null);
+});
+
+test('avisoMolde: con otras porciones, el molde escalado por el área', async () => {
+  const { avisoMolde } = await cargar('ingredientes.js');
+  const brownie = { porciones: 6, molde: '20×30 cm' };
+  assert.equal(avisoMolde(brownie, 12),
+    'Para 12 porciones, el molde de 20×30 cm no alcanza: usá dos, o uno de unos 28×42 cm.', 'el ejemplo de la spec');
+  assert.equal(avisoMolde(brownie, 18), 'Para 18 porciones, el molde de 20×30 cm no alcanza: usá tres, o uno de unos 35×52 cm.');
+  assert.equal(avisoMolde(brownie, 15), 'Para 15 porciones, el molde de 20×30 cm no alcanza: usá dos o tres del mismo tamaño.');
+  assert.equal(avisoMolde({ porciones: 2, molde: '20×30 cm' }, 15),
+    'Para 15 porciones, el molde de 20×30 cm no alcanza: usá siete u ocho del mismo tamaño.');
+  assert.equal(avisoMolde(brownie, 9), 'Para 9 porciones, el molde de 20×30 cm no alcanza: usá uno de unos 24×37 cm.');
+  assert.equal(avisoMolde({ porciones: 10, molde: '20×30 cm' }, 11),
+    'Para 11 porciones, el molde de 20×30 cm no alcanza: usá uno de unos 21×31 cm.', 'factor 1,1: no dice «usá uno» suelto');
+  assert.equal(avisoMolde(brownie, 2), 'Para 2 porciones alcanza un molde de unos 12×17 cm (la receta usa uno de 20×30 cm).');
+  assert.equal(avisoMolde({ porciones: 4, molde: 'budinera de 25 cm' }, 8),
+    'Para 8 porciones, el molde de 25 cm no alcanza: usá dos, o uno de unos 35 cm.', 'nombra las medidas, no el texto entero');
+  assert.equal(avisoMolde({ porciones: 4, molde: '18 cm' }, 1), 'Para 1 porción alcanza un molde de unos 9 cm (la receta usa uno de 18 cm).');
+  assert.equal(avisoMolde({ porciones: 12, molde: '12 pirotines' }, 24), 'Revisá el tamaño del molde.');
+  assert.equal(avisoMolde(brownie, 6), '', 'con las mismas porciones, nada');
+  assert.equal(avisoMolde({ porciones: 6, molde: '' }, 12), '', 'sin molde, nada');
+  assert.equal(avisoMolde({ porciones: '', molde: '20×30 cm' }, 12), '', 'sin porciones no se escala');
+});
+
+test('avisoCoccion: solo con otras porciones y algún paso de horno con tiempo', async () => {
+  const { avisoCoccion, pasoDeHorno } = await cargar('ingredientes.js');
+  const aviso = 'Los tiempos de cocción no se escalan: controlá la cocción.';
+  const horno = { pasos: [{ texto: 'Precalentá el horno a 180 °C.' }, { texto: 'Horneá hasta que dore.', timer_min: 25 }] };
+  assert.equal(avisoCoccion(horno, 2), aviso);
+  assert.equal(avisoCoccion(horno, 1), '');
+  assert.equal(avisoCoccion({ pasos: [{ texto: 'Llevá al horno 40 minutos.' }] }, 0.5), aviso, 'el tiempo en el texto también cuenta');
+  assert.equal(avisoCoccion({ pasos: [{ texto: 'Precalentá el horno.' }] }, 2), '', 'sin tiempo, no');
+  assert.equal(avisoCoccion({ pasos: [{ texto: 'Cociná 5 minutos en la hornalla.', timer_min: 5 }] }, 2), '', 'la hornalla no es el horno');
+  assert.equal(avisoCoccion({ pasos: [] }, 2), '');
+  assert.equal(pasoDeHorno({ texto: 'HORNEAR 20 min' }), true);
+});
+
+test('textoReceta: con otras porciones, las cantidades cómodas y los avisos', async () => {
+  const { textoReceta } = await cargar('ingredientes.js');
+  const receta = {
+    titulo: 'Brownie', porciones: 6, molde: '20×30 cm',
+    ingredientes: [{ nombre: 'huevos', cantidad: 3, unidad: 'u' }, { nombre: 'esencia de vainilla', cantidad: 1, unidad: 'cdita' }],
+    pasos: [{ texto: 'Horneá 23 minutos.', timer_min: 23 }],
+  };
+  const texto = textoReceta(receta, 15);
+  assert.match(texto, /Para 15 porciones/);
+  assert.match(texto, /- Huevos: 7 u 8\n- Esencia de vainilla: 2 ½ cditas/);
+  assert.match(texto, /usá dos o tres del mismo tamaño/);
+  assert.match(texto, /controlá la cocción/);
+  assert.doesNotMatch(textoReceta(receta, 6), /molde de|cocción/, 'con las porciones originales, sin avisos');
+  assert.match(textoReceta({ ...receta, porciones: 1 }), /Para 1 porción\b/);
+});
+
 test('porcionesTexto: «1 porción», «4 porciones»', async () => {
   const { porcionesTexto } = await cargar('formato.js');
   assert.equal(porcionesTexto(1), '1 porción');
