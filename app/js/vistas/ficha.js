@@ -12,7 +12,7 @@ import { nuevaCorreccion, nuevaEdicion, nuevaNota, nuevoTexto } from '../edicion
 import { estadoPropia, pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
 import { leerRuta } from '../rutas.js';
-import { compartirTexto, confirmar, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
+import { compartirTexto, confirmar, estrellas, navegacion, segmentado, sinReceta, sumarALaSemana } from './controles.js';
 
 const ESTADOS = [
   { valor: 'para_probar', nombre: 'Para probar' },
@@ -232,7 +232,13 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     },
   });
 
-  const barraCocinar = h('div', { class: 'barra-acciones sobre-navegacion' }, botonCocinar);
+  // «Sumar a la semana» (SPEC_v2 §4.1), fijo abajo al lado de «Empezar a cocinar»: corto («Semana») si
+  // está el otro, entero si la receta no tiene pasos. Con las porciones que se están viendo.
+  const textoSemana = h('span');
+  const botonSemana = h('button', { type: 'button', class: 'boton-secundario boton-semana-ficha',
+    onclick: () => sumarALaSemana({ app, editar, avisar }, r, { porciones: porcionesBase(r) ? app.porciones.get(id) || porcionesIniciales(r) : null, conElegir: true }) },
+  icono('calendario', 20), textoSemana);
+  const barraCocinar = h('div', { class: 'barra-acciones sobre-navegacion' }, h('div', { class: 'barra-fila' }, botonCocinar, botonSemana));
   const nav = navegacion('biblioteca', app);
   contenedor.append(h('article', { class: 'ficha con-navegacion' },
     anuncio,
@@ -356,7 +362,15 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   }
 
   function pintarPasos() {
-    barraCocinar.hidden = !r.pasos.length;
+    const conPasos = r.pasos.length > 0;
+    const descartada = r.estado === 'descartada';
+    botonCocinar.hidden = !conPasos;
+    botonSemana.hidden = descartada;
+    barraCocinar.hidden = !conPasos && descartada;
+    textoSemana.textContent = conPasos ? 'Semana' : 'Sumar a la semana';
+    botonSemana.classList.toggle('corto', conPasos);
+    if (conPasos) botonSemana.setAttribute('aria-label', 'Sumar a la semana');
+    else botonSemana.removeAttribute('aria-label');
     zonaPasos.hidden = esPropia(r) && !r.pasos.length;
     if (!r.pasos.length) {
       return rellenar(zonaPasos, h('h2', null, 'Pasos'),

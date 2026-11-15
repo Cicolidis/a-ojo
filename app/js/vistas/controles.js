@@ -5,7 +5,8 @@ import { h, icono } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
 import { cuantasFilas, resumenBandeja } from '../datos.js';
-import { hoyIso, platosQueFaltan } from '../plan.js';
+import { hoyIso, lunesDe, nuevaEntrada, platosQueFaltan, sumarDias, diaYMes } from '../plan.js';
+import { nuevaEdicion } from '../ediciones.js';
 
 /** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
 export function tocarAfueraCierra(dialogo) {
@@ -15,6 +16,38 @@ export function tocarAfueraCierra(dialogo) {
     if (e.target === dialogo && afuera) dialogo.close();
   });
   return dialogo;
+}
+
+/**
+ * «Sumar a la semana» (SPEC_v2 §4.1), desde la ficha y desde las tarjetas de la Biblioteca: una hoja
+ * con «Esta semana» y «La que viene» que pone la receta en «Sin día» (con `porciones`, o sin número
+ * si la receta no las dice). `conElegir`: también «Elegir día y comida» (la ficha). Al cerrar, el foco
+ * vuelve a donde estaba.
+ */
+export function sumarALaSemana({ app, editar, avisar }, receta, { porciones = null, conElegir = false } = {}) {
+  const previo = document.activeElement;
+  const esta = lunesDe(hoyIso());
+  const queViene = sumarDias(esta, 7);
+  const poner = semana => {
+    editar(nuevaEdicion('plan.poner', { quien: app.config.quien,
+      items: [nuevaEntrada({ semana, receta_id: receta.id, porciones })] }));
+    dialogo.close();
+    avisar('✓ En Sin día de ' + (semana === esta ? 'esta semana' : 'la que viene') + '.', { texto: 'Ver', href: '#/semana/' + semana });
+  };
+  const dialogo = tocarAfueraCierra(h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-sumar' },
+    h('h2', { id: 'titulo-sumar' }, 'Sumar ' + receta.titulo),
+    h('p', { class: 'secundario' }, 'Queda en «Sin día»: después la repartís en la semana.'),
+    h('div', { class: 'hoja-botones' },
+      h('button', { type: 'button', class: 'boton-principal', onclick: () => poner(esta) }, 'Esta semana (del ' + diaYMes(esta) + ')'),
+      h('button', { type: 'button', class: 'boton-secundario', onclick: () => poner(queViene) }, 'La que viene (del ' + diaYMes(queViene) + ')'),
+      conElegir ? h('a', { class: 'boton-texto', href: '#/semana/poner/' + receta.id, onclick: () => dialogo.close() }, icono('calendario', 18), 'Elegir día y comida') : null,
+      h('button', { type: 'button', class: 'boton-texto', onclick: () => dialogo.close() }, 'Cancelar'))));
+  dialogo.addEventListener('close', () => {
+    dialogo.remove();
+    if (previo && previo.isConnected && !location.hash.startsWith('#/semana/poner/')) previo.focus();
+  });
+  document.body.append(dialogo);
+  dialogo.showModal();
 }
 
 /**

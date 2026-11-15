@@ -1611,3 +1611,26 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 .una-nuestra { border: 1px dashed var(--borde-control); }
 
 .icono-nuestra { display: flex; align-items: center; justify-content: center; background: var(--superficie-2); color: var(--acento); }
+
+/* «Sumar a la semana»: en la esquina de cada tarjeta y en la barra fija de la ficha. */
+.tarjeta-caja { position: relative; }
+
+.boton-semana {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: 1px solid var(--borde-control);
+  background: var(--superficie);
+  color: var(--tinta);
+}
+
+.barra-fila { display: flex; gap: 8px; max-width: 520px; margin: 0 auto; }
+
+.barra-fila .boton-principal { flex: 1; min-width: 0; }
+
+.barra-fila .boton-principal[hidden] + .boton-semana-ficha { flex: 1; }
+
+.boton-semana-ficha { flex: none; gap: 6px; padding: 0 14px; background: var(--superficie); }
+
+/* Al lado de «Empezar a cocinar»: el ícono arriba y «Semana» abajo, como las pestañas. */
+.boton-semana-ficha.corto { flex-direction: column; gap: 2px; padding: 0 12px; font-size: 13px; }

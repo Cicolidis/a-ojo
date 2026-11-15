@@ -4,14 +4,16 @@ import { h, icono, foto } from '../dom.js';
 import { FILTROS, FILTRO_DESCARTADAS, FILTRO_NUESTRAS, buscar, cuantasFilas, esPropia, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja, tengoConDespensa } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
 import { unirConY } from '../ingredientes.js';
-import { cargando, navegacion, segmentado, vacio } from './controles.js';
+import { cargando, navegacion, segmentado, sumarALaSemana, vacio } from './controles.js';
+import { porcionesIniciales } from '../ingredientes.js';
 
 const PISTAS = {
   buscar: { placeholder: 'Nombre o ingrediente… (ej: garbanzos)', etiqueta: 'Buscar recetas' },
   tengo: { placeholder: '¿Qué tenés? (ej: zapallo, huevos, crema)', etiqueta: 'Ingredientes que tenés' },
 };
 
-export function montar(contenedor, { app, sincronizar }) {
+export function montar(contenedor, ctx) {
+  const { app, sincronizar } = ctx;
   const estado = app.biblioteca;
   const cuenta = h('span', { class: 'secundario' });
   const sync = h('p', { class: 'estado-sync', role: 'status' });
@@ -133,7 +135,7 @@ export function montar(contenedor, { app, sincronizar }) {
     if (tengoTexto) {
       const cercanas = queCocino(app.indice.lista, Object.assign({}, estado, { tengo: tengoTexto }));
       if (cercanas.length) {
-        grilla.replaceChildren(h('div', { class: 'grilla' }, cercanas.map(x => tarjeta(x.receta, x.faltan))));
+        grilla.replaceChildren(h('div', { class: 'grilla' }, cercanas.map(x => tarjeta(x.receta, x.faltan, ctx))));
         return;
       }
       // Si no escribieron nada (solo cuenta la despensa), no hay nada para borrar.
@@ -145,7 +147,7 @@ export function montar(contenedor, { app, sincronizar }) {
     const recetas = buscar(app.indice.lista, estado.modo === 'tengo' ? Object.assign({}, estado, { texto: '' }) : estado);
     if (recetas.length) {
       // Sin el índice de map(): tarjeta() lo tomaría por la lista de lo que falta.
-      grilla.replaceChildren(h('div', { class: 'grilla' }, recetas.map(r => tarjeta(r))));
+      grilla.replaceChildren(h('div', { class: 'grilla' }, recetas.map(r => tarjeta(r, undefined, ctx))));
       return;
     }
     grilla.replaceChildren(estadoVacio(motivoVacio(app.indice.lista, estado, { hayDatos: !!app.datos, sync: app.sync.estado })));
@@ -216,16 +218,24 @@ function textoFaltan(faltan) {
   return (faltan.length === 1 ? 'Falta: ' : 'Faltan: ') + unirConY(muestra);
 }
 
-function tarjeta(r, faltan) {
+/**
+ * Una tarjeta: el link a la ficha y, al lado (un botón no puede ir adentro de un link), «Sumar a la
+ * semana» (SPEC_v2 §4.1), salvo en las descartadas.
+ */
+function tarjeta(r, faltan, ctx) {
   const meta = [esPropia(r) ? 'Receta nuestra' : r.autor, formatearMinutos(r.tiempo_min)].filter(Boolean).join(' · ');
   const valoracion = Number(r.valoracion) > 0
     ? h('span', { class: 'valoracion', role: 'img', 'aria-label': 'Valoración ' + r.valoracion + ' de 5' }, icono('estrella', 12), r.valoracion)
     : null;
-  return h('a', { class: 'tarjeta', href: '#/receta/' + r.id },
+  const link = h('a', { class: 'tarjeta', href: '#/receta/' + r.id },
     foto(r, 'tarjeta-foto'),
     h('span', { class: 'tarjeta-titulo' }, r.titulo),
     faltan ? h('span', { class: 'tarjeta-faltan' + (faltan.length ? '' : ' completa') }, textoFaltan(faltan))
       : meta ? h('span', { class: 'tarjeta-meta' }, meta) : null,
     valoracion,
   );
+  const semana = r.estado === 'descartada' ? null : h('button', { type: 'button', class: 'boton-redondo boton-semana',
+    'aria-label': 'Sumar ' + r.titulo + ' a la semana',
+    onclick: () => sumarALaSemana(ctx, r, { porciones: porcionesIniciales(r) }) }, icono('calendario-mas', 20));
+  return h('div', { class: 'tarjeta-caja' }, link, semana);
 }
