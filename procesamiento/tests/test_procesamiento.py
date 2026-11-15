@@ -488,8 +488,9 @@ TODO_OBSIDIAN = {
         {'receta_id': 'r_brown', 'orden': 2, 'nombre': 'azúcar', 'cantidad': 1.5, 'unidad': 'taza', 'rol': 'principal'},
         {'receta_id': 'r_brown', 'orden': 3, 'nombre': 'sal', 'cantidad': None, 'unidad': 'a ojo', 'rol': 'condimento'},
         {'receta_id': 'r_brown', 'orden': 4, 'nombre': 'vainilla', 'cantidad': 1, 'unidad': 'cdita', 'rol': 'condimento'},
-        {'receta_id': 'r_brown', 'orden': 5, 'nombre': 'nueces', 'cantidad': 100, 'unidad': 'g', 'rol': 'principal', 'rol_usuario': 'opcional'},
-        {'receta_id': 'r_brown', 'orden': 6, 'nombre': 'papel manteca', 'unidad': 'a ojo', 'rol': 'utensilio'},
+        {'receta_id': 'r_brown', 'orden': 5, 'nombre': 'nueces', 'cantidad': 100, 'unidad': 'g', 'nota': 'tostadas', 'rol': 'principal', 'rol_usuario': 'opcional'},
+        {'receta_id': 'r_brown', 'orden': 7, 'nombre': 'dulce de leche', 'unidad': 'a ojo', 'nota': 'Opcional', 'rol': 'opcional'},
+        {'receta_id': 'r_brown', 'orden': 6, 'nombre': 'Papel manteca', 'unidad': 'a ojo', 'rol': 'utensilio'},
     ],
     'pasos': [
         {'receta_id': 'r_brown', 'orden': 2, 'texto': 'Horneá 23 minutos.', 'tip': 'Tiene que quedar blando.'},
@@ -509,13 +510,17 @@ class TestObsidian(unittest.TestCase):
         self.assertTrue(texto.startswith('---\na_ojo_id: "r_brown"\ntipo: "dulce"\netiquetas: ["rápida", "chocolate"]\nestado: "favorita"\nvaloracion: 4\n'))
         self.assertIn('tags: ["receta"]', texto)
         self.assertIn('Para 6 porciones · 45 min · Molde 20×30 cm · [Ver el video](https://www.youtube.com/shorts/x) de @cocina', texto)
-        self.assertIn('- Chocolate semiamargo: 200 g (picado)\n- Azúcar: 1 ½ tazas\n- Sal y vainilla (1 cdita)\n- Nueces: 100 g *(opcional)*', texto)
+        self.assertIn('- Chocolate semiamargo: 200 g (picado)\n- Azúcar: 1 ½ tazas\n- Sal y vainilla (1 cdita)\n- Nueces: 100 g (tostadas) *(opcional)*\n- Dulce de leche *(opcional)*', texto)
         self.assertIn('También vas a necesitar: papel manteca.', texto)
         self.assertIn('## Pasos\n1. Derretí el chocolate.\n2. Horneá 23 minutos.\n    *Tiene que quedar blando.*', texto)
         self.assertIn('- **Laura · 12/9/2026:** Con menos azúcar.', texto)
         self.assertNotIn('Borrada', texto)
         self.assertIn('## Cómo se armó\n\nSalió de la descripción del video y los subtítulos.', texto)
         self.assertIn('El tiempo es estimado.', texto)
+
+    def test_una_porcion_en_singular(self):
+        texto = obsidian.nota_markdown({'id': 'r_1', 'titulo': 'Huevo frito', 'porciones': 1}, [], [], [])
+        self.assertIn('Para 1 porción\n', texto)
 
     def test_nombre_de_archivo(self):
         self.assertEqual(obsidian.nombre_archivo('Brownie: húmedo/con nueces'), 'Brownie húmedo con nueces')

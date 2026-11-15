@@ -140,6 +140,15 @@ def detalle(ing):
     return f' ({", ".join(partes)})' if partes else ''
 
 
+def linea_ingrediente(ing, opcional=False):
+    """«- Nueces: 100 g (tostadas) *(opcional)*». Como fila() de la ficha: la nota «opcional» no se repite."""
+    nota = str(ing.get('nota') or '').strip()
+    if opcional and nota.lower() == 'opcional':
+        nota = ''
+    return (f'- {capitalizar(ing.get("nombre"))}' + (f': {cantidad(ing)}' if cantidad(ing) else '')
+            + (f' ({nota})' if nota else '') + (' *(opcional)*' if opcional else ''))
+
+
 def fecha(iso):
     """«2026-09-12T…» → «12/9/2026»."""
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})', str(iso or ''))
@@ -178,7 +187,8 @@ def nota_markdown(receta, ingredientes, pasos, notas):
 
     if receta.get('foto_url'):
         lineas += [f'![{receta.get("titulo", "")}]({receta["foto_url"]})', '']
-    datos = [x for x in (f'Para {receta["porciones"]:g} porciones' if receta.get('porciones') else '',
+    porciones = receta.get('porciones')
+    datos = [x for x in (f'Para {porciones:g} ' + ('porción' if porciones == 1 else 'porciones') if porciones else '',
                          minutos(receta.get('tiempo_min')),
                          f'Molde {receta["molde"]}' if receta.get('molde') else '') if x]
     fuente = receta.get('fuente_url') or ''
@@ -201,15 +211,14 @@ def nota_markdown(receta, ingredientes, pasos, notas):
     for nombre, s in secciones.items():
         if nombre and len(secciones) > 1:
             lineas += ['', f'### {nombre}']
-        for ing in s['principal']:
-            lineas.append(f'- {capitalizar(ing.get("nombre"))}' + (f': {cantidad(ing)}' if cantidad(ing) else '')
-                          + (f' ({ing["nota"].strip()})' if str(ing.get('nota') or '').strip() else ''))
+        lineas += [linea_ingrediente(ing) for ing in s['principal']]
         if s['condimento']:
             lineas.append('- ' + capitalizar(unir_con_y(i.get('nombre', '') + detalle(i) for i in s['condimento'])))
-        for ing in s['opcional']:
-            lineas.append(f'- {capitalizar(ing.get("nombre"))}' + (f': {cantidad(ing)}' if cantidad(ing) else '') + ' *(opcional)*')
+        lineas += [linea_ingrediente(ing, opcional=True) for ing in s['opcional']]
     if utensilios:
-        lineas += ['', 'También vas a necesitar: ' + unir_con_y(i.get('nombre', '') + detalle(i) for i in utensilios) + '.']
+        # Como textoReceta(): en minúscula, porque sigue a «También vas a necesitar».
+        texto = unir_con_y(i.get('nombre', '') + detalle(i) for i in utensilios)
+        lineas += ['', 'También vas a necesitar: ' + texto[:1].lower() + texto[1:] + '.']
 
     lineas += ['', '## Pasos']
     for n, paso in enumerate(sorted(pasos, key=lambda p: p.get('orden') or 0), 1):
@@ -221,7 +230,7 @@ def nota_markdown(receta, ingredientes, pasos, notas):
     if vivas:
         lineas += ['', '## Nuestras notas']
         for x in vivas:
-            quien = NOMBRES.get(str(x.get('quien') or '').lower(), 'Nuestra nota')
+            quien = NOMBRES.get(str(x.get('quien') or '').strip().lower(), 'Nuestra nota')
             texto = str(x.get('texto') or '').strip().replace('\n', ' ')
             lineas.append(f'- **{quien} · {fecha(x.get("fecha"))}:** {texto}')
 
