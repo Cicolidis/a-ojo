@@ -6,9 +6,9 @@
 // desde Compras, por el buscador de recetas (y se vuelve a la lista).
 
 import { h, icono, rellenar } from '../dom.js';
-import { capitalizar, formatearCantidad, porcionesTexto } from '../formato.js';
-import { agrupar, enUnaLinea, escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
-import { elegidosIniciales, idsPara, itemsDeReceta, recetaCambio, recetasEnLista, vaARevisar } from '../compras.js';
+import { capitalizar, porcionesTexto } from '../formato.js';
+import { agrupar, enUnaLinea, porcionesBase, porcionesIniciales } from '../ingredientes.js';
+import { elegidosIniciales, idsPara, itemsDeReceta, recetaCambio, recetasEnLista, textoParaComprar, vaARevisar } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { contadorPorciones, sinReceta } from './controles.js';
 
@@ -81,7 +81,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
         } }),
         h('span', { class: 'casilla-texto' }, capitalizar(i.nombre),
           opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null),
-        h('span', { class: 'cantidad' }, formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad))));
+        h('span', { class: 'cantidad' }, textoParaComprar(i, factor))));
 
     const paraComprar = secciones.filter(s => s.principales.length || s.opcionales.length);
     rellenar(lista,

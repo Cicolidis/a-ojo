@@ -4,7 +4,7 @@
 
 import { capitalizar, formatearCantidad, formatearNumero } from './formato.js';
 import { alfabetico, normalizar } from './datos.js';
-import { escalar, porcionesBase, rolDe } from './ingredientes.js';
+import { ML_CUCHARAS, acomodar, familiaDe, paraComprar, porcionesBase, rolDe } from './ingredientes.js';
 
 // Los lugares, en el orden en que aparecen en la lista (igual que ENUMS.lugar en la API).
 export const LUGARES = ['supermercado', 'verdulería', 'carnicería', 'panadería', 'almacenata', 'dietética', 'feria'];
@@ -115,7 +115,7 @@ function emparejar(receta, compras) {
   const base = porcionesBase(receta);
   const cantidadPara = (i, c) => {
     const factor = base && Number(c.porciones) > 0 ? Number(c.porciones) / base : 1;
-    const n = Number(escalar(i.cantidad, i.unidad || 'a ojo', factor));
+    const n = Number(paraComprar(i.cantidad, i.unidad || 'a ojo', factor));
     return (i.unidad || 'a ojo') === c.unidad && (c.unidad === 'a ojo' || n === Number(c.cantidad));
   };
   const pasada = coincide => receta.ingredientes.forEach(i => {
@@ -155,7 +155,7 @@ export function itemsDeReceta(receta, porciones, elegidos, nuevoId) {
     .filter(i => vaARevisar(i) || elegidos.has(i.id))
     .map(i => {
       const unidad = i.unidad || 'a ojo';
-      const n = Number(escalar(i.cantidad, unidad, factor));
+      const n = Number(paraComprar(i.cantidad, unidad, factor));
       return {
         id: nuevoId(i),
         nombre: i.nombre,
@@ -178,31 +178,64 @@ export function recetasEnLista(compras) {
   return [...mapa.values()];
 }
 
-// Unidades que se pueden sumar entre sí: a gramos y a mililitros.
-const FAMILIAS = { g: ['g', 1], kg: ['g', 1000], ml: ['ml', 1], l: ['ml', 1000] };
-
-/** «400 g», «1,2 kg», «6», «200 g + 1 taza». Lo «a ojo» no suma; si todo es «a ojo», vacío. */
-export function sumarCantidades(items) {
+/**
+ * Los ítems con cantidad, por familia (SPEC_v2 §7.4): el peso en gramos, el volumen
+ * en mililitros (ml, l y cucharas) y lo demás por su unidad. Map clave → { n, cuantos,
+ * metrico, soloTazas }. Peso y volumen no se mezclan.
+ */
+function porFamilia(items) {
   const totales = new Map();
   for (const it of items) {
     const n = Number(it.cantidad);
     if (it.unidad === 'a ojo' || !(n > 0)) continue;
-    const [unidad, factor] = FAMILIAS[it.unidad] || [it.unidad || 'u', 1];
-    totales.set(unidad, (totales.get(unidad) || 0) + n * factor);
+    const unidad = it.unidad || 'u';
+    const familia = familiaDe(unidad);
+    let clave = unidad;
+    let base = n;
+    if (familia === 'peso') [clave, base] = ['peso', unidad === 'kg' ? n * 1000 : n];
+    if (familia === 'metrico') [clave, base] = ['volumen', unidad === 'l' ? n * 1000 : n];
+    if (familia === 'cucharas') [clave, base] = ['volumen', n * ML_CUCHARAS[unidad]];
+    const t = totales.get(clave) || { n: 0, cuantos: 0, metrico: false, soloTazas: true };
+    t.n += base;
+    t.cuantos += 1;
+    t.metrico = t.metrico || familia === 'metrico';
+    t.soloTazas = t.soloTazas && unidad === 'taza';
+    totales.set(clave, t);
   }
-  return [...totales].map(([unidad, n]) => {
-    if ((unidad === 'g' || unidad === 'ml') && n >= 1000) {
-      return formatearNumero(n / 1000, { fracciones: false }) + (unidad === 'g' ? ' kg' : ' l');
+  return totales;
+}
+
+const textoDe = ({ cantidad, unidad }) => formatearCantidad(cantidad, unidad);
+
+/**
+ * «400 g», «1,2 kg», «6», «1 ¼ tazas», «200 g + 1 taza». Suma dentro de cada familia
+ * aunque cambie la unidad y muestra el total en la más cómoda (acomodar()): con ml o l
+ * en la suma, en ml o l; si son solo cucharas, en cucharas. Lo que se cuenta va tal
+ * cual. Lo «a ojo» no suma; si todo es «a ojo», vacío.
+ */
+export function sumarCantidades(items) {
+  return [...porFamilia(items)].map(([clave, t]) => {
+    if (clave === 'peso') return textoDe(acomodar(t.n, 'g'));
+    if (clave === 'volumen') {
+      return textoDe(t.metrico ? acomodar(t.n, 'ml') : acomodar(t.n / ML_CUCHARAS.cdita, 'cdita', { eraTaza: t.soloTazas }));
     }
-    const metrica = unidad === 'g' || unidad === 'ml';
-    return formatearCantidad(metrica && n >= 10 ? Math.round(n) : n, unidad);
+    return formatearCantidad(t.n, clave);
   }).join(' + ');
 }
 
-/** «(3 + 1)» si la fila junta dos o más cantidades; con la unidad en cada una si no es la misma. */
+/**
+ * Cómo va a quedar un ingrediente en la lista, para el paso de elegir: lo que se guarda
+ * (paraComprar: 7,5 huevos son «8»), acomodado como en la lista. «a ojo» si no tiene cantidad.
+ */
+export function textoParaComprar(ing, factor = 1) {
+  const unidad = ing.unidad || 'a ojo';
+  return sumarCantidades([{ cantidad: paraComprar(ing.cantidad, unidad, factor), unidad }]) || 'a ojo';
+}
+
+/** «(3 + 1)» si alguna familia de la fila juntó dos o más cantidades; con la unidad en cada una si no es la misma. */
 function desglose(items) {
+  if (![...porFamilia(items).values()].some(t => t.cuantos > 1)) return '';
   const con = items.filter(i => i.unidad !== 'a ojo' && Number(i.cantidad) > 0);
-  if (con.length < 2) return '';
   const unidad = con[0].unidad;
   const misma = con.every(i => i.unidad === unidad);
   return '(' + con.map(i => (misma
@@ -237,14 +270,11 @@ export function armarLista(compras, lugares) {
     lugar: l,
     nombre: nombreLugar(l),
     filas: grupos.get(l).map(f => {
-      const cantidad = sumarCantidades(f.items);
-      const partes = desglose(f.items);
       return {
         clave: f.items[0].id,
         nombre: f.nombre,
-        cantidad,
-        // Si no se sumó nada (200 g + 1 cda), el desglose diría lo mismo.
-        desglose: partes === '(' + cantidad + ')' ? '' : partes,
+        cantidad: sumarCantidades(f.items),
+        desglose: desglose(f.items),
         ids: f.items.map(i => i.id),
         hecho: f.items.every(i => i.hecho === true || i.hecho === 'true'),
         opcional: f.items.every(i => i.rol === 'opcional'),

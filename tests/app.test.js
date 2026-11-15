@@ -620,6 +620,39 @@ test('compras: el lugar de cada ítem sale de dónde lo movieron, su rol, la reg
   assert.equal(c.nombreLugar('dietética'), 'Dietética');
 });
 
+test('sumarCantidades: suma dentro de cada familia aunque cambie la unidad (SPEC_v2 §7.4)', async () => {
+  const { sumarCantidades } = await cargar('compras.js');
+  const suma = (...items) => sumarCantidades(items.map(([cantidad, unidad]) => ({ cantidad, unidad })));
+  assert.equal(suma([1, 'taza'], [4, 'cda']), '1 ¼ tazas', 'el ejemplo de la spec');
+  assert.equal(suma([2, 'cda'], [1, 'cdita']), '2 ⅓ cdas', 'el otro ejemplo de la spec');
+  assert.equal(suma([1, 'cdita'], [1, 'cda']), '1 ⅓ cdas');
+  assert.equal(suma([1, 'cdita'], [2, 'cdita']), '1 cda');
+  assert.equal(suma([0.5, 'taza'], [0.25, 'taza']), '¾ taza');
+  assert.equal(suma([200, 'g'], [1, 'taza']), '200 g + 1 taza', 'peso y volumen no se mezclan');
+  assert.equal(suma([1, 'taza'], [100, 'ml']), '340 ml', 'con ml en la suma, en ml');
+  assert.equal(suma([0.5, 'l'], [2, 'taza']), '980 ml');
+  assert.equal(suma([600, 'g'], [0.5, 'kg']), '1,1 kg');
+  assert.equal(suma([7.5, 'u'], [1, 'u']), '8 ½', 'lo que se cuenta va tal cual, nunca «7 u 8»');
+  assert.equal(suma([2, 'diente'], [1, 'diente']), '3 dientes');
+  assert.equal(suma([1, 'pizca'], [1, 'pizca']), '2 pizcas');
+});
+
+test('armarLista: el desglose solo si una familia juntó dos o más cantidades', async () => {
+  const { armarLista } = await cargar('compras.js');
+  const fila = items => armarLista(items.map(([cantidad, unidad], k) => itemCompra('c_' + k, 'r_' + k, 'harina', cantidad, unidad, 'almacén')), [])[0].filas[0];
+  assert.deepEqual([fila([[100, 'g'], [1, 'cda']]).cantidad, fila([[100, 'g'], [1, 'cda']]).desglose], ['100 g + 1 cda', '']);
+  assert.deepEqual([fila([[1, 'cdita'], [1, 'cda']]).cantidad, fila([[1, 'cdita'], [1, 'cda']]).desglose], ['1 ⅓ cdas', '(1 cdita + 1 cda)']);
+  assert.equal(fila([[200, 'g'], [300, 'g']]).desglose, '(200 + 300)');
+});
+
+test('textoParaComprar: lo que va a quedar en la lista', async () => {
+  const { textoParaComprar } = await cargar('compras.js');
+  assert.equal(textoParaComprar({ cantidad: 3, unidad: 'u' }, 2.5), '8');
+  assert.equal(textoParaComprar({ cantidad: 1, unidad: 'cda' }, 0.5), '1 ½ cditas');
+  assert.equal(textoParaComprar({ cantidad: 200, unidad: 'g' }, 7.5), '1 ½ kg');
+  assert.equal(textoParaComprar({ cantidad: null, unidad: 'a ojo' }, 2), 'a ojo');
+});
+
 test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios para revisar', async () => {
   const { indexar, aplicarDelta } = await cargar('datos.js');
   const c = await cargar('compras.js');
@@ -647,6 +680,22 @@ test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios par
   const torti = porId.get('r_torti');
   assert.deepEqual(c.itemsDeReceta(torti, 2, c.elegidosIniciales(torti), () => 'c_x').map(i => [i.nombre, i.cantidad]),
     [['banana', 2], ['huevos', 4], ['canela', 1], ['manteca', 2]]);
+});
+
+test('itemsDeReceta: lo que se cuenta va para arriba, y al volver a agregar se reconocen los ítems', async () => {
+  const { indexar, aplicarDelta } = await cargar('datos.js');
+  const c = await cargar('compras.js');
+  const { porId } = indexar(aplicarDelta(null, fixture()));
+  const brownie = porId.get('r_brown');
+  const elegidos = c.elegidosIniciales(brownie);
+  let n = 0;
+  const items = c.itemsDeReceta(brownie, 15, elegidos, () => 'c_' + n++).map(i => Object.assign(i, { receta_id: 'r_brown', porciones: 15 }));
+  const huevos = items.find(i => i.nombre === 'huevos');
+  assert.deepEqual([huevos.cantidad, huevos.unidad], [8, 'u'], '7,5 huevos: 8 para comprar');
+  assert.deepEqual(items.filter(i => i.nombre === 'esencia de vainilla').map(i => [i.cantidad, i.unidad]), [[2.5, 'cdita']]);
+  // Otra vez a 15: cada ingrediente se queda con su ítem (no cambia ningún id).
+  const ids = c.idsPara(brownie, items);
+  assert.deepEqual(brownie.ingredientes.filter(i => elegidos.has(i.id) || c.vaARevisar(i)).map(ids), items.map(i => i.id));
 });
 
 test('armarLista: por lugar, sumando entre recetas con el desglose, y «Revisá si tenés» al final', async () => {
@@ -713,7 +762,7 @@ test('sumarCantidades: gramos y mililitros se pasan a kilos y litros; lo «a ojo
   assert.equal(sumarCantidades([{ cantidad: 2.5, unidad: 'g' }]), '2,5 g');
   assert.equal(sumarCantidades([{ cantidad: 0.5, unidad: 'taza' }, { cantidad: 0.25, unidad: 'taza' }]), '¾ taza');
   assert.equal(sumarCantidades([{ cantidad: 2, unidad: 'cda' }, { cantidad: 1, unidad: 'cda' }]), '3 cdas');
-  assert.equal(sumarCantidades([{ cantidad: 1500, unidad: 'ml' }]), '1,5 l');
+  assert.equal(sumarCantidades([{ cantidad: 1500, unidad: 'ml' }]), '1 ½ l', 'con fracciones, como en la ficha');
   assert.equal(sumarCantidades([{ cantidad: 0.75, unidad: 'kg' }, { cantidad: 250, unidad: 'g' }]), '1 kg');
   assert.equal(sumarCantidades([{ cantidad: null, unidad: 'a ojo' }, { cantidad: 2, unidad: 'u' }]), '2');
   assert.equal(sumarCantidades([{ cantidad: null, unidad: 'a ojo' }]), '');
