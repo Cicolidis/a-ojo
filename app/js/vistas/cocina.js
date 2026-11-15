@@ -6,8 +6,8 @@
 
 import { h, icono } from '../dom.js';
 import { ingredientesDePaso } from '../cocina.js';
-import { capitalizar, formatearCantidad, formatearReloj, formatearTimer } from '../formato.js';
-import { escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
+import { capitalizar, formatearReloj, formatearTimer, porcionesTexto } from '../formato.js';
+import { porcionesBase, porcionesIniciales, textoCantidad } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { estrellas, sinReceta } from './controles.js';
 
@@ -227,9 +227,9 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
         titulo,
         h('p', { class: 'paso-texto' + (p.texto.length > 180 ? ' largo' : '') }, p.texto),
         ingredientes.length ? h('div', { class: 'chips-ingredientes', 'aria-label': 'Ingredientes de este paso' },
-          ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad)))) : null,
+          ingredientes.map(i => h('span', null, capitalizar(i.nombre) + ' · ' + textoCantidad(i.cantidad, i.unidad, factor)))) : null,
         ingredientes.length && factor !== 1 ? h('p', { class: 'secundario' },
-          'Cantidades para ' + porciones + ' porciones. Los pasos dicen las de ' + base + '.') : null,
+          'Cantidades para ' + porcionesTexto(porciones) + '. Los pasos dicen las de ' + base + '.') : null,
         Number(p.timer_min) > 0 && !timers[p.id] ? h('button', {
           type: 'button',
           class: 'boton-secundario boton-timer',

@@ -47,7 +47,13 @@ export function formatearCantidad(cantidad, unidad) {
   if (unidad === 'a ojo' || !isFinite(n) || n <= 0) return 'a ojo';
   const numero = formatearNumero(n, { fracciones: unidad !== 'g' && unidad !== 'ml' });
   if (unidad === 'u' || !unidad) return numero;
-  return numero + ' ' + (n > 1 && PLURALES[unidad] ? PLURALES[unidad] : unidad);
+  // En plural desde lo que formatearNumero ya no escribe «1» (1,005 cda es «1 cda»).
+  return numero + ' ' + (n - 1 >= 0.01 && PLURALES[unidad] ? PLURALES[unidad] : unidad);
+}
+
+/** «1 porción», «4 porciones». */
+export function porcionesTexto(n) {
+  return n + (Number(n) === 1 ? ' porción' : ' porciones');
 }
 
 /** 45 → «45 min», 60 → «1 h», 75 → «1 h 15 min». */

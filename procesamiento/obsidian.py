@@ -94,7 +94,8 @@ def formatear_cantidad(cantidad, unidad):
     texto = numero(n, fracciones=unidad not in ('g', 'ml'))
     if unidad in ('u', '', None):
         return texto
-    return f'{texto} {PLURALES.get(unidad, unidad) if n > 1 else unidad}'
+    # En plural desde lo que numero() ya no escribe «1» (1,005 cda es «1 cda»).
+    return f'{texto} {PLURALES.get(unidad, unidad) if n - 1 >= 0.01 else unidad}'
 
 
 def cantidad(ing):

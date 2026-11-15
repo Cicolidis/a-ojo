@@ -3,6 +3,7 @@
 // (ediciones.js): se ven al instante y se mandan cuando hay conexión.
 
 import { h, icono, rellenar } from '../dom.js';
+import { porcionesTexto } from '../formato.js';
 import { LUGARES, REVISAR, armarLista, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { cargando, compartirTexto, navegacion, tocarAfueraCierra, vacio } from './controles.js';
@@ -106,7 +107,7 @@ export function montar(contenedor, { app, editar }) {
         const titulo = r ? r.titulo : 'Receta que ya no está';
         return h('li', null,
           h('a', { href: '#/compras/agregar/' + x.receta_id }, titulo,
-            x.porciones ? h('span', { class: 'secundario' }, ' · ' + x.porciones + ' porciones') : null),
+            x.porciones ? h('span', { class: 'secundario' }, ' · ' + porcionesTexto(x.porciones)) : null),
           h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Quitar ' + titulo + ' de la lista',
             onclick: () => {
               editar(nuevaEdicion('compras.quitar', { ids: x.ids }));

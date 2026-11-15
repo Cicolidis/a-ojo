@@ -248,7 +248,7 @@ test('escalar: redondea con sentido y no toca lo «a ojo»', async () => {
   assert.equal(escalar(150, 'g', 4 / 6), 100);
   assert.equal(escalar(15, 'g', 1 / 3), 5);
   assert.equal(escalar(250, 'ml', 1 / 3), 83);
-  assert.equal(escalar(1, 'kg', 1 / 3), 0.33);
+  assert.equal(escalar(1, 'kg', 1 / 3), 0.333);
   assert.equal(escalar(3, 'u', 0.5), 1.5);
   assert.equal(escalar(4, 'u', 1 / 3), 4 / 3, 'al tercio más cercano');
   assert.equal(escalar(3, 'u', 0.7), 2, '2,1 huevos son 2');
@@ -257,6 +257,94 @@ test('escalar: redondea con sentido y no toca lo «a ojo»', async () => {
   assert.equal(escalar(1, 'u', 0.1), 0.25, 'nunca menos de ¼');
   assert.equal(escalar(null, 'a ojo', 2), null);
   assert.equal(escalar(200, 'g', 1), 200);
+});
+
+test('textoCantidad: cucharas en la unidad más cómoda (SPEC_v2 §7.2)', async () => {
+  const { textoCantidad } = await cargar('ingredientes.js');
+  const casos = [
+    [1, 'cda', 0.5, '1 ½ cditas', '½ cda pasa a cditas'],
+    [1, 'cda', 4, '¼ taza', '4 cdas son ¼ taza'],
+    [1, 'cda', 8, '½ taza'],
+    [1, 'cda', 5, '5 cdas', '5 cdas no da una fracción común de taza'],
+    [1, 'cda', 6.75, '7 cdas', 'desde 4 cdas, enteras o medias'],
+    [1, 'cda', 30, '1 ¾ tazas', 'desde una taza, en tazas'],
+    [3, 'cda', 1.3, '¼ taza', '3,9 cdas redondean a 4: se vuelve a elegir'],
+    [1, 'cdita', 2.98, '1 cda', '14,9 ml'],
+    [1, 'cdita', 2.5, '2 ½ cditas'],
+    [2, 'cdita', 3, '2 cdas'],
+    [1, 'cdita', 1 / 3, '⅓ cdita'],
+    [1, 'cdita', 0.1, '¼ cdita', 'nunca menos de ¼'],
+    [1, 'taza', 0.2, '3 ¼ cdas', 'menos de ¼ taza, a cdas'],
+    [1, 'taza', 0.3, '⅓ taza', 'si la receta decía tazas, sigue en tazas'],
+    [1, 'taza', 1.1, '1 taza'],
+    [1, 'taza', 2, '2 tazas', 'las tazas nunca pasan a ml'],
+  ];
+  for (const [n, u, f, esperado, por] of casos) assert.equal(textoCantidad(n, u, f), esperado, por || `${n} ${u} × ${f}`);
+});
+
+test('textoCantidad: peso y ml, sin pasar a cucharas', async () => {
+  const { textoCantidad } = await cargar('ingredientes.js');
+  const casos = [
+    [200, 'g', 2.5, '500 g'],
+    [600, 'g', 2, '1,2 kg'],
+    [300, 'g', 3.332, '1 kg', '999,6 g redondean a 1000: se vuelve a elegir'],
+    [1, 'kg', 1.5, '1 ½ kg'],
+    [1, 'kg', 1 / 3, '333 g', 'menos de un kilo, a gramos'],
+    [15, 'g', 1 / 3, '5 g'],
+    [250, 'ml', 6, '1 ½ l'],
+    [1, 'l', 0.5, '500 ml'],
+    [10, 'ml', 0.5, '5 ml', 'los ml nunca pasan a cucharas'],
+    [1500, 'g', 1, '1500 g', 'con factor 1 queda como la receta'],
+  ];
+  for (const [n, u, f, esperado, por] of casos) assert.equal(textoCantidad(n, u, f), esperado, por || `${n} ${u} × ${f}`);
+});
+
+test('textoCantidad: lo que se cuenta, a enteros o a medios, y la pizca sin escala', async () => {
+  const { textoCantidad } = await cargar('ingredientes.js');
+  const casos = [
+    [3, 'u', 2.5, '7 u 8', '«u» antes del 8'],
+    [3, 'u', 3.5, '10 u 11'],
+    [3, 'u', 1.5, '4 o 5'],
+    [3, 'diente', 1.2, '3 o 4 dientes'],
+    [1, 'lata', 1.5, '1 o 2 latas'],
+    [3, 'u', 0.75, '2', '2,25 huevos son 2'],
+    [3, 'u', 0.92, '3', '2,76 huevos son 3'],
+    [3, 'u', 1 / 3, '1'],
+    [3, 'u', 0.1, '1', 'nunca menos de 1'],
+    [0.5, 'u', 3, '1 ½', 'la receta usa medios: sigue en medios'],
+    [0.5, 'u', 0.5, '½', 'nunca menos de ½'],
+    [1.5, 'u', 0.5, '1'],
+    [0.25, 'u', 0.5, '¼', 'otra fracción: al cuarto, nunca menos de ¼'],
+    [0.25, 'u', 2, '½'],
+    [1 / 3, 'u', 2, '⅔'],
+    [1, 'pizca', 1.5, '1 pizca'],
+    [1, 'pizca', 2, '2 pizcas', 'desde el doble'],
+    [1, 'pizca', 7, '2 pizcas', 'nunca más de 2'],
+    [1, 'pizca', 0.5, '1 pizca'],
+    [null, 'a ojo', 2, 'a ojo'],
+    ['', 'g', 2, 'a ojo'],
+  ];
+  for (const [n, u, f, esperado, por] of casos) assert.equal(textoCantidad(n, u, f), esperado, por || `${n} ${u} × ${f}`);
+});
+
+test('paraComprar: lo que se cuenta va para arriba; lo demás, en la unidad de la receta', async () => {
+  const { paraComprar } = await cargar('ingredientes.js');
+  assert.equal(paraComprar(3, 'u', 2.5), 8);
+  assert.equal(paraComprar(7, 'u', 29 / 7), 29, 'sin decimales sucios: 29,000000000000004 son 29');
+  assert.equal(paraComprar(3, 'u', 0.1), 1);
+  assert.equal(paraComprar(0.5, 'u', 3), 1.5);
+  assert.equal(paraComprar(0.5, 'u', 1.1), 1, '0,55 → al medio de arriba');
+  assert.equal(paraComprar(1, 'cda', 0.5), 0.5, 'en cdas: la lista lo acomoda al sumar');
+  assert.equal(paraComprar(1, 'kg', 1 / 3), 0.333);
+  assert.equal(paraComprar(1, 'pizca', 3), 2);
+  assert.equal(paraComprar(null, 'a ojo', 2), null);
+  assert.equal(paraComprar(3, 'u', 1), 3);
+});
+
+test('porcionesTexto: «1 porción», «4 porciones»', async () => {
+  const { porcionesTexto } = await cargar('formato.js');
+  assert.equal(porcionesTexto(1), '1 porción');
+  assert.equal(porcionesTexto(4), '4 porciones');
 });
 
 test('vistas de porciones: la última usada primero y solo se guarda lo que hace falta', async () => {

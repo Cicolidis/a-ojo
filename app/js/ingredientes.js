@@ -1,7 +1,7 @@
 // Ingredientes en la ficha: cómo se agrupan por sección y rol, cómo se escalan
 // las cantidades y qué vistas de porciones tiene cada receta. Puro, sin DOM.
 
-import { capitalizar, formatearCantidad, formatearMinutos } from './formato.js';
+import { capitalizar, formatearCantidad, formatearMinutos, formatearNumero, porcionesTexto } from './formato.js';
 
 export const ROLES = ['principal', 'condimento', 'opcional', 'utensilio'];
 export const NOMBRES_ROL = { principal: 'Principal', condimento: 'Condimento', opcional: 'Opcional', utensilio: 'Utensilio' };
@@ -65,7 +65,7 @@ export function unirConY(partes) {
 
 /** Cantidad y nota de un ingrediente entre paréntesis, si tiene: «(1 cdita, tostado)». La cantidad «a ojo» no se dice. */
 function detalle(ing, factor) {
-  const cantidad = formatearCantidad(escalar(ing.cantidad, ing.unidad, factor), ing.unidad);
+  const cantidad = textoCantidad(ing.cantidad, ing.unidad, factor);
   const partes = [cantidad === 'a ojo' ? '' : cantidad, String(ing.nota || '').trim()].filter(Boolean);
   return partes.length ? ' (' + partes.join(', ') + ')' : '';
 }
@@ -76,23 +76,152 @@ export function enUnaLinea(ingredientes, factor = 1) {
 }
 
 const FRACCIONES = [0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1];
+const CASI = 1e-9; // para que 29,000000000000004 cuente como 29
 
-/**
- * Cantidad para otra cantidad de porciones (`factor` = porciones nuevas / originales).
- * Las «a ojo» y las vacías no cambian. Redondea con sentido: gramos y mililitros
- * desde 10, a entero; kilos y litros, a dos decimales; el resto, al cuarto o al
- * tercio más cercano (nunca menos de ¼).
- */
-export function escalar(cantidad, unidad, factor = 1) {
-  const n = cantidad === null || cantidad === undefined || cantidad === '' ? NaN : Number(cantidad);
-  if (unidad === 'a ojo' || !isFinite(n) || n <= 0 || !(factor > 0) || factor === 1) return cantidad;
-  const x = n * factor;
-  if (unidad === 'g' || unidad === 'ml') return x >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
-  if (unidad === 'kg' || unidad === 'l') return Math.round(x * 100) / 100;
+/** Al cuarto o al tercio más cercano, nunca menos de `minimo`. */
+function aGrilla(x, minimo = 1 / 4) {
   const entero = Math.floor(x);
   const resto = x - entero;
   const fraccion = FRACCIONES.reduce((a, b) => (Math.abs(b - resto) < Math.abs(a - resto) ? b : a));
-  return Math.max(entero + fraccion, 1 / 4);
+  return Math.max(entero + fraccion, minimo);
+}
+
+/** Gramos y mililitros: a entero desde 10; si no, a un decimal. */
+const aMetrico = x => (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
+const aMil = x => Math.round(x * 1000) / 1000;
+
+function numeroDe(cantidad) {
+  return cantidad === null || cantidad === undefined || cantidad === '' ? NaN : Number(cantidad);
+}
+
+/**
+ * Cantidad para otra cantidad de porciones (`factor` = porciones nuevas / originales),
+ * en la misma unidad. Las «a ojo» y las vacías no cambian. Redondea con sentido: gramos
+ * y mililitros desde 10, a entero; kilos y litros, a tres decimales; el resto, al cuarto
+ * o al tercio más cercano (nunca menos de ¼). Para mostrar, textoCantidad(); para la
+ * lista de compras, paraComprar().
+ */
+export function escalar(cantidad, unidad, factor = 1) {
+  const n = numeroDe(cantidad);
+  if (unidad === 'a ojo' || !isFinite(n) || n <= 0 || !(factor > 0) || factor === 1) return cantidad;
+  const x = n * factor;
+  if (unidad === 'g' || unidad === 'ml') return aMetrico(x);
+  if (unidad === 'kg' || unidad === 'l') return aMil(x);
+  return aGrilla(x);
+}
+
+// Familias de unidades (SPEC_v2 §7.1). La taza es la de /recetas al convertir cups: 240 ml.
+export const ML_CUCHARAS = { cdita: 5, cda: 15, taza: 240 };
+export const CONTABLES = ['u', 'diente', 'lata', 'paquete', 'ramo'];
+const TAZA = ML_CUCHARAS.taza;
+const CDA = ML_CUCHARAS.cda;
+
+/** Familia de una unidad: 'peso', 'metrico' (ml, l), 'cucharas', 'contable', 'pizca' u otra cosa. */
+export function familiaDe(unidad) {
+  if (unidad === 'g' || unidad === 'kg') return 'peso';
+  if (unidad === 'ml' || unidad === 'l') return 'metrico';
+  if (ML_CUCHARAS[unidad]) return 'cucharas';
+  if (CONTABLES.includes(unidad) || !unidad) return 'contable';
+  return unidad;
+}
+
+/** La unidad de cucharas más cómoda para `ml` (sin pasar a ml). `eraTaza`: la receta decía tazas. */
+function enCucharas(ml, eraTaza) {
+  const elegir = x => {
+    if (x >= TAZA - CASI) return ['taza', aGrilla(x / TAZA)];
+    if (x >= 4 * CDA - CASI) {
+      const t = aGrilla(x / TAZA);
+      if (eraTaza || Math.abs(t * TAZA - x) <= 2.5) return ['taza', t];
+      return ['cda', Math.round((x / CDA) * 2) / 2];
+    }
+    if (x >= CDA - CASI) return ['cda', aGrilla(x / CDA)];
+    return ['cdita', aGrilla(x / ML_CUCHARAS.cdita)];
+  };
+  // Si el redondeo tocó un umbral (3,9 cdas → 4 cdas), se vuelve a elegir: «¼ taza».
+  const [u1, n1] = elegir(ml);
+  const [unidad, cantidad] = elegir(n1 * ML_CUCHARAS[u1]);
+  return { cantidad, unidad };
+}
+
+/** Gramos o mililitros totales en la unidad cómoda: kilos o litros desde 1000. */
+function enMetrico(x, chica, grande) {
+  if (x >= 1000 - CASI) return { cantidad: aMil(x / 1000), unidad: grande };
+  const n = aMetrico(x);
+  return n >= 1000 ? { cantidad: 1, unidad: grande } : { cantidad: n, unidad: chica };
+}
+
+/**
+ * Peso y volumen en la unidad más cómoda (SPEC_v2 §7.2), sin cambiar de familia:
+ * 1500 g → 1 ½ kg, 0,5 kg → 500 g, 4 cdas → ¼ taza, ½ cda → 1 ½ cditas. Lo demás
+ * queda como está. `eraTaza`: la receta original decía tazas (entonces no baja a
+ * cdas mientras sea ¼ taza o más). Devuelve { cantidad, unidad }.
+ */
+export function acomodar(cantidad, unidad, { eraTaza = unidad === 'taza' } = {}) {
+  const n = numeroDe(cantidad);
+  if (unidad === 'a ojo' || !isFinite(n) || n <= 0) return { cantidad, unidad };
+  const familia = familiaDe(unidad);
+  if (familia === 'peso') return enMetrico(unidad === 'kg' ? n * 1000 : n, 'g', 'kg');
+  if (familia === 'metrico') return enMetrico(unidad === 'l' ? n * 1000 : n, 'ml', 'l');
+  if (familia === 'cucharas') return enCucharas(n * ML_CUCHARAS[unidad], eraTaza);
+  return { cantidad: n, unidad };
+}
+
+const esEntero = n => Math.abs(n - Math.round(n)) < CASI;
+
+/**
+ * Cantidad para otra cantidad de porciones, en la unidad más cómoda (SPEC_v2 §7.2).
+ * Devuelve { cantidad, unidad, hasta? }: `hasta` es el segundo número de «7 u 8»,
+ * cuando lo que se cuenta cae entre dos enteros. Con factor 1, «a ojo» o sin
+ * cantidad, devuelve lo mismo.
+ * - Contables: si la receta dice enteros (3 huevos), a enteros, nunca menos de 1;
+ *   si dice medios (½ cebolla), a medios; si dice otra fracción (¼), al cuarto o al tercio.
+ * - Pizca: sin escala; desde el doble, «2 pizcas».
+ */
+export function escalarCantidad(cantidad, unidad, factor = 1) {
+  const n = numeroDe(cantidad);
+  if (unidad === 'a ojo' || !isFinite(n) || n <= 0 || !(factor > 0) || factor === 1) return { cantidad, unidad };
+  const x = n * factor;
+  const familia = familiaDe(unidad);
+  if (familia === 'peso' || familia === 'metrico' || familia === 'cucharas') return acomodar(x, unidad);
+  if (familia === 'pizca') return { cantidad: factor >= 2 && n < 2 ? 2 : n, unidad };
+  if (familia === 'contable') {
+    if (esEntero(n)) {
+      if (x < 1) return { cantidad: 1, unidad };
+      const piso = Math.floor(x + CASI);
+      const resto = x - piso;
+      if (resto > 0.25 && resto < 0.75) return { cantidad: piso, unidad, hasta: piso + 1 };
+      return { cantidad: resto >= 0.75 ? piso + 1 : piso, unidad };
+    }
+    if (esEntero(n * 2)) return { cantidad: Math.max(Math.round(x * 2) / 2, 1 / 2), unidad };
+  }
+  return { cantidad: aGrilla(x), unidad };
+}
+
+/** «7 u 8»: «u» antes de los números que suenan con o (8, 11, 80–89, 800–899…). */
+function oU(n) {
+  return String(n).startsWith('8') || n === 11 ? ' u ' : ' o ';
+}
+
+/** La cantidad escalada lista para mostrar: «1 ½ cditas», «¼ taza», «7 u 8», «3 o 4 dientes», «a ojo». */
+export function textoCantidad(cantidad, unidad, factor = 1) {
+  const r = escalarCantidad(cantidad, unidad, factor);
+  if (r.hasta) return formatearNumero(r.cantidad) + oU(r.hasta) + formatearCantidad(r.hasta, r.unidad);
+  return formatearCantidad(r.cantidad, r.unidad);
+}
+
+/**
+ * Lo que va a la lista de compras, en la unidad de la receta: como escalar(), pero
+ * lo que se cuenta va para arriba (7,5 huevos → 8; los medios, al medio de arriba).
+ */
+export function paraComprar(cantidad, unidad, factor = 1) {
+  const n = numeroDe(cantidad);
+  if (unidad === 'a ojo' || !isFinite(n) || n <= 0) return cantidad;
+  const f = factor > 0 ? factor : 1;
+  const familia = familiaDe(unidad);
+  if (familia === 'pizca') return escalarCantidad(n, unidad, f).cantidad;
+  if (familia === 'contable' && esEntero(n)) return Math.max(Math.ceil(n * f - CASI), 1);
+  if (familia === 'contable' && esEntero(n * 2)) return Math.max(Math.ceil(n * f * 2 - CASI) / 2, 1 / 2);
+  return escalar(cantidad, unidad, f);
 }
 
 /** Porciones originales de la receta, o null si no las dice (entonces no se escala). */
@@ -141,7 +270,7 @@ export function hayQueGuardarVista(receta, n) {
 
 /** Un ingrediente en el texto para compartir: «Chocolate semiamargo: 200 g (picado)». */
 function lineaCompartir(ing, factor, opcional) {
-  const cantidad = formatearCantidad(escalar(ing.cantidad, ing.unidad, factor), ing.unidad);
+  const cantidad = textoCantidad(ing.cantidad, ing.unidad, factor);
   const nota = [String(ing.nota || '').trim(), opcional ? 'opcional' : ''].filter(Boolean)
     .filter((x, i, xs) => xs.indexOf(x) === i).join(', ');
   return '- ' + capitalizar(ing.nombre) + (cantidad === 'a ojo' ? '' : ': ' + cantidad) + (nota ? ' (' + nota + ')' : '');
@@ -157,7 +286,7 @@ export function textoReceta(receta, porciones) {
   const n = porciones || base;
   const factor = base && n ? n / base : 1;
   const datos = [
-    n ? 'Para ' + n + (n === 1 ? ' porción' : ' porciones') : '',
+    n ? 'Para ' + porcionesTexto(n) : '',
     receta.tiempo_min ? formatearMinutos(receta.tiempo_min) : '',
     receta.molde ? 'Molde ' + receta.molde : '',
   ].filter(Boolean).join(' · ');

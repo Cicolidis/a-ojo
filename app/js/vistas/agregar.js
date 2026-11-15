@@ -6,7 +6,7 @@
 // desde Compras, por el buscador de recetas (y se vuelve a la lista).
 
 import { h, icono, rellenar } from '../dom.js';
-import { capitalizar, formatearCantidad } from '../formato.js';
+import { capitalizar, formatearCantidad, porcionesTexto } from '../formato.js';
 import { agrupar, enUnaLinea, escalar, porcionesBase, porcionesIniciales } from '../ingredientes.js';
 import { elegidosIniciales, idsPara, itemsDeReceta, recetaCambio, recetasEnLista, vaARevisar } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
@@ -60,7 +60,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       pintar();
     }) : null,
     enLista ? h('div', { class: 'aviso-lista' },
-      h('p', null, 'Ya está en la lista' + (enLista.porciones ? ' para ' + enLista.porciones + ' porciones' : '') +
+      h('p', null, 'Ya está en la lista' + (enLista.porciones ? ' para ' + porcionesTexto(enLista.porciones) : '') +
         '. Si guardás, se actualiza: lo que ya marcaste sigue marcado, salvo lo que ahora lleva más.'),
       cambio ? h('p', null, 'La receta cambió desde que la agregaste: revisá lo que quedó elegido.') : null,
       h('button', { type: 'button', class: 'boton-texto alerta-texto', onclick: quitar }, 'Quitar de la lista')) : null,

@@ -4,8 +4,8 @@
 // Al sincronizar se repinta en el lugar: la nota que se está escribiendo no se pierde.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
-import { capitalizar, fechaCorta, formatearCantidad, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
-import { agrupar, chipsPorciones, enUnaLinea, escalar, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoReceta, vistasDe } from '../ingredientes.js';
+import { capitalizar, fechaCorta, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
+import { agrupar, chipsPorciones, enUnaLinea, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoCantidad, textoReceta, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
 import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
@@ -465,6 +465,6 @@ function fila(i, factor, opcional = false) {
     h('span', null, capitalizar(i.nombre),
       opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null,
       nota ? h('span', { class: 'ingrediente-nota' }, nota) : null),
-    h('span', { class: 'cantidad' }, formatearCantidad(escalar(i.cantidad, i.unidad, factor), i.unidad)),
+    h('span', { class: 'cantidad' }, textoCantidad(i.cantidad, i.unidad, factor)),
   );
 }
