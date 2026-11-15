@@ -190,8 +190,8 @@ Todo es lógica pura de la app (`ingredientes.js`, `formato.js`, `compras.js`), 
 - Con las porciones originales, las cantidades quedan como las dejó `/recetas`.
 
 ### 7.3 Avisos en la ficha y en el modo cocina
-- Con un factor distinto de 1 y la receta con `molde`: «Para 12 porciones, el molde de 20×30 cm no alcanza: usá dos, o uno de unos 28×42 cm» (el área se escala con el factor). Las medidas se leen del texto libre («budinera de 25 cm», «20 x 30»).
-  - «usá dos/tres…» solo con un factor entero desde 2; con uno no entero desde 2, «usá dos o tres del mismo tamaño»; entre 1 y 2, «usá uno de unos 24×37 cm».
+- Con un factor distinto de 1 y la receta con `molde`: «Para 12 porciones, el molde de 20×30 cm no alcanza: usá dos, o uno de unos 28×42 cm» (el área se escala con el factor). Las medidas se leen del texto libre («budinera de 25 cm», «20 x 30»); si dice una cantidad de moldes («2 moldes de 18 cm»), no se puede leer.
+  - «usá dos/tres…» solo con un factor entero (o a menos de 0,15 de uno) desde 2; con uno no entero desde 2, «usá dos o tres del mismo tamaño»; entre 1 y 2, «usá uno de unos 24×37 cm».
   - Con menos porciones: «Para 2 porciones alcanza un molde de unos 12×17 cm (la receta usa uno de 20×30 cm)».
   - Si el molde no se puede leer, solo «Revisá el tamaño del molde».
 - Con un factor distinto de 1 y pasos con tiempo de horno (no de la hornalla): «Los tiempos de cocción no se escalan: controlá la cocción» (una vez, arriba de los pasos; en el modo cocina, en el primer paso y en los de horno).

@@ -350,6 +350,7 @@ test('leerMolde: las medidas del molde, escrito como venga', async () => {
   assert.deepEqual(leerMolde('18 cm'), { diametro: 18 });
   assert.deepEqual(leerMolde('budinera de 25 cm'), { diametro: 25 });
   assert.equal(leerMolde('12 pirotines'), null);
+  assert.equal(leerMolde('2 moldes de 18 cm'), null, 'con una cantidad de moldes, la cuenta no sale');
   assert.equal(leerMolde(''), null);
 });
 
@@ -362,6 +363,10 @@ test('avisoMolde: con otras porciones, el molde escalado por el área', async ()
   assert.equal(avisoMolde(brownie, 15), 'Para 15 porciones, el molde de 20×30 cm no alcanza: usá dos o tres del mismo tamaño.');
   assert.equal(avisoMolde({ porciones: 2, molde: '20×30 cm' }, 15),
     'Para 15 porciones, el molde de 20×30 cm no alcanza: usá siete u ocho del mismo tamaño.');
+  assert.equal(avisoMolde({ porciones: 2, molde: '20×30 cm' }, 21),
+    'Para 21 porciones, el molde de 20×30 cm no alcanza: usá diez u once del mismo tamaño.');
+  assert.equal(avisoMolde({ porciones: 2, molde: '20×30 cm' }, 25),
+    'Para 25 porciones, el molde de 20×30 cm no alcanza: usá 12 o 13 del mismo tamaño.');
   assert.equal(avisoMolde(brownie, 9), 'Para 9 porciones, el molde de 20×30 cm no alcanza: usá uno de unos 24×37 cm.');
   assert.equal(avisoMolde({ porciones: 10, molde: '20×30 cm' }, 11),
     'Para 11 porciones, el molde de 20×30 cm no alcanza: usá uno de unos 21×31 cm.', 'factor 1,1: no dice «usá uno» suelto');
@@ -651,6 +656,12 @@ test('textoParaComprar: lo que va a quedar en la lista', async () => {
   assert.equal(textoParaComprar({ cantidad: 1, unidad: 'cda' }, 0.5), '1 ½ cditas');
   assert.equal(textoParaComprar({ cantidad: 200, unidad: 'g' }, 7.5), '1 ½ kg');
   assert.equal(textoParaComprar({ cantidad: null, unidad: 'a ojo' }, 2), 'a ojo');
+  // Al achicar, las cucharas bajan de ¼ en la unidad de la receta, igual que en la ficha.
+  assert.equal(textoParaComprar({ cantidad: 0.25, unidad: 'taza' }, 1 / 3), '1 ⅓ cdas');
+  assert.equal(textoParaComprar({ cantidad: 0.25, unidad: 'taza' }, 0.5), '2 cdas');
+  assert.equal(textoParaComprar({ cantidad: 1, unidad: 'taza' }, 1 / 6), '2 ⅔ cdas');
+  assert.equal(textoParaComprar({ cantidad: 1, unidad: 'cda' }, 1 / 6), '½ cdita');
+  assert.equal(textoParaComprar({ cantidad: 3, unidad: 'cda' }, 1.3), '¼ taza');
 });
 
 test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios para revisar', async () => {
@@ -696,6 +707,30 @@ test('itemsDeReceta: lo que se cuenta va para arriba, y al volver a agregar se r
   // Otra vez a 15: cada ingrediente se queda con su ítem (no cambia ningún id).
   const ids = c.idsPara(brownie, items);
   assert.deepEqual(brownie.ingredientes.filter(i => elegidos.has(i.id) || c.vaARevisar(i)).map(ids), items.map(i => i.id));
+});
+
+test('re-agregar sobre ítems guardados antes de la Fase 8: conserva los ids y desmarca solo una vez lo que sube', async () => {
+  const { indexar, aplicarDelta } = await cargar('datos.js');
+  const { aplicarEdicion, nuevaEdicion } = await cargar('ediciones.js');
+  const c = await cargar('compras.js');
+  const todo = fixture();
+  const brownie = indexar(aplicarDelta(null, todo)).porId.get('r_brown');
+  const elegidos = c.elegidosIniciales(brownie);
+  // Como quedaba antes: 7,5 huevos, todo marcado.
+  let n = 0;
+  const viejos = c.itemsDeReceta(brownie, 15, elegidos, () => 'c_v' + n++)
+    .map(i => Object.assign(i, { receta_id: 'r_brown', porciones: 15, hecho: true, lugar: '' }, i.nombre === 'huevos' ? { cantidad: 7.5 } : {}));
+  let datos = aplicarDelta(null, Object.assign(todo, { compras: viejos }));
+  const agregar = () => {
+    const ids = c.idsPara(brownie, datos.compras, () => 'c_nuevo');
+    datos = aplicarEdicion(datos, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 15, items: c.itemsDeReceta(brownie, 15, elegidos, ids) }));
+    return datos.compras.filter(x => x.receta_id === 'r_brown');
+  };
+  const una = agregar();
+  assert.deepEqual(una.map(x => x.id).sort(), viejos.map(x => x.id).sort(), 'los mismos ids');
+  assert.deepEqual(una.filter(x => !x.hecho).map(x => [x.nombre, x.cantidad]), [['huevos', 8]], 'solo los huevos vuelven a la lista');
+  datos.compras = datos.compras.map(x => Object.assign({}, x, { hecho: true }));
+  assert.ok(agregar().every(x => x.hecho), 'la segunda vez no desmarca nada');
 });
 
 test('armarLista: por lugar, sumando entre recetas con el desglose, y «Revisá si tenés» al final', async () => {

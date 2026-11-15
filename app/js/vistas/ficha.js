@@ -4,7 +4,7 @@
 // Al sincronizar se repinta en el lugar: la nota que se está escribiendo no se pierde.
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
-import { capitalizar, fechaCorta, formatearMinutos, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
+import { capitalizar, fechaCorta, formatearMinutos, porcionesTexto, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
 import { agrupar, avisoCoccion, avisoMolde, chipsPorciones, enUnaLinea, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoCantidad, textoReceta, vistasDe } from '../ingredientes.js';
 import { normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
@@ -215,6 +215,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     const base = porcionesBase(r);
     const n = app.porciones.get(id) || base;
     const factor = base ? n / base : 1;
+    const molde = avisoMolde(r, n);
     const { secciones, utensilios } = agrupar(r.ingredientes);
     const enCompras = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
     if (!r.ingredientes.length) {
@@ -236,7 +237,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       utensilios.length ? h('p', { class: 'utensilios' },
         h('span', { class: 'etiqueta-seccion' }, 'También vas a necesitar'), enUnaLinea(utensilios, factor)) : null,
       factor !== 1 ? h('p', { class: 'secundario' }, 'Ojo: los pasos dicen las cantidades para ' + base + '.') : null,
-      avisoMolde(r, n) ? h('p', { class: 'alerta' }, icono('aviso', 18), avisoMolde(r, n)) : null,
+      molde ? h('p', { class: 'alerta' }, icono('aviso', 18), molde) : null,
       !enCompras
         ? h('a', { class: 'boton-secundario boton-chico', href: '#/compras/agregar/' + id }, icono('compras', 18), 'Agregar a compras')
         : h('div', { class: 'en-compras' },
@@ -254,7 +255,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       app.porciones.set(id, m);
       conFoco(zonaIngredientes, pintarIngredientes);
       pintarPasos();
-      anuncio.textContent = m === 1 ? '1 porción' : m + ' porciones';
+      anuncio.textContent = porcionesTexto(m);
     };
     const chips = chipsPorciones(r);
     const esVista = vistasDe(r).includes(n);
@@ -262,7 +263,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       h('div', { class: 'porciones-control' },
         h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Menos porciones', 'aria-disabled': String(n <= 1),
           onclick: () => elegir(n - 1) }, icono('menos', 18)),
-        h('span', { class: 'porciones-n' }, n === 1 ? '1 porción' : n + ' porciones'),
+        h('span', { class: 'porciones-n' }, porcionesTexto(n)),
         h('button', { type: 'button', class: 'boton-redondo chico', 'aria-label': 'Más porciones', 'aria-disabled': String(n >= MAX_PORCIONES),
           onclick: () => elegir(n + 1) }, icono('mas', 18))),
       chips.length > 1 ? h('div', { class: 'chips', role: 'group', 'aria-label': 'Porciones guardadas' },

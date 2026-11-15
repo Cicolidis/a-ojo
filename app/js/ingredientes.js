@@ -221,6 +221,8 @@ export function paraComprar(cantidad, unidad, factor = 1) {
   if (familia === 'pizca') return escalarCantidad(n, unidad, f).cantidad;
   if (familia === 'contable' && esEntero(n)) return Math.max(Math.ceil(n * f - CASI), 1);
   if (familia === 'contable' && esEntero(n * 2)) return Math.max(Math.ceil(n * f * 2 - CASI) / 2, 1 / 2);
+  // Las cucharas, sin la grilla (que no baja de ¼ en la unidad original): la lista las acomoda al sumar.
+  if (familia === 'cucharas') return f === 1 ? cantidad : aMil(n * f);
   return escalar(cantidad, unidad, f);
 }
 
@@ -237,13 +239,15 @@ const aNumero = s => Number(s.replace(',', '.'));
  */
 export function leerMolde(texto) {
   const t = String(texto || '');
+  // «2 moldes de 18 cm»: la cuenta de cuántos usar no sale de las medidas.
+  if (/\b\d+\s+moldes\b/i.test(t)) return null;
   const rect = t.match(MOLDE_RECTANGULAR);
   if (rect) return { lados: [aNumero(rect[1]), aNumero(rect[2])] };
   const redondo = t.match(MOLDE_REDONDO);
   return redondo ? { diametro: aNumero(redondo[1]) } : null;
 }
 
-const NUMEROS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'];
+const NUMEROS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce'];
 const enLetras = n => NUMEROS[n] || String(n);
 
 /**
@@ -268,8 +272,10 @@ export function avisoMolde(receta, porciones) {
   const cerca = Math.round(factor);
   if (factor >= 2 && Math.abs(factor - cerca) < 0.15) return noAlcanza + 'usá ' + enLetras(cerca) + ', o uno de unos ' + otro + '.';
   if (factor >= 2) {
-    const mas = enLetras(Math.ceil(factor));
-    return noAlcanza + 'usá ' + enLetras(Math.floor(factor)) + (/^o/.test(mas) ? ' u ' : ' o ') + mas + ' del mismo tamaño.';
+    const [menos, mas] = [Math.floor(factor), Math.ceil(factor)];
+    // En letras hasta doce («diez u once»); desde ahí, los dos en cifras («12 o 13»).
+    const dos = mas <= 12 ? enLetras(menos) + (/^o/.test(enLetras(mas)) ? ' u ' : ' o ') + enLetras(mas) : menos + oU(mas) + mas;
+    return noAlcanza + 'usá ' + dos + ' del mismo tamaño.';
   }
   return noAlcanza + 'usá uno de unos ' + otro + '.';
 }

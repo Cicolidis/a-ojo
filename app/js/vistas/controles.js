@@ -2,6 +2,7 @@
 // (con `.actualizar(valor)`), así un toque no pierde el foco por repintar.
 
 import { h, icono } from '../dom.js';
+import { porcionesTexto } from '../formato.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
 import { resumenBandeja } from '../datos.js';
 
@@ -112,7 +113,7 @@ export function contadorPorciones(valor, alCambiar, max = 99) {
     onclick: () => cambiar(actual + 1) }, icono('mas', 18));
   const el = h('div', { class: 'porciones-control' }, menos, texto, mas);
   function pintar() {
-    texto.textContent = actual === 1 ? '1 porción' : actual + ' porciones';
+    texto.textContent = porcionesTexto(actual);
     menos.setAttribute('aria-disabled', String(actual <= 1));
     mas.setAttribute('aria-disabled', String(actual >= max));
   }

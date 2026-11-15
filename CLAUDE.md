@@ -45,6 +45,7 @@ Las specs son `SPEC_v1.md` (el MVP, fases 1 a 6, en su §9) y `SPEC_v2.md` (fase
 - **Ediciones:** se arman con `ediciones.js` y pasan por `editar()` de `app.js`, que las aplica al instante y las deja en la cola (IndexedDB). `sincronizar` primero manda la cola y después pide `todo`. Una acción nueva necesita su caso en `aplicarEdicion()`, igual al de la API.
 - Si la app empieza a usar columnas nuevas, subir `VERSION_DATOS` en `datos.js`: los snapshots viejos se piden enteros de nuevo.
 - Los ingredientes se muestran por sección y rol con `rolDe()` / `seccionDe()` (`ingredientes.js`): lo editado por ellos gana sobre lo de `/recetas`.
+- **Cantidades escaladas:** para mostrar, `textoCantidad()` (`ingredientes.js`, elige la unidad cómoda y dice «7 u 8»); para la lista de compras, `paraComprar()` / `textoParaComprar()` (lo que se cuenta va para arriba). Las porciones en un texto, con `porcionesTexto()` («1 porción»).
 - **Compras:** el lugar de cada ítem lo calcula `lugarDe()` (`compras.js`) con las reglas de la hoja `Lugares`; en la Sheet solo se guarda adonde lo movieron. Los ids de los ítems (`c_…`) los genera la app.
 - **Capturas:** no van por la cola (pesan megas): se achican con `imagenes.js` y se mandan directo con un `lote` fijo por selección, así un reintento no las duplica. En Drive quedan privadas («A ojo/capturas»); `/recetas` las baja con `procesamiento/aojo api capturas <id>`.
 
