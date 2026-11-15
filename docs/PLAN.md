@@ -113,7 +113,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 ### Fase 7: arrastre de la v1
 
 - [x] Backup sin script: hojas copiadas con `sheet.copyTo()` a una planilla nueva
-- [ ] Push de la API y `hacerBackup()` a mano en el editor: deja una planilla sin script en «A ojo/backups»
+- [x] Push de la API y `hacerBackup()` a mano en el editor: deja una planilla sin script en «A ojo/backups»
 - [x] Test de paridad entre `obsidian.py` y `formato.js` / `ingredientes.js`
 - [x] Una sola lista de pendientes: sacar los estados de §9 de `SPEC_v1.md`
 
