@@ -16,6 +16,9 @@
 // hace que cada respuesta tarde N segundos (para ver la primera carga; 0 vuelve a lo normal).
 // /api-falsa/bandeja?id=…&estado=lista cambia una fila a mano, como si la Mac la hubiera
 // procesado (para probar el `desde` de bandeja.actualizar).
+// Para `/recetas --dry-run` (con A_OJO_API_URL apuntando acá y A_OJO_TOKEN=prueba) responde
+// bandeja.pendientes, bandeja.fila y receta.upsert solo con `validar`, con la validación de
+// verdad (validarReceta_ de apps-script/src, cargado como en los tests). No guarda recetas.
 // Con --vacia arranca sin recetas, compras ni bandeja (para ver las pantallas vacías).
 // Escucha solo en 127.0.0.1: la API falsa acepta cualquier edición y no tiene que verse desde la red.
 
@@ -107,6 +110,17 @@ async function apiFalsa(req, url, res) {
   if (req.method === 'POST' && EDICIONES.includes(q.action)) return responder(await editarFalsa(q, ahora));
   if (req.method === 'POST' && q.action === 'capturas.subir') return responder(subirFalsa(q, ahora));
   if (req.method === 'POST' && q.action === 'capturar') return responder(capturarFalsa(q, ahora));
+  if (req.method === 'POST' && q.action === 'receta.upsert') return responder(upsertFalso(q));
+  if (req.method === 'GET' && q.action === 'bandeja.pendientes') {
+    // Como paraProcesar_ (sin las trabadas: acá nadie procesa de verdad), de la más vieja a la más nueva.
+    const filas = datos().bandeja.filter(b => b.estado === 'pendiente').sort((a, b) => String(a.creado).localeCompare(String(b.creado)));
+    return responder({ ok: true, data: { filas } });
+  }
+  if (req.method === 'GET' && q.action === 'bandeja.fila') {
+    const fila = datos().bandeja.find(b => b.id === q.id);
+    return responder(fila ? { ok: true, data: { fila } }
+      : { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + q.id + '» en la bandeja.', status: 404 });
+  }
   if (q.action !== 'todo') {
     return responder({ ok: false, error: 'accion_desconocida', mensaje: 'La API falsa no conoce «' + q.action + '».', status: 404 });
   }
@@ -210,6 +224,36 @@ async function editarFalsa(pedido, ahora) {
   const detalle = recetaId || cuerpo.id || (cuerpo.ids || []).join(',') || cuerpo.clave || (cuerpo.items || []).map(i => i.nombre).join(', ');
   console.log('API falsa: ' + action + ' ' + detalle);
   return { ok: true, data: { id: cuerpo.id || recetaId } };
+}
+
+// La API de Apps Script cargada como en los tests: solo para validar recetas con su código de verdad.
+let proyecto = null;
+const apiDeVerdad = () => (proyecto ||= require('../tests/fakes/apps-script.js').cargarProyecto()).ctx;
+
+/**
+ * receta.upsert, solo con `validar` (lo que usa /recetas --dry-run): busca la receta como la API
+ * (por id o por la fila) para saber si es propia, y valida con validarReceta_ y ecoPasos_ de Acciones.js.
+ */
+function upsertFalso(q) {
+  if (!(q.validar === true || q.validar === 'true')) {
+    return { ok: false, error: 'solo_validar', mensaje: 'La API falsa no guarda recetas: probá con --dry-run.', status: 400 };
+  }
+  const r = q.receta;
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return { ok: false, error: 'sin_receta', mensaje: 'Falta «receta».', status: 400 };
+  const todo = datos();
+  const fila = q.bandeja_id ? todo.bandeja.find(b => b.id === q.bandeja_id) : null;
+  if (q.bandeja_id && !fila) return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la fila «' + q.bandeja_id + '» en la bandeja.', status: 404 };
+  const existente = (r.id && todo.recetas.find(x => x.id === r.id)) || (fila && todo.recetas.find(x => x.id === fila.receta_id)) || null;
+  const api = apiDeVerdad();
+  try {
+    const v = api.validarReceta_(r, existente && existente.plataforma === 'manual' ? existente : null);
+    console.log('API falsa: receta.upsert (validar) ' + (q.bandeja_id || r.id || '') + ' → válida');
+    return { ok: true, data: Object.assign({ validar: true, id: existente ? existente.id : null, nueva: !existente,
+      mensaje: 'La receta es válida', ingredientes: v.ingredientes.length, pasos: v.pasos.length }, api.ecoPasos_(v)) };
+  } catch (err) {
+    console.log('API falsa: receta.upsert (validar) → ' + err.message);
+    return { ok: false, error: err.codigo || 'error_interno', mensaje: err.message, detalles: err.detalles, status: err.status || 500 };
+  }
 }
 
 /** capturar: como accionCapturar_ (Acciones.js), deduplica por la URL normalizada. */
