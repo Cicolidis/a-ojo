@@ -4,7 +4,7 @@
 import { h, icono } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
-import { resumenBandeja } from '../datos.js';
+import { cuantasFilas, resumenBandeja } from '../datos.js';
 
 /** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
 export function tocarAfueraCierra(dialogo) {
@@ -147,10 +147,11 @@ export function navegacion(activa, app) {
   const el = h('nav', { class: 'navegacion', 'aria-label': 'Secciones' }, secciones.map(s => s.link));
   el.actualizar = () => {
     const comprar = app.datos ? cuantasPorComprar(armarLista(app.datos.compras, app.datos.lugares, app.datos.despensa)) : 0;
-    const ayuda = resumenBandeja(app.datos?.bandeja).ayuda;
+    const resumen = resumenBandeja(app.datos?.bandeja);
+    const ayuda = resumen.ayuda;
     const numeros = {
       compras: [comprar, comprar === 1 ? '1 cosa por comprar' : comprar + ' cosas por comprar'],
-      bandeja: [ayuda, ayuda === 1 ? '1 link necesita ayuda' : ayuda + ' links necesitan ayuda'],
+      bandeja: [ayuda, cuantasFilas(ayuda, resumen.propiasAyuda) + (ayuda === 1 ? ' necesita ayuda' : ' necesitan ayuda')],
     };
     secciones.forEach(s => {
       const [n, texto] = numeros[s.id] || [0, ''];

@@ -133,6 +133,7 @@ const CAPAS = {
   audio: 'lo que se dice en el audio',
   frames: 'el texto que aparece en el video',
   capturas: 'las capturas que mandaron',
+  texto: 'la receta que escribieron',
 };
 
 /** «la descripción del video y los subtítulos», a partir de `origen_datos` («descripcion,subtitulos»); '' si no hay. */

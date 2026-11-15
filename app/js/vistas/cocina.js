@@ -10,6 +10,7 @@ import { capitalizar, formatearReloj, formatearTimer, porcionesTexto } from '../
 import { avisoCoccion, avisoMolde, pasoDeHorno, porcionesBase, porcionesIniciales, textoCantidad } from '../ingredientes.js';
 import { nuevaEdicion, nuevaNota } from '../ediciones.js';
 import { enCasaDeReceta } from '../compras.js';
+import { esPropia } from '../datos.js';
 import { estrellas, sinReceta } from './controles.js';
 
 const clave = id => 'a-ojo:cocina:' + id;
@@ -33,7 +34,8 @@ export function progresoGuardado(id, totalPasos) {
 export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
   const r = app.indice.porId.get(id);
   if (!r || !r.pasos.length) {
-    contenedor.append(sinReceta(app, id, r && { titulo: 'Esta receta no tiene pasos', texto: 'Mirá el video para cocinarla.' }));
+    contenedor.append(sinReceta(app, id, r && { titulo: 'Esta receta no tiene pasos',
+      texto: esPropia(r) ? 'Todavía no está ordenada: el texto que escribieron está en la receta.' : 'Mirá el video para cocinarla.' }));
     return null;
   }
 
@@ -262,7 +264,7 @@ export function montar(contenedor, { app, volver, editar, reemplazar }, id) {
             if (nuevo) nuevo.chip.querySelector('button').focus({ preventScroll: true });
           },
         }, icono('reloj'), 'Timer de ' + formatearTimer(p.timer_min)) : null,
-        p.tip ? h('p', { class: 'tip' }, h('b', null, 'Tip del video: '), p.tip) : null,
+        p.tip ? h('p', { class: 'tip' }, h('b', null, esPropia(r) ? 'Tip: ' : 'Tip del video: '), p.tip) : null,
       ),
       h('div', { class: 'cocina-anteriores' },
         pasos.slice(Math.max(0, actual - 2), actual).map((ant, j, lista) => {

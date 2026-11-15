@@ -4,7 +4,7 @@
 // directo a la lista de compras.
 
 import { h, icono, foto, rellenar } from '../dom.js';
-import { buscar } from '../datos.js';
+import { buscar, esPropia } from '../datos.js';
 import { porcionesTexto } from '../formato.js';
 import { recetasEnLista } from '../compras.js';
 import { cargando, vacio } from './controles.js';
@@ -64,7 +64,7 @@ export function montar(contenedor, { app, volver, reemplazar }) {
       foto(r, 'mini-foto'),
       h('span', { class: 'reciente-texto' },
         h('strong', null, r.titulo),
-        h('span', { class: 'secundario' }, x ? 'En la lista' + (x.porciones ? ' · ' + porcionesTexto(x.porciones) : '') : r.autor || '')),
+        h('span', { class: 'secundario' }, x ? 'En la lista' + (x.porciones ? ' · ' + porcionesTexto(x.porciones) : '') : esPropia(r) ? 'Receta nuestra' : r.autor || '')),
       icono('derecha', 20)));
     }));
   }

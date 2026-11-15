@@ -1,7 +1,7 @@
 // Biblioteca (#/): buscador, filtros, aviso de la bandeja y grilla de recetas.
 
 import { h, icono, foto } from '../dom.js';
-import { FILTROS, FILTRO_DESCARTADAS, buscar, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja, tengoConDespensa } from '../datos.js';
+import { FILTROS, FILTRO_DESCARTADAS, FILTRO_NUESTRAS, buscar, cuantasFilas, esPropia, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja, tengoConDespensa } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
 import { unirConY } from '../ingredientes.js';
 import { cargando, navegacion, segmentado, vacio } from './controles.js';
@@ -47,7 +47,12 @@ export function montar(contenedor, { app, sincronizar }) {
     }, 'modo-biblioteca');
   pintarCampo();
 
-  const campoBuscar = h('label', { class: 'buscador' }, icono('buscar', 18), buscador);
+  // «Nueva receta» (SPEC_v2 §6.1): una receta propia, al lado del buscador.
+  const campoBuscar = h('div', { class: 'buscar-fila' },
+    h('label', { class: 'buscador' }, icono('buscar', 18), buscador),
+    // En pantallas angostas dice «Nueva» (el nombre accesible sigue siendo «Nueva receta»).
+    h('a', { class: 'boton-secundario boton-nueva', href: '#/nueva', 'aria-label': 'Nueva receta' },
+      icono('mas', 18), h('span', null, 'Nueva'), h('span', { class: 'nueva-largo' }, '\u00a0receta')));
 
   // «Con lo que tengo» arranca con la despensa (SPEC_v2 §5.3): un chip para usarla o no.
   const chipDespensa = h('button', { type: 'button', class: 'chip', onclick: () => {
@@ -77,7 +82,8 @@ export function montar(contenedor, { app, sincronizar }) {
   ), nav);
 
   function pintarChips() {
-    const filtros = FILTROS.concat(etiquetasFrecuentes(app.indice.lista).map(filtroEtiqueta),
+    const hayNuestras = app.indice.lista.some(r => esPropia(r) && r.estado !== 'descartada');
+    const filtros = FILTROS.concat(hayNuestras ? [FILTRO_NUESTRAS] : [], etiquetasFrecuentes(app.indice.lista).map(filtroEtiqueta),
       app.indice.lista.some(r => r.estado === 'descartada') ? [FILTRO_DESCARTADAS] : []);
     if (!filtros.some(f => f.id === estado.filtro)) estado.filtro = 'todas';
     chips.replaceChildren(...filtros.map(f => h('button', {
@@ -115,7 +121,7 @@ export function montar(contenedor, { app, sincronizar }) {
     aviso.replaceChildren(h('a', { class: 'aviso-bandeja', href: '#/bandeja' },
       h('span', { class: 'numero', 'aria-hidden': 'true' }, b.total),
       h('div', null,
-        h('strong', null, b.total === 1 ? '1 link en la bandeja' : b.total + ' links en la bandeja'),
+        h('strong', null, cuantasFilas(b.total, b.propias) + ' en la bandeja'),
         h('span', { class: 'secundario' }, partes.join(' · '))),
       icono('derecha', 20),
     ));
@@ -138,7 +144,8 @@ export function montar(contenedor, { app, sincronizar }) {
     }
     const recetas = buscar(app.indice.lista, estado.modo === 'tengo' ? Object.assign({}, estado, { texto: '' }) : estado);
     if (recetas.length) {
-      grilla.replaceChildren(h('div', { class: 'grilla' }, recetas.map(tarjeta)));
+      // Sin el índice de map(): tarjeta() lo tomaría por la lista de lo que falta.
+      grilla.replaceChildren(h('div', { class: 'grilla' }, recetas.map(r => tarjeta(r))));
       return;
     }
     grilla.replaceChildren(estadoVacio(motivoVacio(app.indice.lista, estado, { hayDatos: !!app.datos, sync: app.sync.estado })));
@@ -164,8 +171,9 @@ export function montar(contenedor, { app, sincronizar }) {
         acciones: [{ texto: 'Ver las descartadas', onclick: () => elegirFiltro('descartada', true) }] });
     }
     return vacio({ figura: 'recetas', titulo: 'Todavía no hay recetas',
-      texto: 'Guardá un link desde el celular o la extensión y corré /recetas en la Mac.',
-      acciones: resumenBandeja(app.datos?.bandeja).total ? [{ texto: 'Ver la bandeja', href: '#/bandeja' }] : [] });
+      texto: 'Guardá un link desde el celular o la extensión y corré /recetas en la Mac. O sumá una de las que ya hacen.',
+      acciones: [{ texto: 'Nueva receta', href: '#/nueva' }]
+        .concat(resumenBandeja(app.datos?.bandeja).total ? [{ texto: 'Ver la bandeja', href: '#/bandeja' }] : []) });
   }
 
   function actualizar() {
@@ -209,7 +217,7 @@ function textoFaltan(faltan) {
 }
 
 function tarjeta(r, faltan) {
-  const meta = [r.autor, formatearMinutos(r.tiempo_min)].filter(Boolean).join(' · ');
+  const meta = [esPropia(r) ? 'Receta nuestra' : r.autor, formatearMinutos(r.tiempo_min)].filter(Boolean).join(' · ');
   const valoracion = Number(r.valoracion) > 0
     ? h('span', { class: 'valoracion', role: 'img', 'aria-label': 'Valoración ' + r.valoracion + ' de 5' }, icono('estrella', 12), r.valoracion)
     : null;

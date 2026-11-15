@@ -70,7 +70,7 @@ test('indexar ordena ingredientes, pasos y notas, y la lista va en orden alfabé
   todo.recetas.reverse();
   const { lista, porId } = indexar(aplicarDelta(null, todo));
   assert.deepEqual(lista.map(r => r.titulo), ['Brownie húmedo con nueces', 'Galletitas de garbanzos', 'Licuado descartado',
-    'Pollo marroquí', 'Sopa crema de zapallo', 'Torta vasca', 'Tortilla de banana']);
+    'Milanesas con puré', 'Pollo marroquí', 'Sopa crema de zapallo', 'Torta vasca', 'Tortilla de banana']);
   assert.deepEqual(['ñoquis', 'Nueces', 'oliva', 'Ají molido', 'Paso 10', 'paso 2'].sort(alfabetico),
     ['Ají molido', 'Nueces', 'ñoquis', 'oliva', 'paso 2', 'Paso 10'], 'sin distinguir tildes ni mayúsculas, la ñ después de la n');
   const brownie = porId.get('r_brown');
@@ -84,12 +84,13 @@ test('buscar: sin tildes, todas las palabras, combinado con los filtros y sin de
   const { lista } = indexar(aplicarDelta(null, fixture()));
   const ids = opciones => buscar(lista, opciones).map(r => r.id).sort();
 
-  assert.equal(ids({}).length, 6, 'la descartada no aparece');
+  assert.equal(ids({}).length, 7, 'la descartada no aparece');
   assert.deepEqual(ids({ texto: 'GARBANZO' }), ['r_galle']);
   assert.deepEqual(ids({ texto: 'limon' }), ['r_pollo'], 'busca en ingredientes, sin tildes');
   assert.deepEqual(ids({ texto: 'huevos azucar' }), ['r_brown', 'r_vasca']);
   assert.deepEqual(ids({ texto: 'huevos', filtro: 'favorita' }), ['r_vasca']);
-  assert.deepEqual(ids({ filtro: 'tipo:salado' }), ['r_galle', 'r_pollo']);
+  assert.deepEqual(ids({ filtro: 'tipo:salado' }), ['r_galle', 'r_milan', 'r_pollo']);
+  assert.deepEqual(ids({ filtro: 'nuestras' }), ['r_milan'], 'las recetas propias');
   assert.deepEqual(ids({ filtro: 'etiqueta:rápida' }), ['r_galle', 'r_torti']);
   assert.deepEqual(ids({ texto: 'para invitados' }), ['r_brown', 'r_pollo', 'r_vasca'], 'busca en etiquetas');
   assert.deepEqual(ids({ texto: 'licuado' }), []);
@@ -102,8 +103,8 @@ test('etiquetasFrecuentes y resumenBandeja', async () => {
   const { lista } = indexar(aplicarDelta(null, todo));
   assert.deepEqual(etiquetasFrecuentes(lista, 3), ['para invitados', 'rápida', 'sin tacc']);
   assert.equal(filtroEtiqueta('sin tacc').nombre, 'Sin TACC');
-  assert.deepEqual(resumenBandeja(todo.bandeja), { total: 4, esperando: 3, ayuda: 1 });
-  assert.deepEqual(resumenBandeja(undefined), { total: 0, esperando: 0, ayuda: 0 });
+  assert.deepEqual(resumenBandeja(todo.bandeja), { total: 4, esperando: 3, ayuda: 1, propias: 0, propiasAyuda: 0 });
+  assert.deepEqual(resumenBandeja(undefined), { total: 0, esperando: 0, ayuda: 0, propias: 0, propiasAyuda: 0 });
 });
 
 test('formatearCantidad, formatearMinutos y compañía', async () => {
@@ -922,7 +923,7 @@ test('agruparBandeja: ayuda, esperando a la Mac, recién llegadas y la última c
   const g = b.agruparBandeja(datos.bandeja, porId, Date.parse('2026-10-12T12:00:00.000Z'));
   assert.deepEqual(g.ayuda.map(f => f.id), ['b_00075']);
   assert.deepEqual(g.esperando.map(f => f.id), ['b_00074', 'b_00072', 'b_00073'], 'la que se está procesando, primero');
-  assert.deepEqual(g.recientes.map(r => r.receta.id).sort(), ['r_brown', 'r_galle', 'r_pollo', 'r_sopa', 'r_torti', 'r_vasca']);
+  assert.deepEqual(g.recientes.map(r => r.receta.id).sort(), ['r_brown', 'r_galle', 'r_milan', 'r_pollo', 'r_sopa', 'r_torti', 'r_vasca']);
   assert.equal(g.ultimaCorrida, '2026-10-11T10:00:00.000Z');
   assert.deepEqual(b.agruparBandeja(datos.bandeja, porId, Date.parse('2026-10-20T12:00:00.000Z')).recientes, [], 'solo la última semana');
   assert.deepEqual(b.agruparBandeja([], porId), { ayuda: [], esperando: [], recientes: [], ultimaCorrida: '' });
@@ -933,6 +934,7 @@ test('agruparBandeja: ayuda, esperando a la Mac, recién llegadas y la última c
   assert.equal(b.descripcionLink({ plataforma: 'youtube', url: 'https://www.youtube.com/watch?v=abc' }), 'Video de YouTube');
   assert.equal(b.descripcionLink({ plataforma: 'instagram', url: 'https://www.instagram.com/reel/abc/' }), 'Reel de Instagram');
   assert.equal(b.descripcionLink({ plataforma: 'web', url: 'https://www.paulinacocina.net/receta/' }), 'paulinacocina.net');
+  assert.equal(b.descripcionLink({ plataforma: 'manual', url: '' }), 'Receta nuestra');
 });
 
 test('links compartidos o pegados: extraerLink, leerCompartido, plataformaDe y mismoLink', async () => {
@@ -1495,4 +1497,45 @@ test('receta.corregir de una propia, como la API: su fila o una sin link, nunca 
   assert.equal(aplicarEdicion(datos, nuevaCorreccion('r_tarta001', 'x', 'pareja', ahora)), datos, 'sin ordenar: 409');
   const esperando = Object.assign({}, datos, { bandeja: [Object.assign({}, datos.bandeja[0], { estado: 'pendiente' })] });
   assert.equal(aplicarEdicion(esperando, nuevaCorreccion('r_guiso001', 'x', 'pareja', ahora)), esperando, 'texto esperando: 409');
+});
+
+test('estadoPropia: sin texto, esperando, ordenando, en ayuda u ordenada (con o sin un texto nuevo)', async () => {
+  const { estadoPropia } = await cargar('bandeja.js');
+  const r = (ingredientes = []) => ({ id: 'r_tarta001', ingredientes });
+  const fila = (cambios = {}) => Object.assign({ id: 'b_tarta001', receta_id: 'r_tarta001', creado: '2026-11-15T10:00:00Z',
+    estado: 'pendiente', texto: 'Masa y acelga', pedido: '' }, cambios);
+  const estado = (receta, bandeja) => { const e = estadoPropia(receta, bandeja); return [e.estado, e.reescritura]; };
+  assert.deepEqual(estado(r(), []), ['sin_texto', null]);
+  assert.deepEqual(estado(r(), [fila({ texto: '' })]), ['sin_texto', null], 'una fila sin texto (un pedido viejo)');
+  assert.deepEqual(estado(r(), [fila({ estado: 'descartada' })]), ['sin_texto', null], 'descartada desde una app vieja');
+  assert.deepEqual(estado(r(), [fila()]), ['esperando', null]);
+  assert.deepEqual(estado(r(), [fila({ estado: 'procesando' })]), ['ordenando', null]);
+  assert.deepEqual(estado(r(), [fila({ estado: 'ayuda', motivo: 'No entendí' })]), ['ayuda', null]);
+  assert.equal(estadoPropia(r(), [fila()]).texto, 'Masa y acelga');
+  const ings = [{ id: 'i_1' }];
+  assert.deepEqual(estado(r(ings), [fila({ estado: 'lista' })]), ['ordenada', null]);
+  assert.deepEqual(estado(r(ings), [fila()]), ['ordenada', 'esperando'], 'la reescribieron');
+  assert.deepEqual(estado(r(ings), [fila({ pedido: 'Son 6' })]), ['ordenada', null], 'un pedido de corrección no es un texto esperando');
+  assert.deepEqual(estado(r(ings), [fila({ estado: 'lista' }), fila({ id: 'b_nueva001', creado: '2026-11-15T11:00:00Z', estado: 'ayuda' })]),
+    ['ordenada', 'ayuda'], 'cuenta la fila más nueva');
+});
+
+test('esPropia, cuantasFilas y resumenBandeja con recetas propias', async () => {
+  const { esPropia, cuantasFilas, resumenBandeja } = await cargar('datos.js');
+  assert.equal(esPropia({ plataforma: 'manual' }), true);
+  assert.equal(esPropia({ plataforma: 'youtube' }), false);
+  assert.equal(esPropia(undefined), false);
+  assert.deepEqual([1, 2].map(n => cuantasFilas(n)), ['1 link', '2 links']);
+  assert.deepEqual([cuantasFilas(1, 1), cuantasFilas(2, 2), cuantasFilas(3, 1)], ['1 receta nuestra', '2 recetas nuestras', '3 cosas']);
+  const r = resumenBandeja([{ estado: 'pendiente', plataforma: 'manual' }, { estado: 'ayuda', plataforma: 'manual' },
+    { estado: 'ayuda', plataforma: 'youtube' }, { estado: 'lista', plataforma: 'manual' }]);
+  assert.deepEqual(r, { total: 3, esperando: 1, ayuda: 2, propias: 2, propiasAyuda: 1 });
+});
+
+test('rutas de las recetas propias: #/nueva y #/editar/:id', async () => {
+  const { leerRuta, tituloDe } = await cargar('rutas.js');
+  assert.deepEqual(leerRuta('#/nueva'), { nombre: 'nueva' });
+  assert.deepEqual(leerRuta('#/editar/r_k3x9a0zq'), { nombre: 'editar', id: 'r_k3x9a0zq' });
+  assert.equal(tituloDe({ nombre: 'nueva' }), 'Nueva receta · A ojo');
+  assert.equal(tituloDe({ nombre: 'editar' }, { titulo: 'Milanesas' }), 'Editar la receta · Milanesas · A ojo');
 });

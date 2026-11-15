@@ -41,6 +41,7 @@ export function agruparBandeja(bandeja, porId, ahoraMs = Date.now()) {
 
 /** Qué es el link, para la tarjeta: «Short de YouTube», «Reel de Instagram», «paulinacocina.net»… */
 export function descripcionLink(fila) {
+  if (fila.plataforma === 'manual') return 'Receta nuestra';
   const url = String(fila.url || '');
   if (fila.plataforma === 'youtube') return /\/shorts\//.test(url) ? 'Short de YouTube' : 'Video de YouTube';
   if (fila.plataforma === 'instagram') return /\/reels?\//.test(url) ? 'Reel de Instagram' : 'Publicación de Instagram';
@@ -152,6 +153,22 @@ export function filaDelLink(bandeja, url) {
 export function pedidoDe(bandeja, recetaId) {
   const fila = filaDeReceta(bandeja, recetaId);
   return fila && String(fila.pedido || '').trim() ? fila : null;
+}
+
+/**
+ * En qué está una receta propia, para la ficha (con `receta.ingredientes` del índice):
+ * - sin ingredientes: `sin_texto` (sin fila, sin texto o descartada), `esperando` (la Mac la va a ordenar),
+ *   `ordenando` (la está ordenando) o `ayuda` (no pudo);
+ * - con ingredientes: `ordenada`, y en `reescritura` si un texto nuevo está `esperando`, `ordenando` o en `ayuda`.
+ * Devuelve { estado, reescritura, fila, texto }. Una fila con un pedido de corrección no es un texto esperando.
+ */
+export function estadoPropia(receta, bandeja) {
+  const fila = filaDeReceta(bandeja, receta.id) || null;
+  const texto = fila ? String(fila.texto || '') : '';
+  const enCurso = !fila || !texto.trim() || String(fila.pedido || '').trim() ? null
+    : { pendiente: 'esperando', procesando: 'ordenando', ayuda: 'ayuda' }[fila.estado] || null;
+  if ((receta.ingredientes || []).length) return { estado: 'ordenada', reescritura: enCurso, fila, texto };
+  return { estado: enCurso || 'sin_texto', reescritura: null, fila, texto };
 }
 
 /** La fila más nueva de una receta en la bandeja (como filaDeReceta_ de la API), o undefined. */

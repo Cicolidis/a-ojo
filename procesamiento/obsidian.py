@@ -32,7 +32,7 @@ PLURALES = {'cda': 'cdas', 'cdita': 'cditas', 'taza': 'tazas', 'pizca': 'pizcas'
 FRACCIONES = ((1 / 4, '¼'), (1 / 3, '⅓'), (1 / 2, '½'), (2 / 3, '⅔'), (3 / 4, '¾'))
 CAPAS = {'descripcion': 'la descripción del video', 'subtitulos': 'los subtítulos', 'web': 'la receta de la web',
          'audio': 'lo que se dice en el audio', 'frames': 'el texto que aparece en el video',
-         'capturas': 'las capturas que mandaron'}
+         'capturas': 'las capturas que mandaron', 'texto': 'la receta que escribieron'}
 CONFIANZA = {'alta': 'Los datos están completos: salieron del texto, los subtítulos o un audio claro.',
              'media': 'Hubo que estimar algunos pasos o completar algo por contexto.',
              'baja': 'Faltan cantidades importantes: mirá el video antes de empezar.'}

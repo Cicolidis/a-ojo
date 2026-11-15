@@ -6,10 +6,10 @@
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { capitalizar, fechaCorta, formatearMinutos, porcionesTexto, formatearTimer, nombreDe, textoOrigen, textoTraduccion } from '../formato.js';
 import { agrupar, avisoCoccion, avisoMolde, chipsPorciones, enUnaLinea, hayQueGuardarVista, porcionesBase, porcionesIniciales, textoCantidad, textoReceta, vistasDe } from '../ingredientes.js';
-import { normalizar } from '../datos.js';
+import { esPropia, normalizar } from '../datos.js';
 import { recetasEnLista } from '../compras.js';
-import { nuevaCorreccion, nuevaEdicion, nuevaNota } from '../ediciones.js';
-import { pedidoDe } from '../bandeja.js';
+import { nuevaCorreccion, nuevaEdicion, nuevaNota, nuevoTexto } from '../ediciones.js';
+import { estadoPropia, pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
 import { compartirTexto, confirmar, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
@@ -156,6 +156,55 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       recuperar.focus();
     } }, 'Descartar receta');
 
+  // Receta propia (SPEC_v2 §6.2): el texto que escriben para que la Mac la ordene. Como las notas, el
+  // formulario no se repinta mientras está abierto; lo de arriba (el estado y el texto guardado), sí.
+  const zonaPropia = h('section', { class: 'seccion', 'aria-labelledby': 'titulo-propia' });
+  const estadoTexto = h('div', { class: 'propia-estado' });
+  const campoTexto = h('textarea', { rows: '8', maxlength: '5000', 'aria-label': 'La receta',
+    placeholder: '4 milanesas, 1 kg de papa, manteca y leche. Freí las milanesas…' });
+  const abrirTexto = h('button', { type: 'button', class: 'boton-secundario boton-chico', onclick: () => abrirFormTexto() });
+  const reescribir = h('button', { type: 'button', class: 'boton-texto', onclick: () => abrirFormTexto() }, 'Reescribir la receta');
+  const cerrarTexto = () => {
+    campoTexto.value = '';
+    formTexto.hidden = true;
+  };
+  const formTexto = h('form', {
+    class: 'form-nota',
+    hidden: true,
+    onsubmit: e => {
+      e.preventDefault();
+      if (!campoTexto.value.trim()) return campoTexto.focus();
+      const { fila } = estadoPropia(r, app.datos?.bandeja);
+      editar(nuevoTexto(id, campoTexto.value, fila && fila.id, app.config.quien));
+      cerrarTexto();
+      pintar();
+      // El foco va al recuadro con el texto guardado.
+      const guardado = estadoTexto.querySelector('[tabindex="-1"]');
+      (guardado || titulo).focus();
+      avisar('✓ Guardada. La Mac la ordena en la próxima corrida.');
+    },
+  },
+  h('p', { class: 'secundario' }, 'Escribila como te salga: la Mac la ordena en ingredientes y pasos la próxima vez que corra.'),
+  campoTexto,
+  h('div', { class: 'form-botones' },
+    h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
+      cerrarTexto();
+      pintar();
+      (abrirTexto.hidden ? reescribir : abrirTexto).focus();
+    } }, 'Cancelar'),
+    h('button', { type: 'submit', class: 'boton-principal' }, 'Guardar la receta')));
+  zonaPropia.append(estadoTexto, abrirTexto, formTexto);
+
+  /** Abre el campo con el texto que ya tenía (si tenía), en lugar del botón. */
+  function abrirFormTexto() {
+    campoTexto.value = estadoPropia(r, app.datos?.bandeja).texto;
+    formTexto.hidden = false;
+    abrirTexto.hidden = true;
+    reescribir.hidden = true;
+    zonaPropia.hidden = false;
+    campoTexto.focus();
+  }
+
   const botonCocinar = h('a', {
     class: 'boton-principal',
     href: '#/cocina/' + id,
@@ -176,19 +225,24 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       zonaMeta,
       zonaPedido,
       h('div', { class: 'ficha-estado' }, selector, valorar, descartada),
+      zonaPropia,
       zonaIngredientes,
       zonaPasos,
       comoSeArmo,
       h('section', { class: 'seccion' }, tituloNotas, listaNotas, abrirNota, formNota),
-      h('div', { class: 'ficha-pie' }, abrirPedido, formPedido, descartar),
+      h('div', { class: 'ficha-pie' }, abrirPedido, formPedido, reescribir, descartar),
     ),
     barraCocinar,
   ), nav);
 
   function pintarMeta() {
     const fuente = urlSegura(r.fuente_url);
+    const propia = esPropia(r);
     const datos = [
-      fuente ? h('a', { href: fuente, target: '_blank', rel: 'noopener noreferrer' }, r.autor || 'Ver el video', icono('externo', 14))
+      // Una propia dice «Receta nuestra» en lugar del autor, y se edita (nombre, tipo y rinde).
+      propia ? h('span', null, 'Receta nuestra') : null,
+      propia ? h('a', { href: '#/editar/' + id }, icono('lapiz', 14), 'Editar') : null,
+      propia ? null : fuente ? h('a', { href: fuente, target: '_blank', rel: 'noopener noreferrer' }, r.autor || 'Ver el video', icono('externo', 14))
         : r.autor ? h('span', null, r.autor) : null,
       r.tiempo_min ? h('span', null, formatearMinutos(r.tiempo_min)) : null,
       r.molde ? h('span', null, 'Molde ' + r.molde) : null,
@@ -196,8 +250,9 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     ].filter(Boolean);
     rellenar(zonaMeta,
       datos.length ? h('div', { class: 'ficha-meta' }, datos) : null,
-      r.confianza === 'baja' ? h('p', { class: 'alerta' }, icono('aviso', 18),
-        'Puede que falten cantidades o pasos. Mirá el video antes de empezar.') : null,
+      r.confianza === 'baja' ? h('p', { class: 'alerta' }, icono('aviso', 18), propia
+        ? 'Puede que falten cantidades o pasos: revisá lo que escribieron antes de empezar.'
+        : 'Puede que falten cantidades o pasos. Mirá el video antes de empezar.') : null,
     );
   }
 
@@ -218,6 +273,8 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     const molde = avisoMolde(r, n);
     const { secciones, utensilios } = agrupar(r.ingredientes);
     const enCompras = recetasEnLista(app.datos?.compras).find(x => x.receta_id === id);
+    // Una propia sin ordenar no muestra ingredientes: lo dice su recuadro (pintarPropia).
+    zonaIngredientes.hidden = esPropia(r) && !r.ingredientes.length;
     if (!r.ingredientes.length) {
       return rellenar(zonaIngredientes,
         h('h2', { id: 'titulo-ingredientes' }, 'Ingredientes'),
@@ -283,6 +340,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
 
   function pintarPasos() {
     barraCocinar.hidden = !r.pasos.length;
+    zonaPasos.hidden = esPropia(r) && !r.pasos.length;
     if (!r.pasos.length) {
       return rellenar(zonaPasos, h('h2', null, 'Pasos'),
         h('p', { class: 'secundario' }, 'Esta receta no tiene pasos. Mirá el video para cocinarla.'));
@@ -308,8 +366,11 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     abrirPedido.textContent = fila ? 'Sumar algo al pedido' : 'Algo está mal en esta receta';
     // Mientras la Mac la corrige, la API no acepta pedidos: el botón no se ofrece (si tenía el foco, pasa al título).
     const corrigiendo = !!fila && fila.estado === 'procesando';
-    if (corrigiendo && document.activeElement === abrirPedido) titulo.focus({ preventScroll: true });
-    abrirPedido.hidden = corrigiendo || !formPedido.hidden;
+    // Una propia sin ordenar, o con un texto esperando, se corrige cambiando el texto (la API no acepta pedidos).
+    const propia = esPropia(r) ? estadoPropia(r, app.datos?.bandeja) : null;
+    const conTexto = !!propia && (propia.estado !== 'ordenada' || !!propia.reescritura);
+    if ((corrigiendo || conTexto) && document.activeElement === abrirPedido) titulo.focus({ preventScroll: true });
+    abrirPedido.hidden = corrigiendo || conTexto || !formPedido.hidden;
     if (!fila) return rellenar(zonaPedido);
     const cancelar = h('button', { type: 'button', class: 'boton-secundario', onclick: cancelarPedido }, 'Cancelar el pedido');
     const texto = h('p', { class: 'pedido-texto' }, fila.pedido);
@@ -331,14 +392,63 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     media: 'Hubo que estimar algunos pasos o completar algo por contexto.',
     baja: 'Faltan cantidades importantes: mirá el video antes de empezar.',
   };
+  // Una propia salió de lo que escribieron ellos: no hay video para mirar.
+  const CONFIANZA_PROPIA = {
+    alta: 'Los datos están completos: salieron de lo que escribieron.',
+    media: 'Hubo que completar algo por contexto: lo que no estaba quedó «a ojo».',
+    baja: 'Faltan cantidades importantes: revisá lo que escribieron antes de empezar.',
+  };
+
+  /** El recuadro de una receta propia: si falta escribirla, si la Mac la va a ordenar o si no pudo. */
+  function pintarPropia() {
+    if (!esPropia(r)) {
+      zonaPropia.hidden = true;
+      reescribir.hidden = true;
+      return;
+    }
+    const p = estadoPropia(r, app.datos?.bandeja);
+    const abierto = !formTexto.hidden;
+    const ordenada = p.estado === 'ordenada';
+    // Ya ordenada, sin un texto nuevo esperando: la ficha de siempre y «Reescribir la receta» al pie.
+    zonaPropia.hidden = ordenada && !p.reescritura && !abierto;
+    if (document.activeElement === reescribir && (p.reescritura || !ordenada)) titulo.focus({ preventScroll: true });
+    reescribir.hidden = !ordenada || !!p.reescritura || abierto;
+    abrirTexto.hidden = abierto || (ordenada && !p.reescritura);
+    abrirTexto.textContent = p.estado === 'sin_texto' ? 'Escribir la receta' : 'Cambiar el texto';
+    const texto = p.texto.trim() ? h('p', { class: 'texto-propio' }, p.texto) : null;
+    const recuadro = (...hijos) => h('div', { class: 'aviso-pedido', tabindex: '-1' }, ...hijos);
+    const cual = ordenada ? p.reescritura : p.estado;
+    let contenido;
+    if (cual === 'sin_texto') {
+      contenido = [h('p', null, h('strong', null, 'Todavía no escribieron esta receta.')),
+        h('p', { class: 'secundario' }, 'Escribila como salga y la Mac la ordena en ingredientes y pasos.')];
+    } else if (cual === 'esperando') {
+      contenido = [recuadro(h('p', null, h('strong', null, ordenada ? 'La Mac la va a reordenar con el texto nuevo' : 'La Mac la va a ordenar'),
+        ' en la próxima corrida. Mientras tanto, la receta tal como la escribieron:'), texto)];
+    } else if (cual === 'ordenando') {
+      contenido = [recuadro(h('p', null, h('strong', null, ordenada ? 'La Mac la está reordenando ahora.' : 'La Mac la está ordenando ahora.')), texto)];
+    } else if (cual === 'ayuda') {
+      contenido = [recuadro(h('p', { class: 'motivo' }, icono('aviso', 18), p.fila.motivo || 'La Mac no pudo ordenarla.'), texto)];
+    } else {
+      contenido = [];
+    }
+    // Si el foco estaba en el recuadro (recién guardado el texto), vuelve al nuevo.
+    const teniaFoco = estadoTexto.contains(document.activeElement);
+    rellenar(estadoTexto, ordenada ? null : h('h2', { id: 'titulo-propia' }, 'La receta'), contenido);
+    const nuevo = teniaFoco && estadoTexto.querySelector('[tabindex="-1"]');
+    if (nuevo) nuevo.focus({ preventScroll: true });
+    if (ordenada) zonaPropia.removeAttribute('aria-labelledby');
+    else zonaPropia.setAttribute('aria-labelledby', 'titulo-propia');
+  }
 
   function pintarArmado() {
     const origen = textoOrigen(r.origen_datos);
     const notas = String(r.notas_proceso || '').trim();
+    const confianza = (esPropia(r) ? CONFIANZA_PROPIA : CONFIANZA)[r.confianza];
     comoSeArmo.hidden = !origen && !notas;
     rellenar(cuerpoArmado,
       origen ? h('p', null, 'Salió de ' + origen + '.') : null,
-      CONFIANZA[r.confianza] ? h('p', null, CONFIANZA[r.confianza]) : null,
+      confianza ? h('p', null, confianza) : null,
       notas ? h('p', { class: 'notas-proceso' }, notas) : null);
   }
 
@@ -436,6 +546,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
       progreso ? 'Seguir cocinando (paso ' + (progreso + 1) + ')' : 'Empezar a cocinar');
     pintarMeta();
     pintarEstado();
+    pintarPropia();
     conFoco(zonaIngredientes, pintarIngredientes);
     pintarPasos();
     pintarArmado();
@@ -449,7 +560,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     actualizar: pintar,
     // Una nota a medio escribir: una versión nueva de la app espera para recargar.
     ocupada: () => (!formNota.hidden && textoNota.value.trim() !== '') || (!formPedido.hidden && textoPedido.value.trim() !== '')
-      || !!editando,
+      || (!formTexto.hidden && campoTexto.value.trim() !== '') || !!editando,
   };
 }
 

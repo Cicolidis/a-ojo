@@ -18,6 +18,7 @@ import * as lugares from './vistas/lugares.js';
 import * as despensa from './vistas/despensa.js';
 import * as bandeja from './vistas/bandeja.js';
 import * as elegir from './vistas/elegir.js';
+import * as propia from './vistas/propia.js';
 import * as bienvenida from './vistas/bienvenida.js';
 
 const CINCO_MIN_MS = 5 * 60 * 1000;
@@ -103,6 +104,8 @@ function mostrar({ enfocar = false } = {}) {
   else if (ruta.nombre === 'lugares') vista = lugares.montar(contenedor, ctx);
   else if (ruta.nombre === 'despensa') vista = despensa.montar(contenedor, ctx);
   else if (ruta.nombre === 'bandeja') vista = bandeja.montar(contenedor, ctx);
+  else if (ruta.nombre === 'nueva') vista = propia.montar(contenedor, ctx);
+  else if (ruta.nombre === 'editar') vista = propia.montar(contenedor, ctx, ruta.id);
   else vista = biblioteca.montar(contenedor, ctx);
 
   document.title = app.config ? tituloDe(ruta, ruta.id && app.indice.porId.get(ruta.id)) : 'A ojo';

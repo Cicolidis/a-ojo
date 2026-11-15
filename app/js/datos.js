@@ -12,7 +12,8 @@ const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 // 5: ingredientes de cada paso (Fase 6.3).
 // 6: notas editadas y borradas (Fase 6.3).
 // 7: la despensa (Fase 9).
-export const VERSION_DATOS = 7;
+// 8: recetas propias, con el texto de su fila de la bandeja (Fase 10a).
+export const VERSION_DATOS = 8;
 
 /**
  * Aplica una respuesta de `todo` al snapshot guardado y devuelve uno nuevo.
@@ -142,6 +143,14 @@ export const FILTROS = [
   { id: 'tipo:salado', nombre: 'Salado' },
 ];
 
+/** ¿Es una receta propia (SPEC_v2 §6), de las que ya hacemos, sin video ni web? */
+export function esPropia(r) {
+  return !!r && r.plataforma === 'manual';
+}
+
+/** Aparece después de Dulce y Salado solo si hay alguna receta propia (sin contar las descartadas). */
+export const FILTRO_NUESTRAS = { id: 'nuestras', nombre: 'Nuestras' };
+
 /** Aparece al final de los filtros solo si hay alguna descartada: es la forma de recuperarlas. */
 export const FILTRO_DESCARTADAS = { id: 'descartada', nombre: 'Descartadas' };
 
@@ -153,6 +162,7 @@ export function filtroEtiqueta(etiqueta) {
 function cumpleFiltro(r, filtro) {
   if (!filtro || filtro === 'todas') return true;
   if (filtro === 'para_probar' || filtro === 'favorita' || filtro === 'descartada') return r.estado === filtro;
+  if (filtro === 'nuestras') return esPropia(r);
   if (filtro.startsWith('tipo:')) return r.tipo === filtro.slice(5);
   if (filtro.startsWith('etiqueta:')) return r.etiquetasLista.includes(filtro.slice(9));
   return true;
@@ -242,9 +252,21 @@ export function etiquetasFrecuentes(lista, n = 6) {
     .map(([e]) => e);
 }
 
-/** Cuántos links siguen en la bandeja: los que esperan a la Mac y los que necesitan ayuda. */
+/**
+ * Cuántas filas siguen en la bandeja: las que esperan a la Mac y las que necesitan ayuda.
+ * `propias` y `propiasAyuda`: cuántas de esas son recetas propias (no son links).
+ */
 export function resumenBandeja(bandeja) {
-  const esperando = (bandeja || []).filter(b => b.estado === 'pendiente' || b.estado === 'procesando').length;
-  const ayuda = (bandeja || []).filter(b => b.estado === 'ayuda').length;
-  return { total: esperando + ayuda, esperando, ayuda };
+  const esperan = (bandeja || []).filter(b => b.estado === 'pendiente' || b.estado === 'procesando');
+  const enAyuda = (bandeja || []).filter(b => b.estado === 'ayuda');
+  const propia = b => b.plataforma === 'manual';
+  return { total: esperan.length + enAyuda.length, esperando: esperan.length, ayuda: enAyuda.length,
+    propias: esperan.filter(propia).length + enAyuda.filter(propia).length, propiasAyuda: enAyuda.filter(propia).length };
+}
+
+/** «1 link», «3 links», «1 receta nuestra», «2 recetas nuestras» o, si hay de los dos, «3 cosas». */
+export function cuantasFilas(n, propias = 0) {
+  if (propias === n) return n === 1 ? '1 receta nuestra' : n + ' recetas nuestras';
+  if (!propias) return n === 1 ? '1 link' : n + ' links';
+  return n + ' cosas';
 }

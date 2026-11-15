@@ -155,6 +155,28 @@
       "creado": "2026-10-07T12:00:00.000Z",
       "actualizado": "2026-10-07T12:00:00.000Z",
       "porciones_vistas": ""
+    },
+    {
+      "estado": "probada",
+      "valoracion": 5,
+      "molde": "",
+      "foto_url": "",
+      "confianza": "media",
+      "origen_datos": "texto",
+      "idioma_original": "es",
+      "notas_proceso": "Las cantidades de la manteca, la leche y el aceite no estaban: quedaron a ojo.",
+      "id": "r_milan",
+      "titulo": "Milanesas con puré",
+      "tipo": "salado",
+      "etiquetas": "",
+      "porciones": 4,
+      "tiempo_min": 40,
+      "autor": "",
+      "fuente_url": "",
+      "plataforma": "manual",
+      "creado": "2026-10-10T21:00:00.000Z",
+      "actualizado": "2026-10-10T22:10:00.000Z",
+      "porciones_vistas": ""
     }
   ],
   "ingredientes": [
@@ -655,6 +677,90 @@
       "nombre": "banana",
       "nota": "",
       "gondola": "verdulería"
+    },
+    {
+      "id": "i_00070",
+      "receta_id": "r_milan",
+      "orden": 1,
+      "cantidad": 4,
+      "unidad": "u",
+      "nombre": "milanesas de carne",
+      "nota": "compradas hechas",
+      "gondola": "carnicería",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00071",
+      "receta_id": "r_milan",
+      "orden": 2,
+      "cantidad": 1,
+      "unidad": "kg",
+      "nombre": "papas",
+      "nota": "",
+      "gondola": "verdulería",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00072",
+      "receta_id": "r_milan",
+      "orden": 3,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "manteca",
+      "nota": "",
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00073",
+      "receta_id": "r_milan",
+      "orden": 4,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "leche",
+      "nota": "",
+      "gondola": "lácteos y huevos",
+      "seccion": "",
+      "rol": "principal",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00074",
+      "receta_id": "r_milan",
+      "orden": 5,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "aceite",
+      "nota": "para freír",
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
+    },
+    {
+      "id": "i_00075",
+      "receta_id": "r_milan",
+      "orden": 6,
+      "cantidad": null,
+      "unidad": "a ojo",
+      "nombre": "sal",
+      "nota": "",
+      "gondola": "almacén",
+      "seccion": "",
+      "rol": "condimento",
+      "seccion_usuario": "",
+      "rol_usuario": ""
     }
   ],
   "pasos": [
@@ -896,6 +1002,33 @@
       "texto": "Licuá todo.",
       "timer_min": null,
       "tip": ""
+    },
+    {
+      "id": "p_00070",
+      "receta_id": "r_milan",
+      "orden": 1,
+      "texto": "Hervé las papas peladas en agua con sal hasta que estén tiernas.",
+      "timer_min": 20,
+      "tip": "",
+      "ingredientes": "2,6"
+    },
+    {
+      "id": "p_00071",
+      "receta_id": "r_milan",
+      "orden": 2,
+      "texto": "Pisalas con la manteca y la leche hasta que quede un puré liso.",
+      "timer_min": null,
+      "tip": "",
+      "ingredientes": "2,3,4"
+    },
+    {
+      "id": "p_00072",
+      "receta_id": "r_milan",
+      "orden": 3,
+      "texto": "Freí las milanesas en aceite caliente, unos minutos de cada lado.",
+      "timer_min": 8,
+      "tip": "",
+      "ingredientes": "1,5"
     }
   ],
   "notas": [
@@ -983,9 +1116,27 @@
     }
   ],
   "despensa": [
-    { "id": "d_aceite1", "nombre": "aceite de oliva", "desde": "2026-10-10T10:00:00.000Z", "quien": "camilo", "actualizado": "2026-10-10T10:00:00.000Z" },
-    { "id": "d_azucar1", "nombre": "Azúcar", "desde": "2026-10-10T10:00:00.000Z", "quien": "pareja", "actualizado": "2026-10-10T10:00:00.000Z" },
-    { "id": "d_sal0001", "nombre": "sal", "desde": "2026-10-10T10:00:00.000Z", "quien": "pareja", "actualizado": "2026-10-10T10:00:00.000Z" }
+    {
+      "id": "d_aceite1",
+      "nombre": "aceite de oliva",
+      "desde": "2026-10-10T10:00:00.000Z",
+      "quien": "camilo",
+      "actualizado": "2026-10-10T10:00:00.000Z"
+    },
+    {
+      "id": "d_azucar1",
+      "nombre": "Azúcar",
+      "desde": "2026-10-10T10:00:00.000Z",
+      "quien": "pareja",
+      "actualizado": "2026-10-10T10:00:00.000Z"
+    },
+    {
+      "id": "d_sal0001",
+      "nombre": "sal",
+      "desde": "2026-10-10T10:00:00.000Z",
+      "quien": "pareja",
+      "actualizado": "2026-10-10T10:00:00.000Z"
+    }
   ],
   "bandeja": [
     {
@@ -1119,6 +1270,21 @@
       "receta_id": "",
       "intentos": 1,
       "actualizado": "2026-10-11T10:00:00.000Z"
+    },
+    {
+      "id": "b_00077",
+      "creado": "2026-10-10T21:00:00.000Z",
+      "url": "",
+      "plataforma": "manual",
+      "quien": "pareja",
+      "estado": "lista",
+      "motivo": "",
+      "receta_id": "r_milan",
+      "intentos": 1,
+      "actualizado": "2026-10-10T22:10:00.000Z",
+      "capturas": "",
+      "pedido": "",
+      "texto": "Las milanesas de carne que hacemos siempre, 4 (las compramos hechas).\n1 kg de papas, manteca y leche para el puré, sal.\nFreír las milanesas en aceite. Hervir las papas, pisarlas con la manteca y la leche."
     }
   ]
 }

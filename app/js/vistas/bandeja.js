@@ -117,10 +117,13 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
 
   // Una fila con pedido es una receta que pidieron corregir («Algo está mal en esta receta»).
   const conPedido = fila => !!String(fila.pedido || '').trim();
+  // Una fila de una receta propia (SPEC_v2 §6): no tiene link, tiene el texto que escribieron.
+  const esPropia = fila => fila.plataforma === 'manual';
   const describir = fila => {
-    if (!conPedido(fila)) return descripcionLink(fila);
     const receta = app.indice.porId.get(fila.receta_id);
-    return 'Corregir: ' + (receta ? receta.titulo : descripcionLink(fila));
+    if (conPedido(fila)) return 'Corregir: ' + (receta ? receta.titulo : descripcionLink(fila));
+    if (esPropia(fila)) return 'Receta nuestra' + (receta ? ': ' + receta.titulo : '');
+    return descripcionLink(fila);
   };
 
   function cancelarPedido(fila) {
@@ -133,8 +136,11 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
   const botonCancelarPedido = (fila, clase) => h('button', { type: 'button', class: clase,
     'aria-label': 'Cancelar el pedido: ' + describir(fila), onclick: () => cancelarPedido(fila) }, 'Cancelar el pedido');
 
-  // «Guardado por Laura · hoy 16:23» (si no se sabe quién, «Guardado hoy 16:23»).
-  const guardado = fila => (nombreDe(fila.quien) ? 'Guardado por ' + nombreDe(fila.quien) + ' · ' : 'Guardado ') + fechaHora(fila.creado);
+  // «Guardado por Laura · hoy 16:23» (si no se sabe quién, «Guardado hoy 16:23»). Una receta propia, «Escrita por…».
+  const guardado = fila => {
+    const que = esPropia(fila) ? 'Escrita' : 'Guardado';
+    return (nombreDe(fila.quien) ? que + ' por ' + nombreDe(fila.quien) + ' · ' : que + ' ') + fechaHora(esPropia(fila) ? fila.actualizado || fila.creado : fila.creado);
+  };
 
   function cabeza(fila) {
     const url = urlSegura(fila.url);
@@ -170,6 +176,15 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
             onclick: () => mandar(fila) },
           mandando ? 'Mandando…' : s.archivos.length === 1 ? 'Mandar 1 captura' : 'Mandar ' + s.archivos.length + ' capturas')),
       ];
+    } else if (esPropia(fila)) {
+      // Sin capturas ni «Descartar»: se arregla cambiando el texto en la ficha (o se prueba de nuevo).
+      acciones = [
+        h('div', { class: 'form-botones' },
+          conPedido(fila) ? botonCancelarPedido(fila, 'boton-secundario')
+            : h('a', { class: 'boton-secundario', href: '#/receta/' + fila.receta_id, 'aria-label': 'Cambiar el texto: ' + desc }, 'Cambiar el texto'),
+          h('button', { type: 'button', class: 'boton-principal', 'data-foco': 'probar:' + fila.id, 'aria-label': 'Probar de nuevo: ' + desc,
+            onclick: () => cambiarEstado(fila, 'pendiente', 'La Mac lo vuelve a intentar la próxima vez que corra.') }, 'Probar de nuevo')),
+      ];
     } else {
       const entrada = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'solo-lector', 'data-foco': 'subir:' + fila.id,
         onchange: e => elegir(fila, [...e.target.files]) });
@@ -193,7 +208,9 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
   function tarjetaEsperando(fila) {
     const n = cuantasCapturas(fila);
     // `local`: la acaban de guardar en este celular y todavía no llegó a la Sheet.
-    const estado = fila.local ? 'Sin mandar todavía'
+    // La de una receta propia lleva el id de la app: sigue sin mandar mientras su edición esté en la cola.
+    const sinMandar = fila.local || app.cola.some(e => e.datos && e.datos.bandeja_id === fila.id);
+    const estado = sinMandar ? 'Sin mandar todavía'
       : fila.estado === 'procesando' ? 'Procesando…'
       : (n ? (n === 1 ? 'Con 1 captura · ' : 'Con ' + n + ' capturas · ') : '') + 'Esperando a la Mac';
     return h('li', { class: 'tarjeta-link' },
@@ -202,6 +219,7 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
       h('div', { class: 'link-pie' },
         h('span', { class: 'secundario' }, estado),
         conPedido(fila) && fila.estado === 'pendiente' ? botonCancelarPedido(fila, 'boton-texto alerta-texto')
+        : esPropia(fila) ? h('a', { class: 'boton-texto', href: '#/receta/' + fila.receta_id, 'aria-label': 'Ver la receta: ' + describir(fila) }, 'Ver la receta')
         : fila.estado === 'pendiente' && !fila.local ? h('button', { type: 'button', class: 'boton-texto alerta-texto',
           'aria-label': 'Descartar ' + descripcionLink(fila),
           onclick: () => cambiarEstado(fila, 'descartada', 'Descartado. Si lo volvés a guardar, vuelve a la bandeja.') }, 'Descartar') : null));
