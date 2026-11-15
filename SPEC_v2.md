@@ -229,7 +229,7 @@ Cada fase termina con un commit y su tilde en `docs/PLAN.md`. **Las pruebas en d
 - **Listo cuando:** con la API falsa, se arma una semana con 4 comidas (una receta repetida, una entrada movida de día y una receta propia creada desde «+»); «Repetir una semana» la copia igual a la siguiente y «Usar como modelo» deja sus platos en «Sin día» de otra; y la compra de la semana suma las porciones de la repetida, deja desmarcado lo que está en la despensa y avisa de la receta propia sin ingredientes.
 
 ### Fase 11: pruebas en dispositivos
-Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de la Fase 6 son las que figuran sin tildar en `docs/PLAN.md`; acá se repiten para tenerlas juntas.
+Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de la Fase 6 (y la 4b y la 5) pasan acá: en `docs/PLAN.md`, esas fases dicen «→ Fase 11» y la casilla está solo en esta.
 - **De la Fase 6 (y la 4b y la 5):**
   - compartir un Reel desde Instagram a la app instalada, también volviendo enseguida a Instagram;
   - un «Algo está mal» resuelto con `/recetas`;

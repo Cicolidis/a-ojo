@@ -1,6 +1,6 @@
 # A ojo — Plan
 
-Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 7 en adelante), que siguen siendo la fuente de verdad: si cambia una fase, se cambia primero ahí. Las specs dicen qué se pide; lo que está hecho o falta va solo acá, en las casillas. Cada fase termina con una demo y un commit. Una casilla se marca apenas se termina la tarea.
+Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 7 en adelante), que siguen siendo la fuente de verdad: si cambia una fase, se cambia primero ahí. Las specs dicen qué se pide; lo que está hecho o falta va solo acá, en las casillas, y cada tarea tiene una sola: las pruebas en dispositivos de las fases 4b, 5 y 6 se tildan en la Fase 11 (ahí dicen «→ Fase 11»). Cada fase termina con una demo y un commit. Una casilla se marca apenas se termina la tarea.
 
 ## Fase 1: datos y captura
 
@@ -36,7 +36,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Lista de compras por lugar: paso para elegir, mover, reglas de `Lugares` y envío por WhatsApp
 - [x] Navegación inferior y pantalla Bandeja con la subida de capturas; capa 6 de `/recetas`
 - [x] Demo: arman la compra de 3 recetas, con un opcional y un ítem movido, y la mandan por WhatsApp
-- [ ] Demo: una fila en «Necesita ayuda» se resuelve subiendo capturas desde el celular y corriendo `/recetas`
+- Demo: una fila en «Necesita ayuda» se resuelve subiendo capturas desde el celular y corriendo `/recetas` → Fase 11
 
 ## Fase 5: pulido
 
@@ -45,7 +45,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Microanimaciones que respetan «reducir movimiento»
 - [x] Revisión de accesibilidad (AA) y test de contraste en los dos modos
 - [x] Modo oscuro según el sistema
-- [ ] Demo formal en Android: instalada de cero, en modo oscuro y con «quitar animaciones»
+- Demo formal en Android: instalada de cero, en modo oscuro y con «quitar animaciones» → Fase 11
 
 ## Fase 6: correcciones, infraestructura y funciones nuevas
 
@@ -54,7 +54,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Cola offline: estado esperado (`desde`) en `bandeja.actualizar`
 - [x] Timers con la app en segundo plano: investigado; queda solo el aviso
 - [x] Fotos: la alternativa `lh3` preparada en `urlImagen_()`
-- [ ] Fotos: medir en el celular cuánto ocupa la caché con `navigator.storage.estimate()`
+- Fotos: medir en el celular cuánto ocupa la caché con `navigator.storage.estimate()` → Fase 11
 - [ ] Links `/share/` de Instagram: no canonizarlos (pendiente hasta que aparezca uno real)
 - [x] `bandeja.tomar`: dos corridas de `/recetas` no toman la misma fila
 - [x] Capturas a la papelera de Drive cuando la fila queda `lista`
@@ -75,14 +75,14 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] `setup.sh` también en Linux con apt (WSL 2)
 - [x] Cookies de Instagram desde Firefox, también el de Windows desde WSL 2
 - [x] Guía `docs/procesar-en-windows.md`
-- [ ] Prueba real de `/recetas` en la computadora de Laura
+- Prueba real de `/recetas` en la computadora de Laura → Fase 11
 
 ### 6.3 Funciones nuevas
 
-- [ ] Compartir directo a A ojo: `share_target` y «Pegar un link» en la Bandeja (implementado y revisado; falta la prueba en Android, que incluye compartir y volver enseguida a Instagram para ver si el link llega igual a la Sheet)
-- [ ] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción (desplegado con la API 0.7.0; falta la demo)
+- [x] Compartir directo a A ojo: `share_target` y «Pegar un link» en la Bandeja (la prueba en Android, que incluye compartir y volver enseguida a Instagram para ver si el link llega igual a la Sheet → Fase 11)
+- [x] «Algo está mal en esta receta»: pedir que se reprocese con un texto que `/recetas` lee como instrucción (desplegado con la API 0.7.0; la demo → Fase 11)
 - [x] Quién escribió cada nota: un mapa de nombres (`camilo` → Camilo, `pareja` → Laura)
-- [ ] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (desplegado con la API 0.8.0; falta la prueba con una receta nueva)
+- [x] Pasos con sus ingredientes explícitos (columna nueva en `Pasos`) (desplegado con la API 0.8.0; la prueba con una receta nueva → Fase 11)
 - [x] «Cómo se armó» en la ficha: `notas_proceso`, plegado
 - [x] Compartir una receta por WhatsApp
 - [x] Editar y borrar notas
@@ -93,19 +93,19 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 
 ### 6.4 Forma de trabajo
 
-- [ ] `/recetas` con `model: sonnet`: comparar 3 o 4 recetas con Opus antes de dejarlo fijo
+- `/recetas` con `model: sonnet`: comparar 3 o 4 recetas con Opus antes de dejarlo fijo → Fase 11
 
 ### Demo de la Fase 6
 
-- [ ] Un «Descartar» mandado sin conexión sobre una fila que ya está `lista` vuelve con aviso y no la cambia
+- Un «Descartar» mandado sin conexión sobre una fila que ya está `lista` vuelve con aviso y no la cambia → Fase 11
 - [x] Los tests corren en GitHub Actions y un test que falla frena la publicación
 - [x] `npm run deploy` termina con un `ping` que responde
-- [ ] Hay al menos un backup semanal en Drive
-- [ ] Un Reel compartido desde Instagram a la app instalada aparece en la Bandeja
-- [ ] Un pedido de «Algo está mal» se resuelve corriendo `/recetas`
+- Hay al menos un backup semanal en Drive → Fase 11
+- Un Reel compartido desde Instagram a la app instalada aparece en la Bandeja → Fase 11
+- Un pedido de «Algo está mal» se resuelve corriendo `/recetas` → Fase 11
 - [x] Las notas muestran quién las escribió («Laura», «Camilo»)
-- [ ] Laura corre `/recetas` en su computadora y la receta llega a la app
-- [ ] Dos corridas a la vez no toman la misma fila
+- Laura corre `/recetas` en su computadora y la receta llega a la app → Fase 11
+- Dos corridas a la vez no toman la misma fila → Fase 11
 - [ ] La SPEC describe lo que hace el código
 
 ## v2 (`SPEC_v2.md`)
