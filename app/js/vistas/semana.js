@@ -7,7 +7,8 @@
 import { h, icono, foto, rellenar } from '../dom.js';
 import { nuevaEdicion } from '../ediciones.js';
 import { hayQueGuardarVista } from '../ingredientes.js';
-import { COMIDAS, armarSemana, diaCorto, diasDe, hayCompra, hoyIso, lunesDe, sumarDias, textoDia, textoSemana } from '../plan.js';
+import { COMIDAS, armarSemana, comoModelo, diaCorto, diasDe, hayCompra, hoyIso, lunesDe, repetir, semanasAnteriores, sumarDias, textoDia, textoSemana } from '../plan.js';
+import { unirConY } from '../ingredientes.js';
 import { cargando, contadorPorciones, navegacion, segmentado, tocarAfueraCierra, vacio } from './controles.js';
 
 /** «Lunes 16 · Cena» o «Sin día». */
@@ -31,6 +32,10 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
   const cual = h('p', { class: 'secundario' });
   const sync = h('p', { class: 'estado-sync', role: 'status' });
   const zona = h('div', { class: 'semana-dias' });
+  // Copiar una semana anterior (SPEC_v2 §4.3): arriba de los días, si hay semanas anteriores con algo.
+  const copiar = h('div', { class: 'semana-copiar' },
+    h('button', { type: 'button', class: 'boton-secundario boton-chico', 'data-foco': 'repetir', onclick: () => elegirSemana('repetir') }, 'Repetir una semana'),
+    h('button', { type: 'button', class: 'boton-secundario boton-chico', 'data-foco': 'modelo', onclick: () => elegirSemana('modelo') }, 'Usar como modelo'));
   // «Armar la compra de la semana» (SPEC_v2 §4.2), abajo: solo si queda algo por cocinar.
   const compra = h('a', { class: 'boton-principal armar-compra', href: '#/semana/' + semana + '/compra' }, icono('compras', 20), 'Armar la compra de la semana');
   const dialogo = tocarAfueraCierra(h('dialog', { class: 'hoja', 'aria-labelledby': 'titulo-entrada' }));
@@ -48,6 +53,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
     h('div', { class: 'semana-cabeza' }, anterior, h('div', { class: 'semana-titulo' }, titulo, cual), siguiente),
     volverAHoy,
     sync,
+    copiar,
     zona,
     compra,
     dialogo,
@@ -179,10 +185,67 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
     botones.find(b => b.getAttribute('aria-pressed') === 'true').focus();
   }
 
+  const anteriores = () => semanasAnteriores(app.datos ? app.datos.plan : [], semana, app.indice.porId);
+
+  /** El selector de semanas (una hoja), de la más nueva a la más vieja. */
+  function elegirSemana(modo) {
+    const lista = anteriores();
+    rellenar(dialogo,
+      h('h2', { id: 'titulo-entrada' }, modo === 'repetir' ? 'Repetir una semana' : 'Usar como modelo'),
+      h('p', { class: 'secundario' }, modo === 'repetir'
+        ? 'Copia los platos el mismo día, en la misma comida y con las mismas porciones.'
+        : 'Trae los platos a «Sin día», con sus porciones, para repartirlos cuando quieran.'),
+      h('ul', { class: 'lista-links' }, lista.map(x => h('li', null, h('button', { type: 'button', class: 'opcion-semana',
+        onclick: () => elegida(modo, x) }, x.texto)))),
+      h('button', { type: 'button', class: 'boton-secundario', onclick: () => dialogo.close() }, 'Cancelar'));
+    dialogo.onclose = () => {
+      dialogo.onclose = null;
+      pintar(modo);
+    };
+    dialogo.showModal();
+  }
+
+  /** Eligieron una semana: «Usar como modelo» la trae a «Sin día»; «Repetir», si esta tiene algo, pregunta antes. */
+  function elegida(modo, origen) {
+    const actuales = (app.datos.plan || []).filter(e => e.semana === semana);
+    if (modo === 'modelo') return copiarDe(comoModelo(origen.entradas, semana, app.indice.porId), [], origen, modo);
+    const copia = repetir(origen.entradas, semana, app.indice.porId);
+    if (!actuales.length) return copiarDe(copia, [], origen, modo);
+    // Ya tiene algo: «Sumar a lo que hay» (lo que no pierde nada) o «Reemplazar lo que hay».
+    rellenar(dialogo,
+      h('h2', { id: 'titulo-entrada' }, '¿Qué hacemos con lo que ya hay?'),
+      h('p', { class: 'secundario' }, textoSemana(semana) + ' ya tiene ' + (actuales.length === 1 ? '1 plato' : actuales.length + ' platos') + '.'),
+      h('div', { class: 'hoja-botones' },
+        h('button', { type: 'button', class: 'boton-principal', onclick: () => copiarDe(copia, [], origen, modo) }, 'Sumar a lo que hay'),
+        h('button', { type: 'button', class: 'boton-secundario', onclick: () => copiarDe(copia, actuales.map(e => e.id), origen, modo) }, 'Reemplazar lo que hay'),
+        h('button', { type: 'button', class: 'boton-texto', onclick: () => dialogo.close() }, 'Cancelar')));
+    dialogo.querySelector('.boton-principal').focus();
+  }
+
+  /**
+   * Manda la copia en un solo plan.poner (al reemplazar, con su `quitar`: si algo falla, no se quita
+   * nada). Con más de 50 entradas, en tandas; el `quitar` va en la primera.
+   */
+  function copiarDe({ items, afuera }, quitar, origen, modo) {
+    const fuera = afuera.length ? ' Quedaron afuera: ' + unirConY(afuera) + '.' : '';
+    if (!items.length) {
+      dialogo.close();
+      return avisar('No hay nada para copiar de la ' + textoSemana(origen.semana).toLowerCase() + '.' + fuera);
+    }
+    for (let i = 0; i < items.length; i += 50) {
+      editar(nuevaEdicion('plan.poner', Object.assign({ items: items.slice(i, i + 50), quien: app.config.quien },
+        i === 0 && quitar.length ? { quitar } : {})));
+    }
+    dialogo.close();
+    avisar((modo === 'repetir' ? '✓ Copié la ' : '✓ Los platos de la ') + textoSemana(origen.semana).toLowerCase() +
+      (modo === 'repetir' ? '.' : ' quedaron en «Sin día».') + fuera);
+  }
+
   /** Repinta y deja el foco en el control equivalente (data-foco): el pedido o el que lo tenía; si no está, el título. */
   function pintar(foco) {
     foco = foco || (document.activeElement && document.activeElement.getAttribute('data-foco'));
     compra.hidden = true;
+    copiar.hidden = true;
     if (!app.datos) {
       return rellenar(zona, app.sync.estado === 'sincronizando' ? cargando('Bajando la semana…')
         : vacio({ figura: 'aviso', titulo: 'Todavía no se bajó la semana', texto: 'Cuando haya conexión, aparece sola.' }));
@@ -194,9 +257,12 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
     }
     const s = armarSemana(app.datos.plan, semana, app.indice.porId);
     compra.hidden = !hayCompra(app.datos.plan, semana, hoy);
+    const hayAnteriores = anteriores().length > 0;
+    copiar.hidden = !hayAnteriores;
     rellenar(zona,
       !s.total ? vacio({ figura: 'calendario', titulo: 'Todavía no hay nada para esta semana',
-        acciones: [{ texto: 'Elegir una receta', href: direccionElegir(semana) }] }) : null,
+        acciones: [{ texto: 'Elegir una receta', href: direccionElegir(semana) }]
+          .concat(hayAnteriores ? [{ texto: 'Repetir una semana', onclick: () => elegirSemana('repetir') }] : []) }) : null,
       s.sinDia.length ? h('section', { class: 'semana-dia sin-dia', 'aria-label': 'Sin día' },
         h('div', { class: 'semana-comida-cabeza' }, h('h2', null, 'Sin día'), botonMas('', '')),
         h('ul', { class: 'entradas' }, s.sinDia.map(entrada))) : null,
@@ -206,7 +272,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
         comida(d.fecha, 'cena', d.cena))),
     );
     if (!foco) return;
-    const el = zona.querySelector('[data-foco="' + foco + '"]');
+    const el = contenedor.querySelector('[data-foco="' + foco + '"]');
     (el || titulo).focus({ preventScroll: !!el });
   }
 

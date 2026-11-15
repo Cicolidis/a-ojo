@@ -1657,3 +1657,19 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 .compra-semana-cuerpo { display: flex; flex-direction: column; gap: 10px; }
 
 .armar-compra { align-self: stretch; }
+
+/* Copiar una semana anterior (SPEC_v2 §4.3). */
+.semana-copiar { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+.opcion-semana {
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 1px solid var(--borde-control);
+  border-radius: 14px;
+  background: var(--superficie);
+  text-align: left;
+  font-weight: 500;
+}
+
+.opcion-semana:active { background: var(--superficie-2); }

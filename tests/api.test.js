@@ -1662,3 +1662,21 @@ test('hacerBackup copia el plan entero y después poda lo viejo', () => {
   const copia = p.drive.porId.get(r.id).planilla.getSheetByName('Plan');
   assert.equal(copia.getLastRow(), 3, 'el backup tiene las dos (más el encabezado)');
 });
+
+test('lo que arman nuevaEntrada, repetir y comoModelo de la app pasa validarPlan_ de la API', async () => {
+  const p = proyecto();
+  const plan = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'app', 'js', 'plan.js')).href);
+  const porId = new Map([['r_x', { id: 'r_x', titulo: 'X' }]]);
+  const viejas = [
+    { id: 's_v1', semana: '2025-12-29', fecha: '2026-01-01', comida: 'cena', receta_id: 'r_x', porciones: 2 },
+    { id: 's_v2', semana: '2025-12-29', fecha: '', comida: '', receta_id: 'r_x', porciones: null },
+  ];
+  const items = [
+    plan.nuevaEntrada({ semana: '2026-11-16', fecha: '2026-11-22', comida: 'almuerzo', receta_id: 'r_x', porciones: 3 }),
+    plan.nuevaEntrada({ semana: '2026-11-16', receta_id: 'r_x' }),
+    ...plan.repetir(viejas, '2026-11-16', porId).items,
+    ...plan.comoModelo(viejas, '2026-11-23', porId).items,
+  ];
+  assert.doesNotThrow(() => p.ctx.validarPlan_(items));
+  assert.equal(items[2].fecha, '2026-11-19', 'el jueves sigue siendo jueves (también al cruzar el año)');
+});

@@ -140,3 +140,54 @@ export function compraDeLaSemana(plan, semana, hoy, porId) {
 export function hayCompra(plan, semana, hoy) {
   return (plan || []).some(e => e.semana === semana && (!e.fecha || e.fecha >= hoy)) && sumarDias(semana, 6) >= hoy;
 }
+
+// Copiar una semana anterior (SPEC_v2 §4.3).
+
+const platos = n => (n === 1 ? '1 plato' : n + ' platos');
+
+/**
+ * Las semanas anteriores a `destino` que tienen algo, de la más nueva a la más vieja, para el selector:
+ * [{ semana, entradas (en el orden de la semana), texto: «Semana del 2/11 · 6 platos: Croquetas, Pollo marroquí…» }].
+ */
+export function semanasAnteriores(plan, destino, porId = new Map()) {
+  const semanas = [...new Set((plan || []).filter(e => e.semana < destino).map(e => e.semana))].sort().reverse();
+  return semanas.map(semana => {
+    const s = armarSemana(plan, semana, porId);
+    const entradas = s.dias.flatMap(d => d.almuerzo.concat(d.cena)).concat(s.sinDia);
+    const titulos = [...new Set(entradas.filter(e => e.receta).map(e => e.receta.titulo))];
+    const muestra = titulos.length > 2 ? titulos.slice(0, 2).join(', ') + '…' : titulos.join(' y ');
+    return { semana, entradas, texto: textoSemana(semana) + ' · ' + platos(entradas.length) + (muestra ? ': ' + muestra : '') };
+  });
+}
+
+/** Días entre dos fechas del calendario. */
+const diasEntre = (desde, hasta) => Math.round((aMs(hasta) - aMs(desde)) / DIA_MS);
+
+/**
+ * Las entradas nuevas para `destino` a partir de las de otra semana, con ids nuevos. Las recetas
+ * descartadas o que ya no están quedan afuera. `lugar(e)` dice adónde va cada una. Devuelve { items, afuera }.
+ */
+function copiar(entradas, destino, porId, lugar) {
+  const items = [];
+  const afuera = [];
+  for (const e of entradas) {
+    const r = porId.get(e.receta_id);
+    if (!r || r.estado === 'descartada') {
+      const nombre = r ? r.titulo : 'una receta que ya no está';
+      if (!afuera.includes(nombre)) afuera.push(nombre);
+      continue;
+    }
+    items.push(nuevaEntrada(Object.assign({ semana: destino, receta_id: e.receta_id, porciones: e.porciones }, lugar(e))));
+  }
+  return { items, afuera };
+}
+
+/** «Repetir una semana»: el mismo día de la semana, la misma comida y las mismas porciones; «Sin día» sigue sin día. */
+export function repetir(entradas, destino, porId) {
+  return copiar(entradas, destino, porId, e => (e.fecha ? { fecha: sumarDias(destino, diasEntre(e.semana, e.fecha)), comida: e.comida } : {}));
+}
+
+/** «Usar como modelo»: todos los platos, con sus porciones, a «Sin día» de la semana de destino. */
+export function comoModelo(entradas, destino, porId) {
+  return copiar(entradas, destino, porId, () => ({}));
+}

@@ -1720,3 +1720,33 @@ test('elegidosDeSemana: lo de la despensa arranca desmarcado (En casa); si ya es
   assert.equal(ya.enLista, true);
   assert.deepEqual([...ya.elegidos], ['i2'], 'lo que ya está en la lista, aunque esté en la despensa');
 });
+
+test('semanasAnteriores, repetir y comoModelo: ids nuevos, mismo día y comida, y sin las descartadas', async () => {
+  const p = await cargar('plan.js');
+  const porId = new Map([['r_pollo', { id: 'r_pollo', titulo: 'Pollo marroquí' }], ['r_sopa', { id: 'r_sopa', titulo: 'Sopa' }],
+    ['r_desc', { id: 'r_desc', titulo: 'Licuado', estado: 'descartada' }], ['r_milan', { id: 'r_milan', titulo: 'Milanesas' }]]);
+  const e = (id, semana, fecha, comida, receta_id, porciones) => ({ id, semana, fecha, comida, receta_id, porciones, creado: '2026-11-01T10:00:00Z' });
+  const plan = [
+    e('s_1', '2026-11-02', '2026-11-02', 'cena', 'r_pollo', 4),
+    e('s_2', '2026-11-02', '2026-11-05', 'almuerzo', 'r_sopa', 2),
+    e('s_3', '2026-11-02', '', '', 'r_milan', null),
+    e('s_4', '2026-11-02', '2026-11-07', 'cena', 'r_desc', 2),
+    e('s_5', '2026-11-02', '2026-11-08', 'cena', 'r_borrada', 2),
+    e('s_6', '2026-10-26', '2026-10-27', 'cena', 'r_sopa', 2),
+    e('s_7', '2026-11-16', '2026-11-16', 'cena', 'r_sopa', 2),
+  ];
+  const anteriores = p.semanasAnteriores(plan, '2026-11-16', porId);
+  assert.deepEqual(anteriores.map(s => s.semana), ['2026-11-02', '2026-10-26'], 'de la más nueva a la más vieja; no la de destino');
+  assert.equal(anteriores[0].texto, 'Semana del 2/11 · 5 platos: Pollo marroquí, Sopa…');
+  assert.equal(anteriores[1].texto, 'Semana del 26/10 · 1 plato: Sopa');
+
+  const r = p.repetir(anteriores[0].entradas, '2026-11-16', porId);
+  assert.deepEqual(r.items.map(i => [i.receta_id, i.fecha, i.comida, i.porciones]), [
+    ['r_pollo', '2026-11-16', 'cena', 4], ['r_sopa', '2026-11-19', 'almuerzo', 2], ['r_milan', '', '', null]]);
+  assert.ok(r.items.every(i => /^s_/.test(i.id) && !plan.some(x => x.id === i.id) && i.semana === '2026-11-16'), 'ids nuevos');
+  assert.deepEqual(r.afuera, ['Licuado', 'una receta que ya no está']);
+
+  const m = p.comoModelo(anteriores[0].entradas, '2026-11-23', porId);
+  assert.ok(m.items.every(i => i.fecha === '' && i.comida === '' && i.semana === '2026-11-23'));
+  assert.deepEqual(m.items.map(i => i.porciones), [4, 2, null]);
+});
