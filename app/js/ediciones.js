@@ -7,6 +7,7 @@
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
 import { claveIngrediente, mismoNombre } from './compras.js';
 import { extraerLink, filaDeReceta, mismoLink, plataformaDe, unirPedido } from './bandeja.js';
+import { esPropia } from './datos.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -96,8 +97,13 @@ function recetaPropia(d, cuando) {
   };
 }
 
+/**
+ * La fila nueva de una receta escrita, provisoria (`local`) hasta que llegue la de la API: casi
+ * siempre es la misma (el mismo id), pero si el otro celular ya escribió esa receta, la API usa
+ * la fila de él. aplicarDelta() saca las `local`, así no queda una fila fantasma.
+ */
 function filaPropia(id, recetaId, quien, texto, cuando) {
-  return { id, creado: cuando, url: '', plataforma: 'manual', quien: quien || '', estado: 'pendiente', motivo: '',
+  return { id, local: true, creado: cuando, url: '', plataforma: 'manual', quien: quien || '', estado: 'pendiente', motivo: '',
     receta_id: recetaId, intentos: 0, actualizado: cuando, capturas: '', pedido: '', texto };
 }
 
@@ -123,7 +129,7 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       // Como la API: si la receta ya está (un reintento), no se toca; si falta su fila, se suma.
       const recetas = datos.recetas || [];
       const ya = recetas.find(r => r.id === d.id);
-      if (ya && ya.plataforma !== 'manual') return datos;
+      if (ya && !esPropia(ya)) return datos;
       const cuando = creada || new Date().toISOString();
       const conReceta = ya ? datos : Object.assign({}, datos, { recetas: recetas.concat(recetaPropia(d, cuando)) });
       const texto = textoPropio(d.texto);
@@ -133,7 +139,7 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
     }
     case 'receta.editar': {
       const receta = (datos.recetas || []).find(r => r.id === d.id);
-      if (!receta || receta.plataforma !== 'manual') return datos;
+      if (!esPropia(receta)) return datos;
       const c = {};
       if (tituloPropio(d.titulo)) c.titulo = tituloPropio(d.titulo);
       if (d.tipo) c.tipo = d.tipo;
@@ -144,7 +150,7 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       // Como la API: la fila pedida, o la más nueva de la receta, o una nueva; con el mismo texto no cambia.
       const receta = (datos.recetas || []).find(r => r.id === d.id);
       const texto = textoPropio(d.texto);
-      if (!receta || receta.plataforma !== 'manual' || !texto) return datos;
+      if (!esPropia(receta) || !texto) return datos;
       const bandeja = datos.bandeja || [];
       const pedida = bandeja.find(b => b.id === d.bandeja_id);
       if (pedida && pedida.receta_id !== d.id) return datos;
@@ -154,7 +160,8 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       if (fila.texto === texto && ['pendiente', 'procesando', 'lista'].includes(fila.estado)) return datos;
       return Object.assign({}, datos, {
         bandeja: bandeja.map(b => (b === fila
-          ? Object.assign({}, b, { texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: cuando }) : b)),
+          ? Object.assign({}, b, { texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: cuando },
+            d.quien ? { quien: d.quien } : {}) : b)),
       });
     }
     case 'receta.porciones':
@@ -263,7 +270,7 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       const bandeja = datos.bandeja || [];
       const texto = unaLinea(d.texto);
       const receta = (datos.recetas || []).find(r => r.id === d.id);
-      const propia = !!receta && receta.plataforma === 'manual';
+      const propia = esPropia(receta);
       let suyas = bandeja.filter(b => b.receta_id === d.id);
       // Nunca con un link vacío (una propia): coincidiría con las filas de las otras propias.
       if (!suyas.length && receta && receta.fuente_url) suyas = bandeja.filter(b => mismoLink(b.url, receta.fuente_url));

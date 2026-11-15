@@ -161,6 +161,7 @@ Los platos que ya hacemos, sin video ni web: se cargan rápido para ponerlos en 
 - Con el texto escrito y todavía sin procesar: «La Mac la va a ordenar en la próxima corrida», y el texto se ve tal cual, para cocinar igual.
 - «Editar» (solo en las propias) cambia el nombre, el tipo y cuánto rinde («Rinde: para cuántas porciones son las cantidades de la receta»; para cocinar para otras está el −/+ de la ficha). Los ingredientes y los pasos se corrigen como cualquier receta: «Algo está mal» (solo en las ya ordenadas) o reescribiendo el texto.
 - Una creada por error se descarta, como cualquier receta.
+- En la Bandeja, la fila de una propia no ofrece capturas ni «Descartar»: «Cambiar el texto» (lleva a la ficha), «Probar de nuevo» y, si la Mac no pudo ordenarla, «Dejarla sin ordenar» (la saca de la Bandeja; la receta queda con el nombre y se puede volver a escribir).
 
 ### 6.3 En `/recetas`
 - Una fila con `plataforma = manual` no baja nada: su única capa es `texto`. Se estructura con las mismas reglas de §6.2 de la v1 (rioplatense, voseo en los pasos, **nunca inventar cantidades**, roles, secciones e ingredientes por paso) y se manda con `receta.upsert` sobre la receta que ya existe.

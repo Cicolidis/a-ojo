@@ -165,6 +165,10 @@ def cmd_actualizar(args):
     datos = {'id': args.bandeja_id, 'estado': args.estado}
     if args.motivo:
         datos['motivo'] = args.motivo
+    # Con --desde, la API no la toca si mientras tanto cambió de estado (409 estado_cambio):
+    # por ejemplo, una receta propia que reescribieron mientras la Mac la ordenaba.
+    if args.desde:
+        datos['desde'] = args.desde
     if dry_run(args):
         log(args.bandeja_id, 'actualizar', f'(dry-run) {args.estado} {args.motivo or ""}')
         salida({'ok': True, 'dry_run': True, 'id': args.bandeja_id, 'estado': args.estado})
@@ -365,6 +369,7 @@ def main(argv=None):
     s.add_argument('bandeja_id')
     s.add_argument('estado', choices=['pendiente', 'procesando', 'lista', 'ayuda', 'descartada'])
     s.add_argument('--motivo')
+    s.add_argument('--desde', choices=['pendiente', 'procesando', 'lista', 'ayuda', 'descartada'])
     s.add_argument('--dry-run', action='store_true')
     s.set_defaults(fn=cmd_actualizar)
 

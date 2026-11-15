@@ -160,6 +160,9 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
   // formulario no se repinta mientras está abierto; lo de arriba (el estado y el texto guardado), sí.
   const zonaPropia = h('section', { class: 'seccion', 'aria-labelledby': 'titulo-propia' });
   const estadoTexto = h('div', { class: 'propia-estado' });
+  // Reescribirla reemplaza una corrección pedida que todavía no se hizo: se avisa arriba del campo.
+  const avisoPedido = h('p', { class: 'alerta', hidden: true }, icono('aviso', 18),
+    'Reescribirla cancela la corrección que pidieron: la Mac la ordena de nuevo con este texto.');
   const campoTexto = h('textarea', { rows: '8', maxlength: '5000', 'aria-label': 'La receta',
     placeholder: '4 milanesas, 1 kg de papa, manteca y leche. Freí las milanesas…' });
   const abrirTexto = h('button', { type: 'button', class: 'boton-secundario boton-chico', onclick: () => abrirFormTexto() });
@@ -174,7 +177,14 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     onsubmit: e => {
       e.preventDefault();
       if (!campoTexto.value.trim()) return campoTexto.focus();
-      const { fila } = estadoPropia(r, app.datos?.bandeja);
+      const { fila, texto } = estadoPropia(r, app.datos?.bandeja);
+      // El mismo texto que ya tiene (y que la Mac ya ordenó o va a ordenar): no hay nada que mandar.
+      if (fila && campoTexto.value.trim() === texto.trim() && ['pendiente', 'procesando', 'lista'].includes(fila.estado)) {
+        cerrarTexto();
+        pintar();
+        (abrirTexto.hidden ? reescribir : abrirTexto).focus();
+        return avisar('No cambiaste el texto.');
+      }
       editar(nuevoTexto(id, campoTexto.value, fila && fila.id, app.config.quien));
       cerrarTexto();
       pintar();
@@ -185,6 +195,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     },
   },
   h('p', { class: 'secundario' }, 'Escribila como te salga: la Mac la ordena en ingredientes y pasos la próxima vez que corra.'),
+  avisoPedido,
   campoTexto,
   h('div', { class: 'form-botones' },
     h('button', { type: 'button', class: 'boton-secundario', onclick: () => {
@@ -197,7 +208,9 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
 
   /** Abre el campo con el texto que ya tenía (si tenía), en lugar del botón. */
   function abrirFormTexto() {
-    campoTexto.value = estadoPropia(r, app.datos?.bandeja).texto;
+    const { fila, texto } = estadoPropia(r, app.datos?.bandeja);
+    campoTexto.value = texto;
+    avisoPedido.hidden = !(fila && String(fila.pedido || '').trim());
     formTexto.hidden = false;
     abrirTexto.hidden = true;
     reescribir.hidden = true;
@@ -412,6 +425,7 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     // Ya ordenada, sin un texto nuevo esperando: la ficha de siempre y «Reescribir la receta» al pie.
     zonaPropia.hidden = ordenada && !p.reescritura && !abierto;
     if (document.activeElement === reescribir && (p.reescritura || !ordenada)) titulo.focus({ preventScroll: true });
+    if (document.activeElement === abrirTexto && ordenada && !p.reescritura) titulo.focus({ preventScroll: true });
     reescribir.hidden = !ordenada || !!p.reescritura || abierto;
     abrirTexto.hidden = abierto || (ordenada && !p.reescritura);
     abrirTexto.textContent = p.estado === 'sin_texto' ? 'Escribir la receta' : 'Cambiar el texto';

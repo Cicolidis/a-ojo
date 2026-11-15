@@ -1,6 +1,8 @@
 // Bandeja (§7.2): los links que necesitan ayuda, los que esperan a la Mac y las
 // recetas recién llegadas. Puro, sin DOM.
 
+import { esPropia } from './datos.js';
+
 const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_RECIENTES = 10;
 // Los estados que solo escribe /recetas: su `actualizado` dice cuándo corrió la Mac.
@@ -41,7 +43,7 @@ export function agruparBandeja(bandeja, porId, ahoraMs = Date.now()) {
 
 /** Qué es el link, para la tarjeta: «Short de YouTube», «Reel de Instagram», «paulinacocina.net»… */
 export function descripcionLink(fila) {
-  if (fila.plataforma === 'manual') return 'Receta nuestra';
+  if (esPropia(fila)) return 'Receta nuestra';
   const url = String(fila.url || '');
   if (fila.plataforma === 'youtube') return /\/shorts\//.test(url) ? 'Short de YouTube' : 'Video de YouTube';
   if (fila.plataforma === 'instagram') return /\/reels?\//.test(url) ? 'Reel de Instagram' : 'Publicación de Instagram';

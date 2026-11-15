@@ -143,7 +143,7 @@ export const FILTROS = [
   { id: 'tipo:salado', nombre: 'Salado' },
 ];
 
-/** ¿Es una receta propia (SPEC_v2 §6), de las que ya hacemos, sin video ni web? */
+/** ¿Es una receta propia (SPEC_v2 §6), de las que ya hacemos, sin video ni web? También vale para su fila de la bandeja. */
 export function esPropia(r) {
   return !!r && r.plataforma === 'manual';
 }
@@ -259,9 +259,8 @@ export function etiquetasFrecuentes(lista, n = 6) {
 export function resumenBandeja(bandeja) {
   const esperan = (bandeja || []).filter(b => b.estado === 'pendiente' || b.estado === 'procesando');
   const enAyuda = (bandeja || []).filter(b => b.estado === 'ayuda');
-  const propia = b => b.plataforma === 'manual';
   return { total: esperan.length + enAyuda.length, esperando: esperan.length, ayuda: enAyuda.length,
-    propias: esperan.filter(propia).length + enAyuda.filter(propia).length, propiasAyuda: enAyuda.filter(propia).length };
+    propias: esperan.filter(esPropia).length + enAyuda.filter(esPropia).length, propiasAyuda: enAyuda.filter(esPropia).length };
 }
 
 /** «1 link», «3 links», «1 receta nuestra», «2 recetas nuestras» o, si hay de los dos, «3 cosas». */

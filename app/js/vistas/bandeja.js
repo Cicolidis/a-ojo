@@ -5,6 +5,7 @@
 
 import { h, icono, foto, rellenar, urlSegura } from '../dom.js';
 import { fechaHora, nombreDe } from '../formato.js';
+import { esPropia } from '../datos.js';
 import { agruparBandeja, cuantasCapturas, descripcionLink } from '../bandeja.js';
 import { idAzar, nuevaCorreccion, nuevaEdicion } from '../ediciones.js';
 import { llamarApi } from '../api.js';
@@ -118,7 +119,6 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
   // Una fila con pedido es una receta que pidieron corregir («Algo está mal en esta receta»).
   const conPedido = fila => !!String(fila.pedido || '').trim();
   // Una fila de una receta propia (SPEC_v2 §6): no tiene link, tiene el texto que escribieron.
-  const esPropia = fila => fila.plataforma === 'manual';
   const describir = fila => {
     const receta = app.indice.porId.get(fila.receta_id);
     if (conPedido(fila)) return 'Corregir: ' + (receta ? receta.titulo : descripcionLink(fila));
@@ -184,6 +184,9 @@ export function montar(contenedor, { app, editar, avisar, guardarLink, sincroniz
             : h('a', { class: 'boton-secundario', href: '#/receta/' + fila.receta_id, 'aria-label': 'Cambiar el texto: ' + desc }, 'Cambiar el texto'),
           h('button', { type: 'button', class: 'boton-principal', 'data-foco': 'probar:' + fila.id, 'aria-label': 'Probar de nuevo: ' + desc,
             onclick: () => cambiarEstado(fila, 'pendiente', 'La Mac lo vuelve a intentar la próxima vez que corra.') }, 'Probar de nuevo')),
+        // Para sacarla de la Bandeja sin ordenarla: la receta queda con el nombre y se puede escribir de nuevo.
+        conPedido(fila) ? null : h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Dejarla sin ordenar: ' + desc,
+          onclick: () => cambiarEstado(fila, 'descartada', 'Queda sin ordenar. La podés escribir de nuevo desde la receta.') }, 'Dejarla sin ordenar'),
       ];
     } else {
       const entrada = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'solo-lector', 'data-foco': 'subir:' + fila.id,

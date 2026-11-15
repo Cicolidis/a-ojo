@@ -542,10 +542,19 @@ class TestObsidian(unittest.TestCase):
 
     def test_una_receta_propia_dice_receta_nuestra(self):
         texto = obsidian.nota_markdown({'id': 'r_milan', 'titulo': 'Milanesas', 'porciones': 2, 'plataforma': 'manual',
-                                        'fuente_url': '', 'origen_datos': 'texto'}, [], [], [])
+                                        'fuente_url': '', 'origen_datos': 'texto', 'confianza': 'baja'}, [], [], [])
         self.assertIn('Para 2 porciones · Receta nuestra\n', texto)
-        self.assertNotIn('Ver el video', texto)
+        self.assertNotIn('video', texto)
         self.assertIn('Salió de la receta que escribieron.', texto)
+        self.assertIn('revisá lo que escribieron', texto)
+        self.assertNotIn('## Ingredientes', texto, 'sin ordenar: sin encabezados vacíos')
+        self.assertNotIn('## Pasos', texto)
+
+    def test_actualizar_con_desde(self):
+        with mock.patch.object(api, 'llamar', return_value={'id': 'b_1', 'estado': 'ayuda', 'intentos': 1}) as llamar:
+            correr_api('actualizar', 'b_1', 'ayuda', '--motivo', 'No entendí la receta', '--desde', 'procesando')
+        llamar.assert_called_once_with('POST', 'bandeja.actualizar',
+                                       {'id': 'b_1', 'estado': 'ayuda', 'motivo': 'No entendí la receta', 'desde': 'procesando'})
 
     def test_una_porcion_en_singular(self):
         texto = obsidian.nota_markdown({'id': 'r_1', 'titulo': 'Huevo frito', 'porciones': 1}, [], [], [])

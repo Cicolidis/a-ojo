@@ -307,9 +307,10 @@ function accionRecetaUpsert_(req) {
     // Por link, solo si tiene: con el link vacío coincidiría con cualquier receta propia.
     if (!existente && v.clave) existente = recetas.filter(f => f.datos.fuente_url && claveDe_(f.datos.fuente_url) === v.clave)[0] || null;
 
-    // Una propia que reescribieron mientras la Mac la ordenaba: la fila ya no está `procesando`.
-    // La receta se guarda igual, pero la fila queda `pendiente` para ordenar el texto nuevo.
-    const reescrita = !!(propia && bandeja && bandeja.datos.estado !== 'procesando');
+    // Una propia que reescribieron mientras la Mac la ordenaba: receta.escribir la volvió a `pendiente`.
+    // La receta se guarda igual, pero la fila queda así para ordenar el texto nuevo. (Un reintento del
+    // upsert la encuentra `lista`, no `pendiente`: no cuenta como reescrita.)
+    const reescrita = !!(propia && bandeja && bandeja.datos.estado === 'pendiente');
     const resumen = Object.assign({ nueva: !existente, ingredientes: v.ingredientes.length, pasos: v.pasos.length },
       ecoPasos_(v));
     if (validar) {
@@ -864,7 +865,9 @@ function accionRecetaEscribir_(req) {
     const d = fila.datos;
     const yaEsta = d.texto === texto && ['pendiente', 'procesando', 'lista'].indexOf(d.estado) !== -1;
     if (!yaEsta) {
-      Object.assign(d, { texto: texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: ahora });
+      // `quien`: quién la escribió por última vez («Escrita por…» en la Bandeja).
+      Object.assign(d, { texto: texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: ahora },
+        quien ? { quien: quien } : {});
       escribirFila_('Bandeja', fila.fila, d);
     }
     return { bandeja_id: d.id, estado: d.estado };

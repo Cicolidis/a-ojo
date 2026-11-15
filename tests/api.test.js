@@ -1402,6 +1402,9 @@ test('receta.escribir deja el texto pendiente, no duplica al reintentar y se gua
   const fila = p.filas('Bandeja')[0];
   assert.deepEqual([fila.estado, fila.motivo, fila.intentos, fila.pedido], ['pendiente', '', 0, '']);
 
+  assert.equal(accion('receta.escribir', { id: 'r_tarta001', texto: 'Otra versión', bandeja_id: 'b_tarta001', quien: 'camilo' }).ok, true);
+  assert.equal(p.filas('Bandeja')[0].quien, 'camilo', 'quién la escribió por última vez');
+
   assert.equal(escribir(' ').error, 'sin_texto');
   assert.equal(escribir('x', 'c_nada0001').error, 'id_invalido');
   assert.equal(accion('receta.escribir', { id: 'r_nada0', texto: 'x', bandeja_id: 'b_nada0001' }).error, 'no_encontrada');
@@ -1458,6 +1461,9 @@ test('receta.upsert de una propia: sin link, conserva título, tipo y porciones,
   assert.equal(p.filas('Ingredientes').filter(i => i.receta_id === 'r_milanesa').length, 4);
   const fila = p.filas('Bandeja').find(b => b.id === 'b_milanesa');
   assert.deepEqual([fila.estado, fila.texto], ['lista', '4 milanesas…'], 'el texto queda para reescribirla');
+  const reintento = p.upsert(ordenada(), { bandeja_id: 'b_milanesa' });
+  assert.equal(reintento.data.reescrita, undefined, 'un reintento (la fila ya está lista) no cuenta como reescrita');
+  assert.equal(p.filas('Bandeja').find(b => b.id === 'b_milanesa').estado, 'lista');
   assert.equal(p.filas('Ingredientes').filter(i => i.receta_id === 'r_guiso001').length, 0, 'no pisó la otra propia');
   assert.equal(p.filas('Recetas').length, 2);
 

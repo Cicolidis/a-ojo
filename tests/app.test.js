@@ -1539,3 +1539,20 @@ test('rutas de las recetas propias: #/nueva y #/editar/:id', async () => {
   assert.equal(tituloDe({ nombre: 'nueva' }), 'Nueva receta · A ojo');
   assert.equal(tituloDe({ nombre: 'editar' }, { titulo: 'Milanesas' }), 'Editar la receta · Milanesas · A ojo');
 });
+
+test('la fila de una receta escrita es provisoria (local) hasta que la trae la API, y reescribirla cambia quién la escribió', async () => {
+  const { aplicarEdicion, nuevaReceta, nuevoTexto } = await cargar('ediciones.js');
+  const { aplicarDelta } = await cargar('datos.js');
+  const base = { version: 1, since: 'x', ultimaCompleta: 'x', recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] };
+  const crear = nuevaReceta({ titulo: 'Tarta', tipo: 'salado', porciones: 2, texto: 'Masa y acelga' }, 'camilo');
+  const datos = aplicarEdicion(base, crear);
+  assert.equal(datos.bandeja[0].local, true);
+  // El otro celular ya la había escrito: la API usó su fila. El delta la trae y la provisoria se va.
+  const deVerdad = Object.assign({}, datos.bandeja[0], { id: 'b_deLaura1', local: undefined, quien: 'pareja' });
+  delete deVerdad.local;
+  const despues = aplicarDelta(datos, { ahora: 'y', completo: false, recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [deVerdad] });
+  assert.deepEqual(despues.bandeja.map(b => b.id), ['b_deLaura1'], 'sin fila fantasma');
+
+  const reescrita = aplicarEdicion(despues, nuevoTexto(crear.datos.id, 'Masa, acelga y huevos', 'b_deLaura1', 'camilo'));
+  assert.equal(reescrita.bandeja[0].quien, 'camilo');
+});

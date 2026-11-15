@@ -186,7 +186,9 @@ async function editarFalsa(pedido, ahora) {
     }
     // Como la API: una propia sin ordenar (o con un texto esperando) se corrige cambiando el texto.
     const propia = todo.recetas.find(r => r.id === recetaId).plataforma === 'manual';
-    if (propia && String(cuerpo.texto || '').trim() && aplicarEdicion(todo, { id: 'x', accion: action, datos: cuerpo, creada: ahora }) === todo) {
+    const ordenada = (todo.ingredientes || []).some(i => i.receta_id === recetaId);
+    const esperaTexto = suya && !String(suya.pedido || '').trim() && (suya.estado === 'pendiente' || suya.estado === 'ayuda');
+    if (propia && String(cuerpo.texto || '').trim() && (!ordenada || esperaTexto)) {
       return { ok: false, error: 'texto_pendiente', mensaje: 'Esa receta todavía no está ordenada: cambiá el texto en lugar de pedir una corrección.', status: 409 };
     }
   }
@@ -210,7 +212,8 @@ async function editarFalsa(pedido, ahora) {
     // La fila que crearon o cambiaron receta.crear y receta.escribir llega en el próximo delta.
     if (action === 'receta.crear' || action === 'receta.escribir') {
       const antes = new Map(todo.bandeja.map(b => [b.id, b]));
-      datosFalsos.bandeja = datosFalsos.bandeja.map(b => (antes.get(b.id) === b ? b : Object.assign({}, b, { actualizado: ahora })));
+      // aplicarEdicion() la deja `local` (provisoria, en el celular): acá ya es la de la Sheet.
+      datosFalsos.bandeja = datosFalsos.bandeja.map(b => (antes.get(b.id) === b ? b : Object.assign({}, b, { local: undefined, actualizado: ahora })));
       const fila = datosFalsos.bandeja.find(b => b.id === cuerpo.bandeja_id) ||
         datosFalsos.bandeja.filter(b => b.receta_id === recetaId).sort((a, b) => String(b.creado).localeCompare(String(a.creado)))[0];
       console.log('API falsa: ' + action + ' ' + recetaId + (fila ? ' → ' + fila.id + ' ' + fila.estado : ''));

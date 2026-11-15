@@ -110,7 +110,7 @@ En la tabla de §4, el resultado de estas filas es `corregida` y en el motivo va
 
 La receta ya existe (la crearon en la app, con nombre, tipo y porciones) y tiene el texto que escribieron, como les salió («4 milanesas, 1 kg de papa, manteca y leche. Freír las milanesas…»). No hay nada para bajar: **no corras `fetch`** ni busques fotos.
 
-1. **Bajarla:** `procesamiento/aojo api receta <id>`. Deja la receta guardada en `<dir>/receta.json` (sin ingredientes ni pasos, o con los de la vez anterior si la reescribieron) y el texto en `<dir>/texto.txt`; los dos vienen también en la respuesta. Si el texto viene vacío, pasala a `ayuda` con «La receta está vacía. Escribila desde la receta.» y seguí con la próxima.
+1. **Bajarla:** `procesamiento/aojo api receta <id>`. Deja la receta guardada en `<dir>/receta.json` (sin ingredientes ni pasos, o con los de la vez anterior si la reescribieron) y el texto en `<dir>/texto.txt`; los dos vienen también en la respuesta. Si el texto viene vacío, pasala a `ayuda` con `api actualizar <id> ayuda --desde procesando --motivo "La receta está vacía. Escribila desde la receta."` y seguí con la próxima.
 2. **Ordenarla:** reescribí `receta.json` con Write a partir del texto, con todas las reglas de §3: rioplatense, voseo en los pasos, roles, secciones e ingredientes por paso. **Nunca inventes cantidades**: lo que el texto no dice («manteca y leche») queda `cantidad: null`, `unidad: "a ojo"`. Pasos que el texto no cuenta pero son obvios para que el plato salga (pelar las papas antes de hervirlas) se pueden sumar, y se cuentan en `notas_proceso`.
    - `titulo`, `tipo` y `porciones`: dejalos **vacíos** (`""` o `null`), salvo que el texto diga otros («para 6», «la tarta de la abuela»). La API conserva los que pusieron ellos.
    - `fuente_url` y `autor` vacíos, `foto` no hay. `origen_datos: ["texto"]`. `idioma_original`: el del texto (casi siempre `es`).
@@ -118,7 +118,9 @@ La receta ya existe (la crearon en la app, con nombre, tipo y porciones) y tiene
    - `notas_proceso`, para ellos: qué se dedujo o se completó («Las cantidades de la leche y la manteca no estaban: quedaron a ojo.»).
 3. **Relectura:** como en §1.3.3, pero contra el texto: cada dato del texto tiene que estar en `receta.json`.
 4. **Guardar:** `procesamiento/aojo api upsert <id> --sin-foto`. Si responde `reescrita: true`, la reescribieron mientras la ordenabas: la receta quedó guardada, pero la fila vuelve a `pendiente` para ordenar el texto nuevo en la próxima corrida. Contalo en la tabla.
-5. Si el texto **no es una receta** o no se entiende qué lleva: `api actualizar <id> ayuda --motivo "No entendí la receta: <por qué, en una línea>. Cambiá el texto desde la receta."`
+5. Si el texto **no es una receta** o no se entiende qué lleva: `api actualizar <id> ayuda --desde procesando --motivo "No entendí la receta: <por qué, en una línea>. Cambiá el texto desde la receta."`
+
+Con `--desde procesando`, si mientras tanto reescribieron el texto la API responde `estado_cambio` y no la toca: queda para la próxima corrida con el texto nuevo. Decilo en la tabla y seguí con la próxima.
 
 En la tabla de §4, el resultado es `lista` y las capas, `texto`.
 

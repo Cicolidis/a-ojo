@@ -36,6 +36,10 @@ CAPAS = {'descripcion': 'la descripción del video', 'subtitulos': 'los subtítu
 CONFIANZA = {'alta': 'Los datos están completos: salieron del texto, los subtítulos o un audio claro.',
              'media': 'Hubo que estimar algunos pasos o completar algo por contexto.',
              'baja': 'Faltan cantidades importantes: mirá el video antes de empezar.'}
+# Una receta propia salió de lo que escribieron: no hay video (como CONFIANZA_PROPIA de la ficha).
+CONFIANZA_PROPIA = {'alta': 'Los datos están completos: salieron de lo que escribieron.',
+                    'media': 'Hubo que completar algo por contexto: lo que no estaba quedó «a ojo».',
+                    'baja': 'Faltan cantidades importantes: revisá lo que escribieron antes de empezar.'}
 ESTADOS = {'para_probar': 'para probar', 'probada': 'probada', 'favorita': 'favorita', 'descartada': 'descartada'}
 AVISO = '> [!info] Exportada de A ojo\n> Esta nota se reescribe cada vez que se exporta: lo que cambies acá se pierde. Editá la receta en la app.'
 
@@ -210,7 +214,9 @@ def nota_markdown(receta, ingredientes, pasos, notas):
         s[rol_de(ing)].append(ing)
     if '' in secciones:
         secciones = {'': secciones.pop(''), **secciones}
-    lineas.append('## Ingredientes')
+    # Una receta propia sin ordenar todavía no tiene ingredientes ni pasos: sin encabezados vacíos.
+    if ingredientes:
+        lineas.append('## Ingredientes')
     for nombre, s in secciones.items():
         if nombre and len(secciones) > 1:
             lineas += ['', f'### {nombre}']
@@ -223,7 +229,8 @@ def nota_markdown(receta, ingredientes, pasos, notas):
         texto = unir_con_y(i.get('nombre', '') + detalle(i) for i in utensilios)
         lineas += ['', 'También vas a necesitar: ' + texto[:1].lower() + texto[1:] + '.']
 
-    lineas += ['', '## Pasos']
+    if pasos:
+        lineas += ['', '## Pasos']
     for n, paso in enumerate(sorted(pasos, key=lambda p: p.get('orden') or 0), 1):
         lineas.append(f'{n}. {str(paso.get("texto") or "").strip()}')
         if str(paso.get('tip') or '').strip():
@@ -238,7 +245,8 @@ def nota_markdown(receta, ingredientes, pasos, notas):
             lineas.append(f'- **{quien} · {fecha(x.get("fecha"))}:** {texto}')
 
     origen = texto_origen(receta.get('origen_datos'))
-    armado = [x for x in (f'Salió de {origen}.' if origen else '', CONFIANZA.get(receta.get('confianza'), ''),
+    confianza = (CONFIANZA_PROPIA if receta.get('plataforma') == 'manual' else CONFIANZA).get(receta.get('confianza'), '')
+    armado = [x for x in (f'Salió de {origen}.' if origen else '', confianza,
                           str(receta.get('notas_proceso') or '').strip()) if x]
     if armado:
         lineas += ['', '## Cómo se armó', '', '\n\n'.join(armado)]

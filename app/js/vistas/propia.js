@@ -35,8 +35,14 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
   let tocoPorciones = false;
   let guardada = false;
 
+  // Al crear, Enter en el nombre pasa a «La receta» (como dice la tecla) en lugar de guardar.
   const nombre = h('input', { type: 'text', id: 'nombre-receta', maxlength: String(MAX_NOMBRE), autocomplete: 'off',
-    enterkeyhint: 'next', placeholder: 'Ej.: Milanesas con puré', oninput: () => marcarError(false) });
+    enterkeyhint: crear ? 'next' : 'done', placeholder: 'Ej.: Milanesas con puré', oninput: () => marcarError(false),
+    onkeydown: e => {
+      if (!crear || e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      texto.focus();
+    } });
   if (r) nombre.value = r.titulo || '';
   const error = h('p', { class: 'error-campo', id: 'error-nombre', role: 'alert', hidden: true }, 'Poné un nombre para guardarla.');
   const marcarError = conError => {
@@ -59,6 +65,8 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
 
   const guardar = e => {
     e.preventDefault();
+    // Un segundo toque mientras la pantalla cambia no crea otra receta.
+    if (guardada) return;
     const titulo = nombre.value.replace(/\s+/g, ' ').trim();
     if (!titulo) {
       marcarError(true);
@@ -78,6 +86,8 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
     if (tipo !== r.tipo) cambios.tipo = tipo;
     if (tocoPorciones && porciones !== Number(r.porciones)) cambios.porciones = porciones;
     if (Object.keys(cambios).length) editar(nuevaEdicion('receta.editar', Object.assign({ id }, cambios)));
+    // Con otro rinde, la ficha vuelve a abrir en él (no en las porciones que se estaban viendo).
+    if ('porciones' in cambios) app.porciones.delete(id);
     volver(destino);
     if (Object.keys(cambios).length) avisar('✓ Cambios guardados');
   };
