@@ -7,7 +7,8 @@
  */
 
 const ENUMS = {
-  plataforma: ['youtube', 'instagram', 'web', 'otro'],
+  // manual: una receta propia (SPEC_v2 §6), sin link.
+  plataforma: ['youtube', 'instagram', 'web', 'otro', 'manual'],
   quien: ['camilo', 'pareja'],
   estadoBandeja: ['pendiente', 'procesando', 'lista', 'ayuda', 'descartada'],
   tipo: ['dulce', 'salado', 'sopa', 'bebida', 'otro'],
@@ -16,7 +17,8 @@ const ENUMS = {
   unidad: ['g', 'kg', 'ml', 'l', 'u', 'cda', 'cdita', 'taza', 'pizca', 'a ojo', 'lata', 'paquete', 'diente', 'ramo'],
   gondola: ['verdulería', 'almacén', 'lácteos y huevos', 'carnicería', 'panadería', 'congelados', 'otros'],
   // Capas de §6.1 que pueden aparecer en Recetas.origen_datos.
-  capa: ['descripcion', 'subtitulos', 'web', 'audio', 'frames', 'capturas'],
+  // texto: la receta que escribieron ellos (una receta propia).
+  capa: ['descripcion', 'subtitulos', 'web', 'audio', 'frames', 'capturas', 'texto'],
   // Rol de un ingrediente en la receta: lo infaltable, lo que da sabor, lo que se puede saltear y lo que no se come.
   rol: ['principal', 'condimento', 'opcional', 'utensilio'],
   // Dónde se compra cada cosa (§7.2). El supermercado incluye al chino.
@@ -65,6 +67,9 @@ const ESQUEMA = {
       // «Algo está mal en esta receta»: lo que pidieron corregir desde la app (receta.corregir).
       // /recetas lo lee como instrucción; se vacía cuando la fila vuelve a quedar `lista`.
       col_('pedido'),
+      // Una receta propia (plataforma manual): la receta escrita en la app, para que /recetas la ordene.
+      // Queda aunque la fila pase a `lista`: es lo que se carga al reescribirla.
+      col_('texto'),
     ],
   },
   Recetas: {

@@ -79,7 +79,7 @@ let cortadaHasta = 0;
 let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
   'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir', 'nota.editar', 'nota.borrar',
-  'despensa.sumar', 'despensa.quitar'];
+  'despensa.sumar', 'despensa.quitar', 'receta.crear', 'receta.editar', 'receta.escribir'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -144,8 +144,12 @@ async function editarFalsa(pedido, ahora) {
   const recetaId = action === 'nota.agregar' || action === 'compras.agregar' ? cuerpo.receta_id
     : action.startsWith('receta.') ? cuerpo.id : '';
   const todo = datos();
-  if (recetaId && !todo.recetas.some(r => r.id === recetaId)) {
+  // receta.crear es la única de receta.* que llega antes de que la receta exista.
+  if (recetaId && action !== 'receta.crear' && !todo.recetas.some(r => r.id === recetaId)) {
     return { ok: false, error: 'no_encontrada', mensaje: 'No encontré la receta «' + recetaId + '».', status: 404 };
+  }
+  if ((action === 'receta.editar' || action === 'receta.escribir') && todo.recetas.find(r => r.id === recetaId).plataforma !== 'manual') {
+    return { ok: false, error: 'no_propia', mensaje: 'Solo las recetas nuestras se editan o escriben en la app.', status: 400 };
   }
   if (action === 'bandeja.actualizar') {
     const fila = todo.bandeja.find(b => b.id === cuerpo.id);
@@ -184,6 +188,15 @@ async function editarFalsa(pedido, ahora) {
     datosFalsos.notas = datosFalsos.notas.map(n => (n.id === cuerpo.id && !n.creado ? Object.assign({}, n, { creado: ahora }) : n));
   } else if (action.startsWith('receta.')) {
     datosFalsos.recetas = tocar(datosFalsos.recetas, recetaId, { actualizado: ahora });
+    // La fila que crearon o cambiaron receta.crear y receta.escribir llega en el próximo delta.
+    if (action === 'receta.crear' || action === 'receta.escribir') {
+      const antes = new Map(todo.bandeja.map(b => [b.id, b]));
+      datosFalsos.bandeja = datosFalsos.bandeja.map(b => (antes.get(b.id) === b ? b : Object.assign({}, b, { actualizado: ahora })));
+      const fila = datosFalsos.bandeja.find(b => b.id === cuerpo.bandeja_id) ||
+        datosFalsos.bandeja.filter(b => b.receta_id === recetaId).sort((a, b) => String(b.creado).localeCompare(String(a.creado)))[0];
+      console.log('API falsa: ' + action + ' ' + recetaId + (fila ? ' → ' + fila.id + ' ' + fila.estado : ''));
+      return { ok: true, data: { id: recetaId, bandeja_id: fila ? fila.id : null } };
+    }
   } else if (action === 'bandeja.actualizar') {
     datosFalsos.bandeja = tocar(datosFalsos.bandeja, cuerpo.id, { actualizado: ahora });
   } else if (action === 'compras.agregar') {

@@ -81,15 +81,17 @@ Todas idempotentes, con su caso en `aplicarEdicion()` y su test, como pide `CLAU
 | POST | `plan.quitar` | `{ids}` | `{quitados}` |
 | POST | `despensa.sumar` | `{items: [{id, nombre}], quien}` | `{ids, nuevos}`. Los que ya estaban (por id o por nombre, también dentro del mismo pedido) no se tocan |
 | POST | `despensa.quitar` | `{ids}` | `{quitados}` |
-| POST | `receta.crear` | `{id, titulo, tipo, porciones?, texto?, bandeja_id?, quien}` | `{id, bandeja_id?}`. Crea una receta propia (`plataforma = manual`). Con `texto`, también la fila de la bandeja (`pendiente`) para que `/recetas` la ordene. Los ids los genera la app |
+| POST | `receta.crear` | `{id, titulo, tipo, porciones?, texto?, bandeja_id?, quien}` | `{id, bandeja_id?}`. Crea una receta propia (`plataforma = manual`). Con `texto`, también la fila de la bandeja (`pendiente`) para que `/recetas` la ordene. Los ids los genera la app. Si la receta ya existe (un reintento), no la toca, pero suma la fila si faltaba |
 | POST | `receta.editar` | `{id, titulo?, tipo?, porciones?}` | `{id}`. Solo para recetas propias: las demás las cambia `/recetas` |
-| POST | `receta.escribir` | `{id, texto, bandeja_id}` | `{bandeja_id}`. Escribe (o reescribe) el texto de una receta propia y la deja `pendiente` en la bandeja |
+| POST | `receta.escribir` | `{id, texto, bandeja_id, quien?}` | `{bandeja_id}`. Escribe (o reescribe) el texto de una receta propia y la deja `pendiente` en la bandeja, en su fila (o en una nueva con `bandeja_id`). Reescribir vacía el pedido de corrección. Si la Mac la está ordenando, el texto se guarda igual y queda para la corrida siguiente |
 
 `todo` suma `plan` y `despensa` a su respuesta, siempre enteras.
 
 Cambios en acciones que ya existen:
 - `receta.upsert` acepta una receta sin `fuente_url` cuando la receta guardada (por `id` o por el `receta_id` de la fila) es propia; conserva `plataforma = manual` y el título que le pusieron ellos, salvo que el texto diga otro nombre.
-- «Algo está mal» (`receta.corregir`) en una receta propia usa su fila de la bandeja (o la crea, sin link): `/recetas` corrige sobre el texto y la receta guardada.
+- «Algo está mal» (`receta.corregir`) en una receta propia usa su fila de la bandeja (o la crea, sin link): `/recetas` corrige sobre el texto y la receta guardada. Si todavía no está ordenada o espera un texto nuevo, responde 409 (`texto_pendiente`): ahí se cambia el texto.
+- `receta.upsert` de una propia conserva el título, el tipo y las porciones si vienen vacíos; si la reescribieron mientras la Mac la ordenaba, guarda la receta pero la fila queda `pendiente`, para ordenar el texto nuevo.
+- Una receta propia nunca se busca ni se deduplica por link: no tiene.
 
 ---
 
@@ -150,14 +152,15 @@ Los platos que ya hacemos, sin video ni web: se cargan rápido para ponerlos en 
 
 ### 6.1 Crear
 - **«Nueva receta»** en la Biblioteca (al lado del buscador) y **«Una receta nuestra»** en el buscador de recetas del plan.
-- Un formulario corto: **nombre** (obligatorio), **porciones** (−/+, por defecto 4), **tipo** (dulce, salado, sopa, bebida, otro) y, opcional, **«La receta»**: un campo de texto libre donde se escribe como salga («4 milanesas, 1 kg de papa, manteca y leche. Freír las milanesas…»).
+- Un formulario corto: **nombre** (obligatorio), **porciones** (−/+, por defecto 2), **tipo** (dulce, salado, sopa, bebida, otro; arranca en salado) y, opcional, **«La receta»**: un campo de texto libre donde se escribe como salga («4 milanesas, 1 kg de papa, manteca y leche. Freír las milanesas…»).
 - Al guardar, la receta existe enseguida (va por la cola, también sin conexión). Desde el plan, queda puesta en la comida donde se tocó «+».
 
 ### 6.2 Cómo se ve
 - En la Biblioteca y en la ficha, en lugar del autor dice **«Receta nuestra»**. Un chip de filtro «Nuestras» aparece si hay alguna.
 - Sin ingredientes, la ficha muestra «Todavía no escribieron esta receta» con **«Escribir la receta»** (el mismo campo de texto), y no ofrece «Agregar a compras» ni «Empezar a cocinar» (§7.2 de la v1).
 - Con el texto escrito y todavía sin procesar: «La Mac la va a ordenar en la próxima corrida», y el texto se ve tal cual, para cocinar igual.
-- «Editar» (solo en las propias) cambia el nombre, el tipo y las porciones. Los ingredientes y los pasos se corrigen como cualquier receta: «Algo está mal» o reescribiendo el texto.
+- «Editar» (solo en las propias) cambia el nombre, el tipo y cuánto rinde («Rinde: para cuántas porciones son las cantidades de la receta»; para cocinar para otras está el −/+ de la ficha). Los ingredientes y los pasos se corrigen como cualquier receta: «Algo está mal» (solo en las ya ordenadas) o reescribiendo el texto.
+- Una creada por error se descarta, como cualquier receta.
 
 ### 6.3 En `/recetas`
 - Una fila con `plataforma = manual` no baja nada: su única capa es `texto`. Se estructura con las mismas reglas de §6.2 de la v1 (rioplatense, voseo en los pasos, **nunca inventar cantidades**, roles, secciones e ingredientes por paso) y se manda con `receta.upsert` sobre la receta que ya existe.
@@ -270,6 +273,7 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
 - **Despensa (Fase 9):** «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa.
+- **Recetas propias (Fase 10a, 15/11):** arrancan en 2 porciones y como saladas, sin foto. En «Editar», las porciones se llaman «Rinde». No se borran: se descartan.
 - **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
 **Supuestos de este borrador, para revisar antes de empezar:**
@@ -279,4 +283,3 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - El historial del plan se guarda 26 semanas (medio año).
 - Al repetir sobre una semana que ya tiene algo, se pregunta si reemplazar o sumar.
 - «Usar como modelo» trae todos los platos, aunque alguno ya esté en la semana de destino.
-- Las recetas propias arrancan en 4 porciones y sin foto.

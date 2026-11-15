@@ -202,8 +202,8 @@ test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   p.ctx.setup();
   assert.equal(p.propiedades.get('TOKEN'), token, 'no cambia el token');
   const bandeja = p.planilla.getSheetByName('Bandeja');
-  assert.equal(bandeja.getLastColumn(), 13);
-  assert.equal(bandeja.getRange(1, 13).getValues()[0][0], 'apodo');
+  assert.equal(bandeja.getLastColumn(), 14);
+  assert.equal(bandeja.getRange(1, 14).getValues()[0][0], 'apodo');
   assert.equal(p.filas('Bandeja').length, 1);
 });
 
@@ -1277,4 +1277,156 @@ test('nota.editar y nota.borrar: idempotentes, y el cambio llega en el delta', a
   const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   sh.getRange(1, enc.indexOf('borrada') + 1).setValues([['']]);
   assert.equal(p.postJson({ action: 'nota.borrar', t: p.token, id }).error, 'falta_columna');
+});
+
+// Recetas propias (SPEC_v2 §6).
+
+/** Quita una columna de una hoja, como en una Sheet a la que todavía no se le corrió setup(). */
+function sinColumna(p, hoja, columna) {
+  const sh = p.planilla.getSheetByName(hoja);
+  const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  sh.getRange(1, enc.indexOf(columna) + 1).setValues([['']]);
+}
+
+test('receta.crear: una propia sin link, con su fila de la bandeja si viene escrita, sin duplicar al reintentar', async () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+
+  const sola = accion('receta.crear', { id: 'r_milanesa', titulo: '  Milanesas  con puré ', tipo: 'salado', porciones: 2, quien: 'pareja' });
+  assert.equal(sola.ok, true, sola.mensaje);
+  assert.deepEqual(sola.data, { id: 'r_milanesa', bandeja_id: null, repetida: false });
+  const r = p.filas('Recetas').find(x => x.id === 'r_milanesa');
+  assert.deepEqual([r.titulo, r.tipo, r.porciones, r.plataforma, r.fuente_url, r.autor, r.estado, r.confianza, r.origen_datos],
+    ['Milanesas con puré', 'salado', 2, 'manual', '', '', 'para_probar', '', '']);
+  assert.equal(p.filas('Bandeja').length, 0, 'sin texto no hay nada para ordenar');
+
+  const texto = '4 milanesas, 1 kg de papa,\n  manteca y leche.   \n\n\n\nFreír las milanesas.';
+  const conTexto = { id: 'r_guiso001', titulo: 'Guiso de lentejas', tipo: 'salado', texto, bandeja_id: 'b_guiso001', quien: 'camilo' };
+  assert.deepEqual(accion('receta.crear', conTexto).data, { id: 'r_guiso001', bandeja_id: 'b_guiso001', repetida: false });
+  const fila = p.filas('Bandeja').find(b => b.id === 'b_guiso001');
+  assert.deepEqual([fila.url, fila.plataforma, fila.estado, fila.receta_id, fila.quien, fila.intentos],
+    ['', 'manual', 'pendiente', 'r_guiso001', 'camilo', 0]);
+  assert.equal(fila.texto, '4 milanesas, 1 kg de papa,\n  manteca y leche.\n\nFreír las milanesas.', 'conserva los renglones');
+  assert.equal(p.get({ action: 'bandeja.pendientes', t: p.token }).data.filas.length, 1, '/recetas la ve');
+
+  // Un reintento (la respuesta se perdió) no duplica nada ni pisa lo editado mientras tanto.
+  accion('receta.editar', { id: 'r_guiso001', titulo: 'Guiso de la abuela' });
+  assert.equal(accion('receta.crear', conTexto).data.repetida, true);
+  assert.equal(p.filas('Recetas').filter(x => x.id === 'r_guiso001').length, 1);
+  assert.equal(p.filas('Recetas').find(x => x.id === 'r_guiso001').titulo, 'Guiso de la abuela');
+  assert.equal(p.filas('Bandeja').length, 1);
+
+  // Un intento cortado entre las dos escrituras: el reintento crea la fila que faltaba.
+  accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado' });
+  const r2 = accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', texto: 'Masa y acelga', bandeja_id: 'b_tarta001' });
+  assert.equal(r2.data.repetida, true);
+  assert.equal(p.filas('Bandeja').find(b => b.id === 'b_tarta001').texto, 'Masa y acelga');
+
+  // Dos con el mismo título se permiten (no hay link para deduplicar).
+  assert.equal(accion('receta.crear', { id: 'r_milanes2', titulo: 'Milanesas con puré', tipo: 'salado' }).ok, true);
+
+  const delta = p.get({ action: 'todo', t: p.token, since: desde }).data;
+  assert.deepEqual(delta.recetas.map(x => x.id).sort(), ['r_guiso001', 'r_milanes2', 'r_milanesa', 'r_tarta001']);
+  assert.deepEqual(delta.bandeja.map(b => b.id).sort(), ['b_guiso001', 'b_tarta001']);
+  assert.equal(delta.bandeja.find(b => b.id === 'b_guiso001').texto.startsWith('4 milanesas'), true);
+});
+
+test('receta.crear valida y no usa ids de otros', () => {
+  const p = proyecto();
+  const accion = cuerpo => p.postJson(Object.assign({ action: 'receta.crear', t: p.token, id: 'r_nueva001', titulo: 'Tarta', tipo: 'salado' }, cuerpo));
+  const malo = accion({ id: 'x', titulo: ' ', tipo: 'picante', porciones: 0 });
+  assert.equal(malo.error, 'receta_invalida');
+  assert.equal(malo.detalles.length, 4, 'junta todos los errores: ' + malo.mensaje);
+  assert.equal(accion({ titulo: 'x'.repeat(81) }).error, 'receta_invalida');
+  assert.equal(accion({ texto: 'algo' }).error, 'receta_invalida', 'con texto hace falta bandeja_id');
+  assert.equal(accion({ texto: 'x'.repeat(5001), bandeja_id: 'b_nueva001' }).error, 'receta_invalida');
+  assert.equal(accion({ quien: 'otra' }).error, 'quien_invalido');
+  assert.equal(p.filas('Recetas').length, 0);
+
+  const deLink = p.upsert(receta()).data.id;
+  assert.equal(accion({ id: deLink }).status, 409, 'el id es de una receta de link');
+  const id = p.capturar('https://youtu.be/cyTOswdJ4TY').data.id;
+  assert.equal(accion({ texto: 'algo', bandeja_id: id }).status, 409, 'la fila es de otra cosa');
+  assert.equal(p.filas('Recetas').length, 1);
+});
+
+test('receta.editar cambia nombre, tipo y porciones solo de las propias', async () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', porciones: 2 });
+  const desde = p.get({ action: 'todo', t: p.token }).data.ahora;
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(p.get({ action: 'todo', t: p.token, since: desde }).data.recetas.length, 0);
+
+  const r = accion('receta.editar', { id: 'r_tarta001', titulo: 'Tarta de acelga', porciones: 6 });
+  assert.deepEqual(r.data, { id: 'r_tarta001', titulo: 'Tarta de acelga', tipo: 'salado', porciones: 6 });
+  assert.deepEqual(p.get({ action: 'todo', t: p.token, since: desde }).data.recetas.map(x => x.titulo), ['Tarta de acelga']);
+  const antes = p.filas('Recetas')[0].actualizado;
+  await new Promise(r => setTimeout(r, 5));
+  accion('receta.editar', { id: 'r_tarta001', titulo: 'Tarta de acelga', porciones: 6 });
+  assert.equal(p.filas('Recetas')[0].actualizado, antes, 'sin cambios no escribe');
+
+  assert.equal(accion('receta.editar', { id: 'r_tarta001' }).error, 'receta_invalida');
+  assert.equal(accion('receta.editar', { id: 'r_tarta001', tipo: 'picante' }).error, 'receta_invalida');
+  assert.equal(accion('receta.editar', { id: 'r_nada0', titulo: 'x' }).error, 'no_encontrada');
+  const deLink = p.upsert(receta()).data.id;
+  assert.equal(accion('receta.editar', { id: deLink, titulo: 'Otro' }).error, 'no_propia');
+});
+
+test('receta.escribir deja el texto pendiente, no duplica al reintentar y se guarda aunque la Mac la esté ordenando', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado' });
+  const escribir = (texto, bandeja_id = 'b_tarta001') => accion('receta.escribir', { id: 'r_tarta001', texto, bandeja_id, quien: 'pareja' });
+
+  assert.deepEqual(escribir('Masa, acelga y huevos').data, { bandeja_id: 'b_tarta001', estado: 'pendiente' });
+  assert.deepEqual(escribir('Masa, acelga y huevos').data, { bandeja_id: 'b_tarta001', estado: 'pendiente' });
+  assert.equal(p.filas('Bandeja').length, 1);
+  assert.equal(p.filas('Bandeja')[0].quien, 'pareja');
+
+  // Con otro bandeja_id (otro celular), usa la fila que ya tiene la receta.
+  assert.equal(escribir('Masa, acelga, huevos y queso', 'b_otrocel1').data.bandeja_id, 'b_tarta001');
+  assert.equal(p.filas('Bandeja').length, 1);
+
+  // La Mac la toma; mientras tanto la reescriben: el texto queda y la fila vuelve a pendiente.
+  accion('bandeja.tomar', { id: 'b_tarta001' });
+  assert.equal(escribir('Masa, acelga, huevos y queso').data.estado, 'procesando', 'el mismo texto: no la toca');
+  assert.equal(escribir('Masa, acelga, huevos, queso y cebolla').data.estado, 'pendiente');
+  assert.equal(p.filas('Bandeja')[0].texto, 'Masa, acelga, huevos, queso y cebolla');
+
+  // Una que necesitaba ayuda: reescribirla la devuelve a la cola, sin el pedido ni el motivo.
+  p.editar('Bandeja', 'b_tarta001', { estado: 'ayuda', motivo: 'No entendí la receta', intentos: 3, pedido: 'algo' });
+  escribir('Masa, acelga, huevos, queso y cebolla');
+  const fila = p.filas('Bandeja')[0];
+  assert.deepEqual([fila.estado, fila.motivo, fila.intentos, fila.pedido], ['pendiente', '', 0, '']);
+
+  assert.equal(escribir(' ').error, 'sin_texto');
+  assert.equal(escribir('x', 'c_nada0001').error, 'id_invalido');
+  assert.equal(accion('receta.escribir', { id: 'r_nada0', texto: 'x', bandeja_id: 'b_nada0001' }).error, 'no_encontrada');
+  const deLink = p.upsert(receta()).data.id;
+  assert.equal(accion('receta.escribir', { id: deLink, texto: 'x', bandeja_id: 'b_nada0001' }).error, 'no_propia');
+  accion('receta.crear', { id: 'r_otra0001', titulo: 'Otra', tipo: 'dulce' });
+  assert.equal(accion('receta.escribir', { id: 'r_otra0001', texto: 'x', bandeja_id: 'b_tarta001' }).status, 409, 'la fila es de otra receta');
+});
+
+test('receta.crear con texto y receta.escribir piden setup() antes de escribir nada', () => {
+  const p = proyecto();
+  sinColumna(p, 'Bandeja', 'texto');
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const r = accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', texto: 'Masa', bandeja_id: 'b_tarta001' });
+  assert.deepEqual([r.status, r.error], [500, 'falta_columna']);
+  assert.equal(p.filas('Recetas').length, 0, 'no quedó la receta a medias');
+  // Lo que usa el smoke: escribir sobre una receta que no existe avisa primero de la columna.
+  assert.equal(accion('receta.escribir', { id: 'r_nada0', texto: 'x', bandeja_id: 'b_nada0001' }).error, 'falta_columna');
+});
+
+test('bandeja.actualizar con desde: el aviso de una fila de receta propia no habla de links', () => {
+  const p = proyecto();
+  p.postJson({ action: 'receta.crear', t: p.token, id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', texto: 'Masa', bandeja_id: 'b_tarta001' });
+  p.editar('Bandeja', 'b_tarta001', { estado: 'lista' });
+  const r = p.postJson({ action: 'bandeja.actualizar', t: p.token, id: 'b_tarta001', estado: 'pendiente', desde: 'ayuda' });
+  assert.equal(r.status, 409);
+  assert.equal(r.mensaje, 'Esa receta ya está ordenada: no la cambié.');
 });

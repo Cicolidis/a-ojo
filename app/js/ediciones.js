@@ -6,7 +6,7 @@
 
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
 import { claveIngrediente, mismoNombre } from './compras.js';
-import { extraerLink, mismoLink, plataformaDe, unirPedido } from './bandeja.js';
+import { extraerLink, filaDeReceta, mismoLink, plataformaDe, unirPedido } from './bandeja.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -56,6 +56,51 @@ export function nuevaCorreccion(recetaId, texto, quien, ahora = new Date()) {
   return nuevaEdicion('receta.corregir', { id: recetaId, texto: unaLinea(texto), quien }, ahora);
 }
 
+// Recetas propias (SPEC_v2 §6): las crea la app, con sus ids, y /recetas las ordena desde el texto.
+
+/** La receta escrita, con sus renglones: como textoPropio_ de la API. */
+export function textoPropio(v) {
+  return String(v ?? '').replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** El nombre de una receta propia, en una línea y sin espacios de más. */
+const tituloPropio = v => unaLinea(v).replace(/\s+/g, ' ');
+
+/**
+ * Edición para crear una receta propia: { titulo, tipo, porciones, texto? }. Genera el id de la
+ * receta y, si viene escrita, el de su fila de la bandeja (los mismos que va a usar la API).
+ */
+export function nuevaReceta({ titulo, tipo, porciones, texto }, quien, ahora = new Date()) {
+  const escrita = textoPropio(texto);
+  return nuevaEdicion('receta.crear', Object.assign(
+    { id: idAzar('r'), titulo: tituloPropio(titulo), tipo, porciones: porciones ?? null, quien },
+    escrita ? { texto: escrita, bandeja_id: idAzar('b') } : {}), ahora);
+}
+
+/**
+ * Edición para escribir (o reescribir) el texto de una receta propia. `filaId`: la fila que ya
+ * tiene en la bandeja, si se sabe. Solo se manda un id b_… (una fila provisoria e_… no le sirve a la API).
+ */
+export function nuevoTexto(recetaId, texto, filaId, quien, ahora = new Date()) {
+  const bandejaId = /^b_[0-9a-z]{5,12}$/.test(String(filaId || '')) ? filaId : idAzar('b');
+  return nuevaEdicion('receta.escribir', { id: recetaId, texto: textoPropio(texto), bandeja_id: bandejaId, quien }, ahora);
+}
+
+function recetaPropia(d, cuando) {
+  return {
+    id: d.id, titulo: tituloPropio(d.titulo), tipo: d.tipo, etiquetas: '', estado: 'para_probar', valoracion: 0,
+    porciones: d.porciones ?? null, tiempo_min: null, molde: '', autor: '', fuente_url: '', plataforma: 'manual',
+    foto_url: '', confianza: '', origen_datos: '', idioma_original: 'es', creado: cuando, actualizado: cuando,
+    notas_proceso: '', porciones_vistas: '',
+  };
+}
+
+function filaPropia(id, recetaId, quien, texto, cuando) {
+  return { id, creado: cuando, url: '', plataforma: 'manual', quien: quien || '', estado: 'pendiente', motivo: '',
+    receta_id: recetaId, intentos: 0, actualizado: cuando, capturas: '', pedido: '', texto };
+}
+
 /** Aplica una edición a los datos locales, como lo haría la API. Devuelve datos nuevos; aplicarla dos veces da lo mismo. */
 export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
   if (!datos) return datos;
@@ -74,6 +119,44 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
         if (d.valoracion !== undefined && d.valoracion !== null) c.valoracion = d.valoracion;
         return c;
       });
+    case 'receta.crear': {
+      // Como la API: si la receta ya está (un reintento), no se toca; si falta su fila, se suma.
+      const recetas = datos.recetas || [];
+      const ya = recetas.find(r => r.id === d.id);
+      if (ya && ya.plataforma !== 'manual') return datos;
+      const cuando = creada || new Date().toISOString();
+      const conReceta = ya ? datos : Object.assign({}, datos, { recetas: recetas.concat(recetaPropia(d, cuando)) });
+      const texto = textoPropio(d.texto);
+      const bandeja = conReceta.bandeja || [];
+      if (!texto || !d.bandeja_id || bandeja.some(b => b.id === d.bandeja_id)) return conReceta;
+      return Object.assign({}, conReceta, { bandeja: bandeja.concat(filaPropia(d.bandeja_id, d.id, d.quien, texto, cuando)) });
+    }
+    case 'receta.editar': {
+      const receta = (datos.recetas || []).find(r => r.id === d.id);
+      if (!receta || receta.plataforma !== 'manual') return datos;
+      const c = {};
+      if (tituloPropio(d.titulo)) c.titulo = tituloPropio(d.titulo);
+      if (d.tipo) c.tipo = d.tipo;
+      if (d.porciones !== undefined && d.porciones !== null && d.porciones !== '') c.porciones = Number(d.porciones);
+      return enReceta(() => c);
+    }
+    case 'receta.escribir': {
+      // Como la API: la fila pedida, o la más nueva de la receta, o una nueva; con el mismo texto no cambia.
+      const receta = (datos.recetas || []).find(r => r.id === d.id);
+      const texto = textoPropio(d.texto);
+      if (!receta || receta.plataforma !== 'manual' || !texto) return datos;
+      const bandeja = datos.bandeja || [];
+      const pedida = bandeja.find(b => b.id === d.bandeja_id);
+      if (pedida && pedida.receta_id !== d.id) return datos;
+      const fila = pedida || filaDeReceta(bandeja, d.id);
+      const cuando = creada || new Date().toISOString();
+      if (!fila) return Object.assign({}, datos, { bandeja: bandeja.concat(filaPropia(d.bandeja_id, d.id, d.quien, texto, cuando)) });
+      if (fila.texto === texto && ['pendiente', 'procesando', 'lista'].includes(fila.estado)) return datos;
+      return Object.assign({}, datos, {
+        bandeja: bandeja.map(b => (b === fila
+          ? Object.assign({}, b, { texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: cuando }) : b)),
+      });
+    }
     case 'receta.porciones':
       return enReceta(r => ({ porciones_vistas: nuevasVistas(r.porciones_vistas, d.porciones, d.quitar) }));
     case 'receta.ingredientes': {

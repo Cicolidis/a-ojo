@@ -150,9 +150,14 @@ export function filaDelLink(bandeja, url) {
  * receta, o null. Si hubiera varias filas de la receta, cuenta la más nueva, como en la API.
  */
 export function pedidoDe(bandeja, recetaId) {
-  const fila = (bandeja || []).filter(b => b.receta_id === recetaId)
-    .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
+  const fila = filaDeReceta(bandeja, recetaId);
   return fila && String(fila.pedido || '').trim() ? fila : null;
+}
+
+/** La fila más nueva de una receta en la bandeja (como filaDeReceta_ de la API), o undefined. */
+export function filaDeReceta(bandeja, recetaId) {
+  return (bandeja || []).filter(b => b.receta_id === recetaId)
+    .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
 }
 
 /** Suma un pedido nuevo a los que ya había, en otra línea, salvo que ya esté (un reintento). Como unirPedido_ de la API. */

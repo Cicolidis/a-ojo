@@ -122,6 +122,14 @@ R=$(api_post "{\"action\":\"despensa.sumar\",\"t\":\"$A_OJO_TOKEN\",\"quien\":\"
 revisar "despensa.sumar suma una fila (corré setup() si no)" "$(echo "$R" | campo data.nuevos)" "1"
 R=$(api_post "{\"action\":\"despensa.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"$DESPENSA\"]}")
 revisar "despensa.quitar la saca" "$(echo "$R" | campo data.quitados)" "1"
+# Recetas propias (Fase 10a): existen y validan, sin crear nada (no hay cómo borrar una receta).
+R=$(api_post "{\"action\":\"receta.crear\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"r_nada0\",\"titulo\":\"\",\"tipo\":\"salado\"}")
+revisar "receta.crear valida" "$(echo "$R" | campo error)" "receta_invalida"
+R=$(api_post "{\"action\":\"receta.editar\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"r_nada0\",\"titulo\":\"x\"}")
+revisar "receta.editar responde no_encontrada" "$(echo "$R" | campo error)" "no_encontrada"
+# Mira la columna Bandeja.texto antes de buscar la receta: con falta_columna, falta correr setup().
+R=$(api_post "{\"action\":\"receta.escribir\",\"t\":\"$A_OJO_TOKEN\",\"id\":\"r_nada0\",\"texto\":\"x\",\"bandeja_id\":\"b_nada0\"}")
+revisar "receta.escribir responde no_encontrada (corré setup() si dice falta_columna)" "$(echo "$R" | campo error)" "no_encontrada"
 R=$(api_post "{\"action\":\"lugares.asignar\",\"t\":\"$A_OJO_TOKEN\",\"por\":\"nada\",\"clave\":\"x\",\"lugar\":\"feria\"}")
 revisar "lugares.asignar valida" "$(echo "$R" | campo error)" "por_invalido"
 

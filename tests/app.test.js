@@ -1411,3 +1411,68 @@ test('queCocino: las recetas que se pueden hacer con lo que hay, de la más cerc
   assert.deepEqual(queCocino(lista, { tengo: 'huevos', filtro: 'dulce' }).every(x => x.receta.tipo === 'dulce'), true, 'respeta el filtro');
   assert.deepEqual(queCocino(lista, { tengo: 'caviar' }), []);
 });
+
+// Recetas propias (SPEC_v2 §6).
+
+test('receta.crear: la receta (y su fila, si viene escrita) aparece al instante, como en la API, sin duplicar', async () => {
+  const { aplicarEdicion, nuevaReceta } = await cargar('ediciones.js');
+  const { aplicarDelta, indexar } = await cargar('datos.js');
+  const ahora = new Date('2026-11-15T12:00:00Z');
+  const sola = nuevaReceta({ titulo: '  Milanesas   con puré ', tipo: 'salado', porciones: 2 }, 'pareja', ahora);
+  assert.match(sola.datos.id, /^r_[0-9a-z]{8}$/);
+  assert.equal(sola.datos.titulo, 'Milanesas con puré');
+  assert.equal(sola.datos.bandeja_id, undefined, 'sin texto no hay fila');
+
+  const escrita = nuevaReceta({ titulo: 'Guiso', tipo: 'salado', porciones: 4, texto: 'Lentejas,  \n\n\n\nchorizo' }, 'camilo', ahora);
+  assert.match(escrita.datos.bandeja_id, /^b_[0-9a-z]{8}$/);
+  assert.equal(escrita.datos.texto, 'Lentejas,\n\nchorizo');
+
+  const base = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] };
+  let datos = aplicarEdicion(aplicarEdicion(base, sola), escrita);
+  datos = aplicarEdicion(datos, escrita);
+  assert.equal(datos.recetas.length, 2, 'aplicarla dos veces no la duplica');
+  const r = datos.recetas.find(x => x.id === sola.datos.id);
+  assert.deepEqual([r.titulo, r.tipo, r.porciones, r.plataforma, r.fuente_url, r.autor, r.estado], ['Milanesas con puré', 'salado', 2, 'manual', '', '', 'para_probar']);
+  assert.equal(datos.bandeja.length, 1);
+  assert.deepEqual([datos.bandeja[0].plataforma, datos.bandeja[0].estado, datos.bandeja[0].receta_id, datos.bandeja[0].texto],
+    ['manual', 'pendiente', escrita.datos.id, 'Lentejas,\n\nchorizo']);
+  assert.equal(indexar(datos).porId.get(sola.datos.id).ingredientes.length, 0);
+
+  // Una receta de link con ese id (no debería pasar): la API responde 409 y no se toca nada.
+  const ajena = { recetas: [{ id: sola.datos.id, plataforma: 'youtube', titulo: 'Otra' }], bandeja: [] };
+  assert.equal(aplicarEdicion(ajena, sola), ajena);
+
+  // Cuando la API ya la tiene, el delta trae la misma (mismo id) y la cola la vuelve a aplicar sin cambiarla.
+  const delta = aplicarDelta(Object.assign({ since: 'x', version: 1, ultimaCompleta: 'x' }, datos),
+    { ahora: 'y', completo: false, recetas: [Object.assign({}, r, { actualizado: 'y' })], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] });
+  assert.equal(aplicarEdicion(delta, sola).recetas.filter(x => x.id === sola.datos.id).length, 1);
+});
+
+test('receta.editar y receta.escribir, como la API: solo propias, y el mismo texto no cambia nada', async () => {
+  const { aplicarEdicion, nuevaEdicion, nuevoTexto } = await cargar('ediciones.js');
+  const datos = {
+    recetas: [{ id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', porciones: 2, plataforma: 'manual' },
+      { id: 'r_video001', titulo: 'Brownie', tipo: 'dulce', porciones: 12, plataforma: 'youtube' }],
+    bandeja: [{ id: 'e_provisor', receta_id: 'r_video001', creado: '2026-11-15T10:00:00Z', estado: 'pendiente', pedido: 'algo' }],
+  };
+  const editada = aplicarEdicion(datos, nuevaEdicion('receta.editar', { id: 'r_tarta001', titulo: ' Tarta  de acelga ', porciones: 6 }));
+  assert.deepEqual(editada.recetas[0], { id: 'r_tarta001', titulo: 'Tarta de acelga', tipo: 'salado', porciones: 6, plataforma: 'manual' });
+  assert.equal(aplicarEdicion(datos, nuevaEdicion('receta.editar', { id: 'r_video001', titulo: 'x' })), datos, 'solo propias');
+
+  const ahora = new Date('2026-11-15T12:00:00Z');
+  const primera = nuevoTexto('r_tarta001', 'Masa y acelga', undefined, 'pareja', ahora);
+  assert.match(primera.datos.bandeja_id, /^b_/);
+  let d = aplicarEdicion(datos, primera);
+  assert.equal(d.bandeja.length, 2);
+  assert.equal(aplicarEdicion(d, primera), d, 'el mismo texto no cambia nada');
+  assert.equal(nuevoTexto('r_video001', 'x', 'e_provisor', 'camilo').datos.bandeja_id.startsWith('b_'), true, 'una fila provisoria no sirve de id');
+  assert.equal(aplicarEdicion(d, nuevoTexto('r_video001', 'x', undefined, 'camilo')), d, 'solo propias');
+
+  // Reescribirla desde otro celular (otro bandeja_id): va a la fila que ya tiene, y vacía pedido y motivo.
+  const fila = d.bandeja.find(b => b.receta_id === 'r_tarta001');
+  d = Object.assign({}, d, { bandeja: d.bandeja.map(b => (b === fila ? Object.assign({}, b, { estado: 'ayuda', motivo: 'No entendí', pedido: 'x', intentos: 3 }) : b)) });
+  const otra = aplicarEdicion(d, nuevoTexto('r_tarta001', 'Masa, acelga y huevos', 'b_otrocel1', 'camilo', ahora));
+  assert.equal(otra.bandeja.length, 2);
+  const nueva = otra.bandeja.find(b => b.receta_id === 'r_tarta001');
+  assert.deepEqual([nueva.id, nueva.texto, nueva.estado, nueva.motivo, nueva.pedido, nueva.intentos], [fila.id, 'Masa, acelga y huevos', 'pendiente', '', '', 0]);
+});

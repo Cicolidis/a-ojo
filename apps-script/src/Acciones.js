@@ -208,6 +208,15 @@ const MOTIVOS_ESTADO_CAMBIO_ = {
   descartada: 'Ese link ya estaba descartado: no lo cambié.',
 };
 
+/** Lo mismo, para la fila de una receta propia (no tiene link). */
+const MOTIVOS_ESTADO_PROPIA_ = {
+  lista: 'Esa receta ya está ordenada: no la cambié.',
+  procesando: 'La Mac está ordenando esa receta justo ahora: no la cambié.',
+  pendiente: 'Esa receta ya había vuelto a la cola: no la cambié.',
+  ayuda: 'Esa receta volvió a necesitar ayuda: no la cambié.',
+  descartada: 'Esa receta ya no estaba en la bandeja: no la cambié.',
+};
+
 /**
  * POST bandeja.actualizar { id, estado, motivo?, receta_id?, desde? }
  * La usan /recetas y la app (Descartar, Probar de nuevo). Volver a `pendiente`
@@ -237,7 +246,10 @@ function accionBandejaActualizar_(req) {
     const datos = encontrada.datos;
     if (desde && datos.estado === estado) return { id: datos.id, estado: datos.estado, intentos: datos.intentos };
     if (desde && datos.estado !== desde) {
-      const err = errorApi_('estado_cambio', 409, MOTIVOS_ESTADO_CAMBIO_[datos.estado] || 'Ese link cambió mientras tanto: no lo cambié.');
+      const propia = datos.plataforma === 'manual';
+      const motivo = (propia ? MOTIVOS_ESTADO_PROPIA_ : MOTIVOS_ESTADO_CAMBIO_)[datos.estado] ||
+        (propia ? 'Esa receta cambió mientras tanto: no la cambié.' : 'Ese link cambió mientras tanto: no lo cambié.');
+      const err = errorApi_('estado_cambio', 409, motivo);
       err.detalles = { estado: datos.estado };
       throw err;
     }
@@ -656,6 +668,176 @@ function unirPedido_(anterior, texto) {
   const lineas = String(anterior || '').split('\n').map(l => l.trim()).filter(Boolean);
   if (lineas.indexOf(texto) === -1) lineas.push(texto);
   return lineas.join('\n');
+}
+
+// Recetas propias (SPEC_v2 §6): los platos que ya hacemos, sin video ni web (plataforma manual).
+// Los ids (r_…, b_…) los genera la app: un reintento de la cola no duplica nada.
+
+const ID_RECETA_ = /^r_[0-9a-z]{5,12}$/;
+const ID_BANDEJA_ = /^b_[0-9a-z]{5,12}$/;
+const MAX_TITULO_ = 80;
+const MAX_TEXTO_ = 5000;
+
+function esPropia_(receta) {
+  return !!receta && receta.plataforma === 'manual';
+}
+
+/** La fila más nueva de una receta en la bandeja (de las que devuelve leerFilas_), o null. */
+function filaDeReceta_(filas, recetaId) {
+  return filas.filter(f => f.datos.receta_id === recetaId).sort((a, b) => porCreado_(b.datos, a.datos))[0] || null;
+}
+
+/** La receta escrita, con sus renglones: sin espacios al final de cada uno ni más de un renglón vacío seguido. */
+function textoPropio_(v) {
+  return String(v === undefined || v === null ? '' : v).replace(/\r\n?/g, '\n').split('\n')
+    .map(l => l.replace(/\s+$/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function quienOpcional_(v) {
+  const quien = String(v || '').trim().toLowerCase();
+  if (quien && ENUMS.quien.indexOf(quien) === -1) {
+    throw errorApi_('quien_invalido', 400, '«quien» tiene que ser ' + ENUMS.quien.join(' o ') + '.');
+  }
+  return quien;
+}
+
+/**
+ * Nombre, tipo y porciones de una receta propia, validados (anota los errores). Con `todos`
+ * (al crearla), el nombre y el tipo son obligatorios; si no, solo se valida lo que vino.
+ */
+function camposPropia_(req, errores, todos) {
+  const campos = {};
+  if (todos || !vacio_(req.titulo)) {
+    const titulo = unaLinea_(req.titulo).replace(/\s+/g, ' ');
+    if (!titulo) errores.push('falta el nombre');
+    else if (titulo.length > MAX_TITULO_) errores.push('el nombre puede tener hasta ' + MAX_TITULO_ + ' caracteres');
+    campos.titulo = titulo;
+  }
+  if (todos || !vacio_(req.tipo)) {
+    const tipo = String(req.tipo || '').trim();
+    if (ENUMS.tipo.indexOf(tipo) === -1) errores.push('«tipo» tiene que ser uno de: ' + ENUMS.tipo.join(', '));
+    campos.tipo = tipo;
+  }
+  if (!vacio_(req.porciones)) {
+    const porciones = Number(req.porciones);
+    if (!Number.isInteger(porciones) || porciones < 1 || porciones > 999) errores.push('«porciones» tiene que ser un número entero desde 1');
+    campos.porciones = porciones;
+  }
+  return campos;
+}
+
+function sinErrores_(errores) {
+  if (!errores.length) return;
+  const err = errorApi_('receta_invalida', 400, 'Revisá la receta: ' + errores.join('; ') + '.');
+  err.detalles = errores;
+  throw err;
+}
+
+/** La fila de la bandeja de una receta propia escrita: `pendiente`, sin link, para que /recetas la ordene. */
+function filaPropia_(id, recetaId, quien, texto, ahora) {
+  return { id: id, creado: ahora, url: '', plataforma: 'manual', quien: quien, estado: 'pendiente', motivo: '',
+    receta_id: recetaId, intentos: 0, actualizado: ahora, capturas: '', pedido: '', texto: texto };
+}
+
+/**
+ * POST receta.crear { id, titulo, tipo, porciones?, texto?, bandeja_id?, quien? }
+ * Crea una receta propia (plataforma manual, sin link ni autor) y, si viene la receta escrita,
+ * su fila `pendiente` en la bandeja para que /recetas la ordene. Idempotente: si la receta ya
+ * existe (un reintento), no la toca; pero si falta su fila, la crea (un intento cortado a la mitad).
+ */
+function accionRecetaCrear_(req) {
+  const id = String(req.id || '').trim();
+  const errores = [];
+  if (!ID_RECETA_.test(id)) errores.push('«' + id + '» no es un id de receta');
+  const campos = camposPropia_(req, errores, true);
+  const texto = textoPropio_(req.texto);
+  if (texto.length > MAX_TEXTO_) errores.push('la receta puede tener hasta ' + MAX_TEXTO_ + ' caracteres');
+  const bandejaId = String(req.bandeja_id || '').trim();
+  if (texto && !ID_BANDEJA_.test(bandejaId)) errores.push('con la receta escrita hace falta un «bandeja_id» (b_…)');
+  sinErrores_(errores);
+  const quien = quienOpcional_(req.quien);
+
+  return conLock_(() => {
+    // Antes de escribir nada: sin setup(), la fila de la bandeja no se podría guardar.
+    exigirColumnas_('Bandeja', ['texto']);
+    const existente = leerFilas_('Recetas').filter(f => f.datos.id === id)[0];
+    if (existente && !esPropia_(existente.datos)) throw errorApi_('id_usado', 409, 'El id «' + id + '» ya es de otra receta.');
+    const fila = texto ? leerFilas_('Bandeja').filter(f => f.datos.id === bandejaId)[0] : null;
+    if (fila && fila.datos.receta_id !== id) throw errorApi_('id_usado', 409, 'El id «' + bandejaId + '» ya es de otra fila de la bandeja.');
+    const ahora = ahoraIso_();
+    if (!existente) {
+      agregarFila_('Recetas', Object.assign({
+        id: id, etiquetas: '', estado: 'para_probar', valoracion: 0, porciones: null, tiempo_min: null, molde: '',
+        autor: '', fuente_url: '', plataforma: 'manual', foto_url: '', confianza: '', origen_datos: '',
+        idioma_original: 'es', creado: ahora, actualizado: ahora, notas_proceso: '', porciones_vistas: '',
+      }, campos));
+    }
+    if (texto && !fila) agregarFila_('Bandeja', filaPropia_(bandejaId, id, quien, texto, ahora));
+    return { id: id, bandeja_id: texto ? bandejaId : null, repetida: !!existente };
+  });
+}
+
+/**
+ * POST receta.editar { id, titulo?, tipo?, porciones? }: el nombre, el tipo y cuánto rinde de una
+ * receta propia (las demás las cambia /recetas). Idempotente: si no cambia nada, no escribe.
+ */
+function accionRecetaEditar_(req) {
+  const errores = [];
+  const campos = camposPropia_(req, errores, false);
+  if (!errores.length && !Object.keys(campos).length) errores.push('mandá «titulo», «tipo» o «porciones»');
+  sinErrores_(errores);
+
+  return conLock_(() => {
+    const receta = filaReceta_(req.id);
+    const d = receta.datos;
+    if (!esPropia_(d)) throw errorApi_('no_propia', 400, 'Así se editan solo las recetas nuestras: las demás las corrige /recetas.');
+    const cambia = Object.keys(campos).some(k => String(d[k] === null || d[k] === undefined ? '' : d[k]) !== String(campos[k]));
+    if (cambia) {
+      Object.assign(d, campos, { actualizado: ahoraIso_() });
+      escribirFila_('Recetas', receta.fila, d);
+    }
+    return { id: d.id, titulo: d.titulo, tipo: d.tipo, porciones: d.porciones };
+  });
+}
+
+/**
+ * POST receta.escribir { id, texto, bandeja_id, quien? }
+ * Escribe (o reescribe) el texto de una receta propia y deja su fila `pendiente` para que
+ * /recetas la ordene: la fila `bandeja_id` o, si no existe, la más nueva de la receta, o una
+ * nueva con ese id. Reescribirla vacía cualquier pedido de corrección. Si la Mac la está
+ * ordenando, el texto se guarda igual: esa corrida no cierra la fila (ver receta.upsert) y
+ * queda para la siguiente. Idempotente: con el mismo texto, no escribe.
+ */
+function accionRecetaEscribir_(req) {
+  const texto = textoPropio_(req.texto);
+  if (!texto) throw errorApi_('sin_texto', 400, 'La receta está vacía.');
+  if (texto.length > MAX_TEXTO_) throw errorApi_('texto_largo', 400, 'La receta puede tener hasta ' + MAX_TEXTO_ + ' caracteres.');
+  const bandejaId = String(req.bandeja_id || '').trim();
+  if (!ID_BANDEJA_.test(bandejaId)) throw errorApi_('id_invalido', 400, '«bandeja_id» tiene que ser un id de la bandeja (b_…).');
+  const quien = quienOpcional_(req.quien);
+
+  return conLock_(() => {
+    // Primero: sin setup(), el texto se perdería en silencio (y el smoke lo detecta acá).
+    exigirColumnas_('Bandeja', ['texto', 'pedido']);
+    const receta = filaReceta_(req.id).datos;
+    if (!esPropia_(receta)) throw errorApi_('no_propia', 400, 'Solo las recetas nuestras se escriben en la app.');
+    const filas = leerFilas_('Bandeja');
+    const pedida = filas.filter(f => f.datos.id === bandejaId)[0];
+    if (pedida && pedida.datos.receta_id !== receta.id) throw errorApi_('id_usado', 409, 'El id «' + bandejaId + '» ya es de otra fila de la bandeja.');
+    const fila = pedida || filaDeReceta_(filas, receta.id);
+    const ahora = ahoraIso_();
+    if (!fila) {
+      agregarFila_('Bandeja', filaPropia_(bandejaId, receta.id, quien, texto, ahora));
+      return { bandeja_id: bandejaId, estado: 'pendiente' };
+    }
+    const d = fila.datos;
+    const yaEsta = d.texto === texto && ['pendiente', 'procesando', 'lista'].indexOf(d.estado) !== -1;
+    if (!yaEsta) {
+      Object.assign(d, { texto: texto, estado: 'pendiente', motivo: '', intentos: 0, pedido: '', actualizado: ahora });
+      escribirFila_('Bandeja', fila.fila, d);
+    }
+    return { bandeja_id: d.id, estado: d.estado };
+  });
 }
 
 /** Cuántas vistas de porciones se guardan por receta, como máximo. */
