@@ -11,6 +11,7 @@ import { recetasEnLista } from '../compras.js';
 import { nuevaCorreccion, nuevaEdicion, nuevaNota, nuevoTexto } from '../ediciones.js';
 import { estadoPropia, pedidoDe } from '../bandeja.js';
 import { progresoGuardado } from './cocina.js';
+import { leerRuta } from '../rutas.js';
 import { compartirTexto, confirmar, estrellas, navegacion, segmentado, sinReceta } from './controles.js';
 
 const ESTADOS = [
@@ -34,8 +35,11 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     pintar();
   };
 
+  // Vuelve adonde estaban: la semana (si se llegó desde ahí) o, si no, la Biblioteca.
+  const desde = history.state && history.state.desde;
+  const origen = typeof desde === 'string' && leerRuta(desde).nombre === 'semana' ? desde : '#/';
   const portada = foto(r, 'ficha-foto');
-  portada.prepend(h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Volver', onclick: () => volver('#/') },
+  portada.prepend(h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Volver', onclick: () => volver(origen) },
     icono('volver')),
   // Compartir la receta (por WhatsApp), con las porciones que se están viendo.
   h('button', { type: 'button', class: 'boton-redondo compartir', 'aria-label': 'Compartir la receta',

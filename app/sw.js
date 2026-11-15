@@ -47,6 +47,7 @@ const ARCHIVOS = [
   'js/vistas/ingredientes.js',
   'js/vistas/lugares.js',
   'js/vistas/propia.js',
+  'js/vistas/semana.js',
 ];
 
 const base = new URL('./', self.location).href;

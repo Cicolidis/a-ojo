@@ -1649,3 +1649,22 @@ test('armarSemana, platosQueFaltan y nuevaEntrada', async () => {
   assert.match(n.id, /^s_[0-9a-z]{8}$/);
   assert.deepEqual([n.fecha, n.comida, n.porciones], ['', '', null], 'sin día, sin comida');
 });
+
+test('rutas de la semana: la semana va en la dirección y se valida (solo lunes), con el destino del «+»', async () => {
+  const { leerRuta, tituloDe } = await cargar('rutas.js');
+  assert.deepEqual(leerRuta('#/semana'), { nombre: 'semana', semana: '' });
+  assert.deepEqual(leerRuta('#/semana/2026-11-16'), { nombre: 'semana', semana: '2026-11-16' });
+  assert.deepEqual(leerRuta('#/semana/2026-11-17'), { nombre: 'semana', semana: '' }, 'no es un lunes: la actual');
+  assert.deepEqual(leerRuta('#/semana/2026-11-16/elegir?fecha=2026-11-18&comida=cena'),
+    { nombre: 'semana-elegir', semana: '2026-11-16', destino: { fecha: '2026-11-18', comida: 'cena' } });
+  assert.deepEqual(leerRuta('#/semana/2026-11-16/elegir?fecha=2026-11-25&comida=cena').destino, { fecha: '', comida: '' }, 'otra semana: Sin día');
+  assert.deepEqual(leerRuta('#/semana/2026-11-16/elegir?fecha=2026-11-18&comida=merienda').destino, { fecha: '', comida: '' });
+  assert.deepEqual(leerRuta('#/semana/2026-11-16/poner/r_pollo?fecha=2026-11-16&comida=almuerzo'),
+    { nombre: 'semana-poner', semana: '2026-11-16', id: 'r_pollo', destino: { fecha: '2026-11-16', comida: 'almuerzo' } });
+  assert.deepEqual(leerRuta('#/semana/poner/r_pollo'), { nombre: 'semana-poner', semana: '', id: 'r_pollo', destino: null });
+  assert.deepEqual(leerRuta('#/semana/2026-11-16/compra'), { nombre: 'semana-compra', semana: '2026-11-16' });
+  assert.deepEqual(leerRuta('#/nueva?semana=2026-11-16&fecha=2026-11-17&comida=cena'),
+    { nombre: 'nueva', semana: '2026-11-16', destino: { fecha: '2026-11-17', comida: 'cena' } });
+  assert.deepEqual(leerRuta('#/nueva?semana=2026-11-17'), { nombre: 'nueva' });
+  assert.equal(tituloDe({ nombre: 'semana' }), 'Semana · A ojo');
+});

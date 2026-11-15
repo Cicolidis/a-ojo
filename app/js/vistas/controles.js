@@ -5,6 +5,7 @@ import { h, icono } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
 import { cuantasFilas, resumenBandeja } from '../datos.js';
+import { hoyIso, platosQueFaltan } from '../plan.js';
 
 /** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
 export function tocarAfueraCierra(dialogo) {
@@ -129,12 +130,14 @@ export function contadorPorciones(valor, alCambiar, max = 99) {
 }
 
 /**
- * Navegación inferior (§7.2): Recetas · Compras · Bandeja, con cuántas cosas
- * faltan comprar y cuántos links necesitan ayuda. `.actualizar()` repinta los números.
+ * Navegación inferior (§7.2 y SPEC_v2 §4.1): Recetas · Semana · Compras · Bandeja, con cuántos
+ * platos faltan cocinar esta semana, cuántas cosas faltan comprar y cuántos links necesitan ayuda.
+ * `.actualizar()` repinta los números.
  */
 export function navegacion(activa, app) {
   const secciones = [
     { id: 'biblioteca', href: '#/', nombre: 'Recetas', icono: 'recetas' },
+    { id: 'semana', href: '#/semana', nombre: 'Semana', icono: 'calendario' },
     { id: 'compras', href: '#/compras', nombre: 'Compras', icono: 'compras' },
     { id: 'bandeja', href: '#/bandeja', nombre: 'Bandeja', icono: 'bandeja' },
   ].map(s => {
@@ -149,7 +152,9 @@ export function navegacion(activa, app) {
     const comprar = app.datos ? cuantasPorComprar(armarLista(app.datos.compras, app.datos.lugares, app.datos.despensa)) : 0;
     const resumen = resumenBandeja(app.datos?.bandeja);
     const ayuda = resumen.ayuda;
+    const platos = app.datos ? platosQueFaltan(app.datos.plan, hoyIso()) : 0;
     const numeros = {
+      semana: [platos, platos === 1 ? '1 plato por cocinar' : platos + ' platos por cocinar'],
       compras: [comprar, comprar === 1 ? '1 cosa por comprar' : comprar + ' cosas por comprar'],
       bandeja: [ayuda, cuantasFilas(ayuda, resumen.propiasAyuda) + (ayuda === 1 ? ' necesita ayuda' : ' necesitan ayuda')],
     };
