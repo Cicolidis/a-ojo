@@ -114,7 +114,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 
 - [x] Backup sin script: hojas copiadas con `sheet.copyTo()` a una planilla nueva
 - [ ] Push de la API y `hacerBackup()` a mano en el editor: deja una planilla sin script en «A ojo/backups»
-- [ ] Test de paridad entre `obsidian.py` y `formato.js` / `ingredientes.js`
+- [x] Test de paridad entre `obsidian.py` y `formato.js` / `ingredientes.js`
 - [ ] Una sola lista de pendientes: sacar los estados de §9 de `SPEC_v1.md`
 
 ### Fase 8: escalado con conversión

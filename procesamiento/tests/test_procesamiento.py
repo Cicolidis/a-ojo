@@ -546,6 +546,50 @@ class TestObsidian(unittest.TestCase):
         self.assertEqual((carpeta / 'Brownie de la abuela.md').read_text(encoding='utf-8'), 'Mi nota.')
 
 
+class TestParidadConLaApp(unittest.TestCase):
+    """Los mismos casos que lee tests/app.test.js: si un lado cambia un plural o una fracción, falla."""
+
+    @classmethod
+    def setUpClass(cls):
+        ruta = Path(__file__).resolve().parents[2] / 'tests' / 'fixtures' / 'formato.json'
+        cls.casos = json.loads(ruta.read_text(encoding='utf-8'))
+
+    def test_numeros(self):
+        for c in self.casos['numeros']:
+            with self.subTest(c=c):
+                self.assertEqual(obsidian.numero(c['n'], fracciones=c.get('fracciones', True)), c['texto'])
+
+    def test_cantidades(self):
+        for c in self.casos['cantidades']:
+            with self.subTest(c=c):
+                self.assertEqual(obsidian.formatear_cantidad(c['cantidad'], c['unidad']), c['texto'])
+                ing = {'cantidad': c['cantidad'], 'unidad': c['unidad']}
+                self.assertEqual(obsidian.cantidad(ing), '' if c['texto'] == 'a ojo' else c['texto'])
+
+    def test_minutos(self):
+        for c in self.casos['minutos']:
+            with self.subTest(c=c):
+                self.assertEqual(obsidian.minutos(c['min']), c['texto'])
+
+    def test_nombres(self):
+        self.assertEqual(obsidian.NOMBRES, self.casos['nombres'])
+
+    def test_ingredientes(self):
+        for c in self.casos['ingredientes']:
+            with self.subTest(ing=c['ing']):
+                self.assertEqual(obsidian.rol_de(c['ing']), c['rol'])
+                self.assertEqual(obsidian.seccion_de(c['ing']), c['seccion'])
+
+    def test_textos(self):
+        for c in self.casos['origen']:
+            with self.subTest(origen=c['origen']):
+                self.assertEqual(obsidian.texto_origen(c['origen']), c['texto'])
+        for c in self.casos['unir_con_y']:
+            self.assertEqual(obsidian.unir_con_y(c['partes']), c['texto'])
+        for c in self.casos['capitalizar']:
+            self.assertEqual(obsidian.capitalizar(c['texto']), c['esperado'])
+
+
 class TestCapturas(unittest.TestCase):
     def test_baja_las_capturas_a_la_carpeta_de_trabajo(self):
         imagenes = [

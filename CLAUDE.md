@@ -52,5 +52,6 @@ Las specs son `SPEC_v1.md` (el MVP, fases 1 a 6, en su §9) y `SPEC_v2.md` (fase
 
 - `npm test`: tests de Node, sin dependencias. `tests/fakes/apps-script.js` simula SpreadsheetApp, DriveApp y los demás servicios, incluida la conversión de fechas ISO que hace Sheets cuando una celda no tiene formato de texto.
 - `npm run test:py`: tests de `procesamiento/` (unittest, sin red: yt-dlp y el reloj se simulan).
+- **Paridad de formato:** `procesamiento/obsidian.py` repite el formato de `formato.js` e `ingredientes.js` (cantidades, fracciones, plurales, minutos, `NOMBRES`). Los casos están en `tests/fixtures/formato.json` y los leen los dos lados: un cambio de formato (como el escalado de la Fase 8) se hace en los dos y en ese archivo.
 - Los dos corren en GitHub Actions (`tests.yml`) sin dependencias: Node sin `npm install` y Python sin el venv, solo la biblioteca estándar. Un test nuevo no puede necesitar yt-dlp, faster-whisper ni ffmpeg de verdad. `pages.yml` publica la app solo si pasan.
 - `npm run smoke`: prueba contra la API desplegada (necesita el `.env`).

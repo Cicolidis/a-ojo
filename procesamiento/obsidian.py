@@ -12,6 +12,7 @@ Solo biblioteca estándar. Imprime una línea de JSON, como los demás scripts.
 """
 import argparse
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -22,6 +23,8 @@ from comun import fallar, salida
 
 ROLES = ('principal', 'condimento', 'opcional', 'utensilio')
 SIN_SECCION = '-'
+# Lo que repite a app/js/formato.js e ingredientes.js tiene sus casos en tests/fixtures/formato.json,
+# que leen los tests de los dos lados: si se cambia algo acá, se cambia también allá.
 # Cómo se muestra cada valor de `quien` (como NOMBRES de app/js/formato.js).
 NOMBRES = {'camilo': 'Camilo', 'pareja': 'Laura'}
 PLURALES = {'cda': 'cdas', 'cdita': 'cditas', 'taza': 'tazas', 'pizca': 'pizcas', 'lata': 'latas',
@@ -39,6 +42,16 @@ AVISO = '> [!info] Exportada de A ojo\n> Esta nota se reescribe cada vez que se 
 
 # Formato (como app/js/formato.js e ingredientes.js)
 
+def redondear(x):
+    """Como Math.round de JS: los .5 van para arriba (round() de Python los lleva al par)."""
+    return math.floor(x + 0.5)
+
+
+def numero_js(x):
+    """Como String(x) de JS para un número: 3.0 → «3», 2.5 → «2.5»."""
+    return str(int(x)) if x == int(x) else repr(x)
+
+
 def rol_de(ing):
     rol = ing.get('rol_usuario') or ing.get('rol')
     return rol if rol in ROLES else 'principal'
@@ -50,8 +63,18 @@ def seccion_de(ing):
     return str(ing.get('seccion_usuario') or ing.get('seccion') or '').strip()
 
 
+def a_numero(valor):
+    """Como Number() de JS, pero NaN si no es un número finito ('' y None también)."""
+    try:
+        n = float(valor)
+    except (TypeError, ValueError):
+        return math.nan
+    return n if math.isfinite(n) else math.nan
+
+
 def numero(n, fracciones=True):
-    entero = int(n)
+    """formatearNumero: 1.5 → «1 ½», 0.25 → «¼»; si no es una fracción común, con coma decimal."""
+    entero = math.floor(n)
     resto = n - entero
     if resto < 0.01:
         return str(entero)
@@ -59,29 +82,32 @@ def numero(n, fracciones=True):
         for valor, simbolo in FRACCIONES:
             if abs(resto - valor) < 0.02:
                 return f'{entero} {simbolo}' if entero else simbolo
-    return f'{round(n, 2):g}'.replace('.', ',')
+    return numero_js(redondear(n * 100) / 100).replace('.', ',')
 
 
-def cantidad(ing):
-    """«200 g», «2 cdas», «½ taza», «3», o '' si es «a ojo»."""
-    unidad = ing.get('unidad') or ''
-    try:
-        n = float(ing.get('cantidad'))
-    except (TypeError, ValueError):
-        return ''
-    if unidad == 'a ojo' or n <= 0:
-        return ''
+def formatear_cantidad(cantidad, unidad):
+    """formatearCantidad: «200 g», «2 cdas», «½ taza», «3» o «a ojo»."""
+    n = a_numero(cantidad)
+    if unidad == 'a ojo' or math.isnan(n) or n <= 0:
+        return 'a ojo'
     texto = numero(n, fracciones=unidad not in ('g', 'ml'))
-    if unidad in ('u', ''):
+    if unidad in ('u', '', None):
         return texto
     return f'{texto} {PLURALES.get(unidad, unidad) if n > 1 else unidad}'
 
 
+def cantidad(ing):
+    """La cantidad de un ingrediente, o '' si es «a ojo» (en la nota no se dice)."""
+    texto = formatear_cantidad(ing.get('cantidad'), ing.get('unidad'))
+    return '' if texto == 'a ojo' else texto
+
+
 def minutos(m):
-    try:
-        m = round(float(m))
-    except (TypeError, ValueError):
+    """formatearMinutos: 45 → «45 min», 60 → «1 h», 75 → «1 h 15 min»."""
+    m = a_numero(m)
+    if math.isnan(m):
         return ''
+    m = redondear(m)
     if m <= 0:
         return ''
     if m < 60:
@@ -97,6 +123,15 @@ def unir_con_y(partes):
 def capitalizar(texto):
     texto = str(texto or '')
     return texto[:1].upper() + texto[1:]
+
+
+def lista_texto(valor):
+    return [x.strip() for x in str(valor or '').split(',') if x.strip()]
+
+
+def texto_origen(origen):
+    """textoOrigen: «descripcion,subtitulos» → «la descripción del video y los subtítulos»."""
+    return unir_con_y(CAPAS.get(c, c) for c in lista_texto(origen))
 
 
 def detalle(ing):
@@ -119,10 +154,6 @@ def yaml(valor):
     if isinstance(valor, (int, float)) and not isinstance(valor, bool):
         return f'{valor:g}'
     return json.dumps(str(valor), ensure_ascii=False)
-
-
-def lista_texto(valor):
-    return [x.strip() for x in str(valor or '').split(',') if x.strip()]
 
 
 def nota_markdown(receta, ingredientes, pasos, notas):
@@ -193,7 +224,7 @@ def nota_markdown(receta, ingredientes, pasos, notas):
             texto = str(x.get('texto') or '').strip().replace('\n', ' ')
             lineas.append(f'- **{quien} · {fecha(x.get("fecha"))}:** {texto}')
 
-    origen = unir_con_y(CAPAS.get(c, c) for c in lista_texto(receta.get('origen_datos')))
+    origen = texto_origen(receta.get('origen_datos'))
     armado = [x for x in (f'Salió de {origen}.' if origen else '', CONFIANZA.get(receta.get('confianza'), ''),
                           str(receta.get('notas_proceso') or '').strip()) if x]
     if armado:

@@ -1,4 +1,6 @@
 // Cómo se muestran cantidades, tiempos y fechas. Puro, sin DOM.
+// procesamiento/obsidian.py repite parte de esto (y de ingredientes.js): los casos de los dos
+// lados están en tests/fixtures/formato.json. Un cambio de formato va acá, en obsidian.py y ahí.
 
 const FRACCIONES = [
   [1 / 4, '¼'],

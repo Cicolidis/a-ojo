@@ -1,0 +1,139 @@
+{
+  "_leeme": "Casos compartidos entre app/js (formato.js, ingredientes.js) y procesamiento/obsidian.py. Los leen tests/app.test.js y procesamiento/tests: si se cambia un plural, una fracción o un redondeo de un solo lado, falla uno de los dos. Cada caso es entrada → texto esperado. Si cambia el formato a propósito (Fase 8), se cambia acá y en los dos lados.",
+
+  "numeros": [
+    { "n": 2, "texto": "2" },
+    { "n": 2.004, "texto": "2" },
+    { "n": 0.25, "texto": "¼" },
+    { "n": 0.3333, "texto": "⅓" },
+    { "n": 0.5, "texto": "½" },
+    { "n": 0.6667, "texto": "⅔" },
+    { "n": 0.75, "texto": "¾" },
+    { "n": 1.5, "texto": "1 ½" },
+    { "n": 2.3333, "texto": "2 ⅓" },
+    { "n": 3.6667, "texto": "3 ⅔" },
+    { "n": 1.26, "texto": "1 ¼" },
+    { "n": 1.265, "texto": "1 ¼" },
+    { "n": 0.32, "texto": "⅓" },
+    { "n": 0.515, "texto": "½" },
+    { "n": 0.682, "texto": "⅔" },
+    { "n": 0.735, "texto": "¾" },
+    { "n": 0.226, "texto": "0,23" },
+    { "n": 0.53, "texto": "0,53" },
+    { "n": 0.7, "texto": "0,7" },
+    { "n": 0.79, "texto": "0,79" },
+    { "n": 1.3, "texto": "1,3" },
+    { "n": 0.2, "texto": "0,2" },
+    { "n": 0.125, "texto": "0,13" },
+    { "n": 1.5, "fracciones": false, "texto": "1,5" },
+    { "n": 0.25, "fracciones": false, "texto": "0,25" },
+    { "n": 1.999, "fracciones": false, "texto": "2" },
+    { "n": 12345.67, "fracciones": false, "texto": "12345,67" }
+  ],
+
+  "cantidades": [
+    { "cantidad": 200, "unidad": "g", "texto": "200 g" },
+    { "cantidad": 1500, "unidad": "g", "texto": "1500 g" },
+    { "cantidad": 2.5, "unidad": "g", "texto": "2,5 g" },
+    { "cantidad": 0.5, "unidad": "g", "texto": "0,5 g" },
+    { "cantidad": 1, "unidad": "kg", "texto": "1 kg" },
+    { "cantidad": 0.5, "unidad": "kg", "texto": "½ kg" },
+    { "cantidad": 1.5, "unidad": "kg", "texto": "1 ½ kg" },
+    { "cantidad": 1.2, "unidad": "kg", "texto": "1,2 kg" },
+    { "cantidad": 250, "unidad": "ml", "texto": "250 ml" },
+    { "cantidad": 0.75, "unidad": "ml", "texto": "0,75 ml" },
+    { "cantidad": 1, "unidad": "l", "texto": "1 l" },
+    { "cantidad": 0.75, "unidad": "l", "texto": "¾ l" },
+    { "cantidad": 1.5, "unidad": "l", "texto": "1 ½ l" },
+
+    { "cantidad": 1, "unidad": "cda", "texto": "1 cda" },
+    { "cantidad": 2, "unidad": "cda", "texto": "2 cdas" },
+    { "cantidad": 0.5, "unidad": "cda", "texto": "½ cda" },
+    { "cantidad": 1.5, "unidad": "cda", "texto": "1 ½ cdas" },
+    { "cantidad": 1, "unidad": "cdita", "texto": "1 cdita" },
+    { "cantidad": 3, "unidad": "cdita", "texto": "3 cditas" },
+    { "cantidad": 0.25, "unidad": "cdita", "texto": "¼ cdita" },
+    { "cantidad": 1.5, "unidad": "cdita", "texto": "1 ½ cditas" },
+    { "cantidad": 1, "unidad": "taza", "texto": "1 taza" },
+    { "cantidad": 2, "unidad": "taza", "texto": "2 tazas" },
+    { "cantidad": 0.25, "unidad": "taza", "texto": "¼ taza" },
+    { "cantidad": 0.5, "unidad": "taza", "texto": "½ taza" },
+    { "cantidad": 1.3333, "unidad": "taza", "texto": "1 ⅓ tazas" },
+
+    { "cantidad": 1, "unidad": "pizca", "texto": "1 pizca" },
+    { "cantidad": 2, "unidad": "pizca", "texto": "2 pizcas" },
+    { "cantidad": 1, "unidad": "diente", "texto": "1 diente" },
+    { "cantidad": 3, "unidad": "diente", "texto": "3 dientes" },
+    { "cantidad": 1, "unidad": "lata", "texto": "1 lata" },
+    { "cantidad": 2, "unidad": "lata", "texto": "2 latas" },
+    { "cantidad": 2, "unidad": "paquete", "texto": "2 paquetes" },
+    { "cantidad": 2, "unidad": "ramo", "texto": "2 ramos" },
+    { "cantidad": 2, "unidad": "hoja", "texto": "2 hoja" },
+
+    { "cantidad": 3, "unidad": "u", "texto": "3" },
+    { "cantidad": 1.5, "unidad": "u", "texto": "1 ½" },
+    { "cantidad": 2, "unidad": "", "texto": "2" },
+    { "cantidad": 2, "unidad": null, "texto": "2" },
+    { "cantidad": "2", "unidad": "cda", "texto": "2 cdas" },
+    { "cantidad": "0.5", "unidad": "taza", "texto": "½ taza" },
+
+    { "cantidad": 2, "unidad": "a ojo", "texto": "a ojo" },
+    { "cantidad": null, "unidad": "g", "texto": "a ojo" },
+    { "cantidad": "", "unidad": "cda", "texto": "a ojo" },
+    { "cantidad": 0, "unidad": "taza", "texto": "a ojo" },
+    { "cantidad": -1, "unidad": "g", "texto": "a ojo" },
+    { "cantidad": "un poco", "unidad": "g", "texto": "a ojo" },
+    { "cantidad": "Infinity", "unidad": "g", "texto": "a ojo" },
+    { "cantidad": "NaN", "unidad": "g", "texto": "a ojo" }
+  ],
+
+  "minutos": [
+    { "min": 45, "texto": "45 min" },
+    { "min": 60, "texto": "1 h" },
+    { "min": 75, "texto": "1 h 15 min" },
+    { "min": 120, "texto": "2 h" },
+    { "min": "90", "texto": "1 h 30 min" },
+    { "min": 44.5, "texto": "45 min" },
+    { "min": 59.6, "texto": "1 h" },
+    { "min": 0, "texto": "" },
+    { "min": -5, "texto": "" },
+    { "min": null, "texto": "" },
+    { "min": "", "texto": "" },
+    { "min": "media hora", "texto": "" }
+  ],
+
+  "nombres": { "camilo": "Camilo", "pareja": "Laura" },
+
+  "ingredientes": [
+    { "ing": {}, "rol": "principal", "seccion": "" },
+    { "ing": { "rol": "condimento" }, "rol": "condimento", "seccion": "" },
+    { "ing": { "rol": "condimento", "rol_usuario": "opcional" }, "rol": "opcional", "seccion": "" },
+    { "ing": { "rol": "utensilio" }, "rol": "utensilio", "seccion": "" },
+    { "ing": { "rol": "raro" }, "rol": "principal", "seccion": "" },
+    { "ing": { "seccion": "Masa" }, "rol": "principal", "seccion": "Masa" },
+    { "ing": { "seccion": " Masa " }, "rol": "principal", "seccion": "Masa" },
+    { "ing": { "seccion": "Masa", "seccion_usuario": "Relleno" }, "rol": "principal", "seccion": "Relleno" },
+    { "ing": { "seccion": "Masa", "seccion_usuario": "-" }, "rol": "principal", "seccion": "" }
+  ],
+
+  "origen": [
+    { "origen": "", "texto": "" },
+    { "origen": "descripcion", "texto": "la descripción del video" },
+    { "origen": "descripcion,subtitulos", "texto": "la descripción del video y los subtítulos" },
+    { "origen": "web, audio,frames", "texto": "la receta de la web, lo que se dice en el audio y el texto que aparece en el video" },
+    { "origen": "capturas,otra", "texto": "las capturas que mandaron y otra" }
+  ],
+
+  "unir_con_y": [
+    { "partes": [], "texto": "" },
+    { "partes": ["sal"], "texto": "sal" },
+    { "partes": ["sal", "pimienta"], "texto": "sal y pimienta" },
+    { "partes": ["sal", "pimienta", "comino"], "texto": "sal, pimienta y comino" }
+  ],
+
+  "capitalizar": [
+    { "texto": "chocolate semiamargo", "esperado": "Chocolate semiamargo" },
+    { "texto": "ñoquis", "esperado": "Ñoquis" },
+    { "texto": "", "esperado": "" }
+  ]
+}

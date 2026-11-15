@@ -138,6 +138,26 @@ test('formatearCantidad, formatearMinutos y compañía', async () => {
   assert.equal(f.textoTraduccion('es'), '');
 });
 
+// Los mismos casos los lee procesamiento/tests (obsidian.py): si un lado cambia un plural o una fracción, falla.
+test('paridad con obsidian.py: los casos de tests/fixtures/formato.json', async () => {
+  const casos = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'formato.json'), 'utf8'));
+  const { formatearNumero, formatearCantidad, formatearMinutos, NOMBRES, textoOrigen, capitalizar } = await cargar('formato.js');
+  const { rolDe, seccionDe, unirConY } = await cargar('ingredientes.js');
+  for (const c of casos.numeros) {
+    assert.equal(formatearNumero(c.n, { fracciones: c.fracciones ?? true }), c.texto, 'numero ' + JSON.stringify(c));
+  }
+  for (const c of casos.cantidades) assert.equal(formatearCantidad(c.cantidad, c.unidad), c.texto, 'cantidad ' + JSON.stringify(c));
+  for (const c of casos.minutos) assert.equal(formatearMinutos(c.min), c.texto, 'minutos ' + JSON.stringify(c));
+  assert.deepEqual(NOMBRES, casos.nombres);
+  for (const c of casos.ingredientes) {
+    assert.equal(rolDe(c.ing), c.rol, 'rol ' + JSON.stringify(c.ing));
+    assert.equal(seccionDe(c.ing), c.seccion, 'seccion ' + JSON.stringify(c.ing));
+  }
+  for (const c of casos.origen) assert.equal(textoOrigen(c.origen), c.texto, 'origen ' + JSON.stringify(c.origen));
+  for (const c of casos.unir_con_y) assert.equal(unirConY(c.partes), c.texto);
+  for (const c of casos.capitalizar) assert.equal(capitalizar(c.texto), c.esperado);
+});
+
 test('fechaHora: hoy, ayer o la fecha, con la hora', async () => {
   const f = await cargar('formato.js');
   const ahora = new Date(2026, 9, 12, 18, 0);
