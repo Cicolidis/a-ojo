@@ -46,6 +46,7 @@ const ARCHIVOS = [
   'js/vistas/ficha.js',
   'js/vistas/ingredientes.js',
   'js/vistas/lugares.js',
+  'js/vistas/poner.js',
   'js/vistas/propia.js',
   'js/vistas/semana.js',
 ];

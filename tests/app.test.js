@@ -1668,3 +1668,12 @@ test('rutas de la semana: la semana va en la dirección y se valida (solo lunes)
   assert.deepEqual(leerRuta('#/nueva?semana=2026-11-17'), { nombre: 'nueva' });
   assert.equal(tituloDe({ nombre: 'semana' }), 'Semana · A ojo');
 });
+
+test('vistas de la semana: textoLugar y la dirección del «+»', async () => {
+  // semana.js arma DOM, pero estas dos funciones son puras (las usan elegir, poner y propia).
+  const { textoLugar, direccionElegir } = await cargar('vistas/semana.js');
+  assert.equal(textoLugar('2026-11-17', 'cena'), 'Martes 17 · Cena');
+  assert.equal(textoLugar('', ''), 'Sin día');
+  assert.equal(direccionElegir('2026-11-16', '2026-11-17', 'almuerzo'), '#/semana/2026-11-16/elegir?fecha=2026-11-17&comida=almuerzo');
+  assert.equal(direccionElegir('2026-11-16'), '#/semana/2026-11-16/elegir');
+});

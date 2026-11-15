@@ -206,7 +206,7 @@ h1:focus, .paso-texto:focus, .vacio-titulo:focus, h2[tabindex]:focus, .ok-texto:
   font: 600 15px var(--sans);
 }
 
-.boton-texto.alerta-texto { color: var(--alerta); }
+.boton-texto.alerta-texto, .boton-secundario.alerta-texto { color: var(--alerta); }
 
 .boton-redondo {
   display: inline-flex;
@@ -1588,7 +1588,7 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 
 .semana-comida-cabeza { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
 
-.entradas { display: flex; flex-direction: column; }
+.entradas { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 
 .entrada { display: flex; align-items: center; gap: 4px; }
 
@@ -1599,3 +1599,15 @@ body:has(.sobre-navegacion) .zona-aviso { bottom: calc(150px + env(safe-area-ins
 .entrada .reciente-texto strong { font-size: 16px; }
 
 .entrada-link.sin-receta { color: var(--tinta-2); }
+
+/* «Mover» y «Elegir día y comida»: primero el día (o «Sin día»), después la comida. */
+.opciones-dias { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+
+.opcion-dia { min-height: 44px; padding: 0 6px; }
+
+.semana-dia > .semana-comida-cabeza h2 { flex: 1; }
+
+/* «Una receta nuestra», arriba del buscador de la semana. */
+.una-nuestra { border: 1px dashed var(--borde-control); }
+
+.icono-nuestra { display: flex; align-items: center; justify-content: center; background: var(--superficie-2); color: var(--acento); }

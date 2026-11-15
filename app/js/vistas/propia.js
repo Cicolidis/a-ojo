@@ -5,6 +5,8 @@
 import { h, icono } from '../dom.js';
 import { esPropia } from '../datos.js';
 import { nuevaEdicion, nuevaReceta } from '../ediciones.js';
+import { nuevaEntrada } from '../plan.js';
+import { textoLugar } from './semana.js';
 import { cargando, contadorPorciones, segmentado, sinReceta } from './controles.js';
 
 const TIPOS = [
@@ -21,7 +23,7 @@ const TIPO_INICIAL = 'salado';
 const MAX_NOMBRE = 80;
 const MAX_TEXTO = 5000;
 
-export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, id) {
+export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, id, ruta = {}) {
   const r = id ? app.indice.porId.get(id) : null;
   if (id && !esPropia(r)) {
     contenedor.append(sinReceta(app, id, r && {
@@ -29,7 +31,9 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
     return null;
   }
   const crear = !id;
-  const destino = crear ? '#/' : '#/receta/' + id;
+  // Desde el «+» de la semana («Una receta nuestra»): al crearla, queda puesta ahí (SPEC_v2 §6.1).
+  const enSemana = crear && ruta && ruta.semana ? { semana: ruta.semana, fecha: ruta.destino.fecha, comida: ruta.destino.comida } : null;
+  const destino = enSemana ? '#/semana/' + enSemana.semana : crear ? '#/' : '#/receta/' + id;
   let tipo = (r && r.tipo) || TIPO_INICIAL;
   let porciones = (r && Number(r.porciones)) || PORCIONES_INICIALES;
   let tocoPorciones = false;
@@ -76,6 +80,13 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
     if (crear) {
       const edicion = nuevaReceta({ titulo, tipo, porciones, texto: texto.value }, app.config.quien);
       editar(edicion);
+      if (enSemana) {
+        editar(nuevaEdicion('plan.poner', { quien: app.config.quien,
+          items: [nuevaEntrada(Object.assign({ receta_id: edicion.datos.id, porciones }, enSemana))] }));
+        volver(destino);
+        avisar('✓ Guardada y sumada a ' + textoLugar(enSemana.fecha, enSemana.comida) + '.');
+        return;
+      }
       // La ficha reemplaza a este formulario: «volver», desde ahí, va a la Biblioteca.
       reemplazar('#/receta/' + edicion.datos.id, '#/');
       avisar(edicion.datos.texto ? '✓ Guardada. La Mac la ordena en la próxima corrida.' : '✓ Guardada');
@@ -114,7 +125,7 @@ export function montar(contenedor, { app, volver, reemplazar, editar, avisar }, 
   const espera = h('div');
   contenedor.append(h('div', { class: 'editor' },
     h('div', { class: 'editor-arriba' },
-      h('button', { type: 'button', class: 'boton-redondo', 'aria-label': crear ? 'Volver a las recetas' : 'Volver a la receta',
+      h('button', { type: 'button', class: 'boton-redondo', 'aria-label': enSemana ? 'Volver a la semana' : crear ? 'Volver a las recetas' : 'Volver a la receta',
         onclick: () => volver(destino) }, icono('volver'))),
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, crear ? 'Nueva receta' : 'Editar la receta'),
     crear ? h('p', { class: 'editor-ayuda' }, 'Una de las que ya hacen, sin video ni web. Va a decir «Receta nuestra».') : null,
