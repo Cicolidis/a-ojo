@@ -44,7 +44,8 @@ AVISO = '> [!info] Exportada de A ojo\n> Esta nota se reescribe cada vez que se 
 
 def redondear(x):
     """Como Math.round de JS: los .5 van para arriba (round() de Python los lleva al par)."""
-    return math.floor(x + 0.5)
+    r = math.floor(x)
+    return r + 1 if x - r >= 0.5 else r
 
 
 def numero_js(x):

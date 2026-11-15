@@ -32,8 +32,9 @@ function hacerBackup() {
   const ss = planilla_();
   const carpeta = carpetaBackups_();
   const nombre = ss.getName() + ' · backup ' + ahoraIso_().slice(0, 10);
-  const id = copiarHojas_(ss, nombre);
-  DriveApp.getFileById(id).moveTo(carpeta);
+  // Con el lock, nadie escribe mientras se copia: Recetas, Ingredientes y Pasos quedan
+  // parejas. Lo que llegue en esos segundos espera o recibe «ocupado» (la cola reintenta).
+  const id = conLock_(() => copiarHojas_(ss, nombre, carpeta));
   const borrados = podarBackups_(carpeta, BACKUPS_A_GUARDAR_);
   console.log('Backup: «' + nombre + '» en A ojo/backups' + (borrados ? ' (' + borrados + ' viejos a la papelera)' : '') + '.');
   return { nombre: nombre, id: id, borrados: borrados };
@@ -41,27 +42,28 @@ function hacerBackup() {
 
 /**
  * Crea una planilla nueva (sin script) con una copia de cada hoja de `ss`, con
- * los mismos nombres y en el mismo orden, y devuelve su id. Si algo falla a
- * mitad de camino, la manda a la papelera: no quedan backups a medias.
+ * los mismos nombres y en el mismo orden, la mueve a `carpeta` y devuelve su id.
+ * Si algo falla a mitad de camino, la manda a la papelera: no quedan backups a
+ * medias ni sueltos en la raíz de Drive.
  */
-function copiarHojas_(ss, nombre) {
+function copiarHojas_(ss, nombre, carpeta) {
   const copia = SpreadsheetApp.create(nombre);
   try {
     copia.setSpreadsheetTimeZone(ss.getSpreadsheetTimeZone());
     const porDefecto = copia.getSheets();
-    // copyTo() las nombra «Copia de …»: se renombran después de borrar la hoja
-    // por defecto, por si alguna se llamara igual que ella. El orden se fija a
-    // mano para no depender de dónde las ponga copyTo().
+    // copyTo() las suma al final, como «Copia de …»: se renombran después de
+    // borrar la hoja por defecto, por si alguna se llamara igual que ella.
     const copiadas = ss.getSheets().map(h => ({ nombre: h.getName(), hoja: h.copyTo(copia) }));
     porDefecto.forEach(h => copia.deleteSheet(h));
-    copiadas.forEach((c, i) => {
-      c.hoja.setName(c.nombre);
-      copia.setActiveSheet(c.hoja);
-      copia.moveActiveSheet(i + 1);
-    });
+    copiadas.forEach(c => c.hoja.setName(c.nombre));
+    DriveApp.getFileById(copia.getId()).moveTo(carpeta);
     return copia.getId();
   } catch (err) {
-    DriveApp.getFileById(copia.getId()).setTrashed(true);
+    try {
+      DriveApp.getFileById(copia.getId()).setTrashed(true);
+    } catch (otro) {
+      console.error('No pude mandar a la papelera el backup a medias «' + nombre + '»: ' + otro);
+    }
     throw err;
   }
 }

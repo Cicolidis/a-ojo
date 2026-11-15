@@ -182,6 +182,18 @@ test('hacerBackup: si falla a mitad de camino, no deja una planilla a medias', (
   assert.ok(sueltas[0].papelera, 'la planilla a medias, a la papelera');
 });
 
+test('hacerBackup: si falla al moverla a la carpeta, tampoco queda suelta en la raíz', () => {
+  const p = proyecto();
+  const create = p.ctx.SpreadsheetApp.create;
+  p.ctx.SpreadsheetApp.create = nombre => {
+    const nueva = create(nombre);
+    p.drive.porId.get(nueva.getId()).moveTo = () => { throw new Error('Drive no responde'); };
+    return nueva;
+  };
+  assert.throws(() => p.ctx.hacerBackup(), /Drive no responde/);
+  assert.ok(p.drive.raiz.archivos.filter(a => a.planilla).every(a => a.papelera));
+});
+
 test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   const p = proyecto();
   p.capturar('https://youtube.com/shorts/cyTOswdJ4TY');
