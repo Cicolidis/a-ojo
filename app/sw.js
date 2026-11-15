@@ -31,6 +31,7 @@ const ARCHIVOS = [
   'js/formato.js',
   'js/imagenes.js',
   'js/ingredientes.js',
+  'js/plan.js',
   'js/rutas.js',
   'js/sync.js',
   'js/vistas/agregar.js',

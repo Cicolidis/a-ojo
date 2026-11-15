@@ -145,7 +145,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 
 - [x] Hoja `Plan` (con `semana` y «Sin día»), `plan.poner` en lote, `plan.quitar` y `todo` con `plan`
 - [x] Limpieza de las entradas de más de 8 semanas en el backup
-- [ ] Lógica del plan (`plan.js`): fechas, semanas y la cuenta de la pestaña
+- [x] Lógica del plan (`plan.js`): fechas, semanas y la cuenta de la pestaña
 - [ ] Pantalla `#/semana` y la pestaña nueva
 - [ ] Elegir, porciones, mover y quitar
 - [ ] «Sumar a la semana» desde la ficha y la Biblioteca

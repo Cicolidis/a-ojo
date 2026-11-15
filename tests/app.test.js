@@ -1591,3 +1591,61 @@ test('plan.poner y plan.quitar, como la API: crea o reemplaza por id, quita en e
   assert.deepEqual(aplicarDelta(datos, vacio).plan, [lunes]);
   assert.deepEqual(aplicarDelta(datos, Object.assign({}, vacio, { plan: [] })).plan, []);
 });
+
+const SEMANAS = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'semanas.json'), 'utf8'));
+
+test('plan.js: lunes, días y textos de los casos de semanas.json (los mismos que valida la API)', async () => {
+  const p = await cargar('plan.js');
+  for (const c of SEMANAS.lunes) {
+    assert.equal(p.lunesDe(c.fecha), c.lunes, c.fecha);
+    assert.equal(p.textoDia(c.fecha), c.dia, c.fecha);
+    assert.equal(p.esSemana(c.lunes), true);
+    assert.ok(p.diasDe(c.lunes).includes(c.fecha));
+  }
+  for (const f of SEMANAS.no_son_lunes) assert.equal(p.esSemana(f), false, f);
+  for (const f of SEMANAS.invalidas) assert.equal(p.esFecha(f), false, JSON.stringify(f));
+  assert.deepEqual(p.diasDe('2025-12-29'), ['2025-12-29', '2025-12-30', '2025-12-31', '2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04']);
+  assert.equal(p.textoSemana('2026-11-16'), 'Semana del 16/11');
+  assert.equal(p.diaCorto('2026-11-22'), 'Do');
+  assert.equal(p.sumarDias('2026-11-16', 7), '2026-11-23');
+  assert.equal(p.hoyIso(new Date(2026, 10, 16, 23, 30)), '2026-11-16', 'la fecha local, aunque en UTC ya sea mañana');
+  assert.equal(p.hoyIso(new Date(2026, 10, 16, 0, 30)), '2026-11-16');
+});
+
+test('plan.js da lo mismo en Buenos Aires y en Tokio (las fechas no pasan por la zona horaria)', () => {
+  const { execFileSync } = require('node:child_process');
+  const modulo = pathToFileURL(path.join(APP, 'js', 'plan.js')).href;
+  const codigo = `import(${JSON.stringify(modulo)}).then(p => console.log(JSON.stringify([
+    p.textoSemana('2026-11-16'), p.textoDia('2026-11-16'), p.lunesDe('2026-11-22'), p.diaCorto('2026-11-16'),
+    p.hoyIso(new Date(2026, 10, 16, 23, 30)), p.hoyIso(new Date(2026, 10, 16, 0, 30))])))`;
+  const esperado = ['Semana del 16/11', 'Lunes 16', '2026-11-16', 'Lu', '2026-11-16', '2026-11-16'];
+  for (const TZ of ['America/Argentina/Buenos_Aires', 'Asia/Tokyo', 'UTC']) {
+    const salida = execFileSync(process.execPath, ['-e', codigo], { env: Object.assign({}, process.env, { TZ }), encoding: 'utf8' });
+    assert.deepEqual(JSON.parse(salida), esperado, TZ);
+  }
+});
+
+test('armarSemana, platosQueFaltan y nuevaEntrada', async () => {
+  const p = await cargar('plan.js');
+  const porId = new Map([['r_pollo', { id: 'r_pollo', titulo: 'Pollo' }], ['r_sopa', { id: 'r_sopa', titulo: 'Sopa' }]]);
+  const e = (id, fecha, comida, receta_id, creado = '2026-11-15T10:00:00Z', semana = '2026-11-16') => ({ id, semana, fecha, comida, receta_id, creado });
+  const plan = [
+    e('s_3', '2026-11-16', 'cena', 'r_sopa', '2026-11-15T09:00:00Z'),
+    e('s_1', '2026-11-16', 'cena', 'r_pollo'),
+    e('s_2', '', '', 'r_borrada'),
+    e('s_4', '2026-11-18', 'almuerzo', 'r_pollo'),
+    e('s_5', '2026-11-10', 'cena', 'r_pollo', undefined, '2026-11-09'),
+  ];
+  const s = p.armarSemana(plan, '2026-11-16', porId);
+  assert.equal(s.total, 4);
+  assert.deepEqual(s.dias[0].cena.map(x => x.id), ['s_3', 's_1'], 'en el orden en que se pusieron');
+  assert.deepEqual(s.dias[2].almuerzo.map(x => x.receta.titulo), ['Pollo']);
+  assert.deepEqual(s.sinDia.map(x => [x.id, x.receta]), [['s_2', null]], 'la receta que ya no está, sin receta');
+  assert.equal(s.dias.length, 7);
+  assert.equal(p.platosQueFaltan(plan, '2026-11-17'), 2, 'el miércoles y el de Sin día; el lunes ya pasó');
+  assert.equal(p.platosQueFaltan(plan, '2026-11-16'), 4);
+  assert.equal(p.platosQueFaltan(plan, '2026-11-23'), 0, 'otra semana');
+  const n = p.nuevaEntrada({ semana: '2026-11-16', comida: 'cena', receta_id: 'r_pollo', porciones: null });
+  assert.match(n.id, /^s_[0-9a-z]{8}$/);
+  assert.deepEqual([n.fecha, n.comida, n.porciones], ['', '', null], 'sin día, sin comida');
+});
