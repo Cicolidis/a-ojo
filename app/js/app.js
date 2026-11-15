@@ -168,8 +168,8 @@ function avisarYaEstaba(fila) {
 
 // Avisos breves abajo de la pantalla (por ejemplo, una edición que la API rechazó).
 // Pueden traer un link: avisar('✓ Agregada a compras', { texto: 'Ver la lista', href: '#/compras' }),
-// o un botón: avisar('Lo pasé a la despensa.', { texto: 'Deshacer', onclick }). El botón se va con el
-// aviso: el foco vuelve al título de la pantalla.
+// o un botón: avisar('Pasé a la despensa: harina.', { texto: 'Deshacer', onclick }). El botón se va con el
+// aviso, se repinta la pantalla que se esté viendo (puede no ser la del aviso) y el foco vuelve al título.
 // La zona (role=status) está siempre en la página, así el lector de pantalla lee cada aviso
 // nuevo. Uno nuevo reemplaza al anterior; mientras su link tiene el foco, no se va.
 const zonaAviso = h('div', { class: 'zona-aviso', role: 'status' });
@@ -182,6 +182,7 @@ function avisar(texto, link) {
     : h('button', { type: 'button', onclick: () => {
       sacarAviso(aviso);
       link.onclick();
+      refrescar();
       const titulo = contenedor.querySelector('h1');
       if (titulo) titulo.focus({ preventScroll: true });
     } }, link.texto);

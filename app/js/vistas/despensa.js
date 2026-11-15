@@ -4,6 +4,7 @@
 
 import { h, icono, rellenar } from '../dom.js';
 import { capitalizar } from '../formato.js';
+import { alfabetico } from '../datos.js';
 import { nombresEscritos, paraDespensa } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { leerRuta } from '../rutas.js';
@@ -21,8 +22,9 @@ export function montar(contenedor, { app, volver, editar, avisar }) {
     'aria-label': 'Sumar a la despensa', placeholder: 'Sumar algo (ej.: harina, huevos, manteca)' });
   const sumar = h('form', { class: 'sumar', onsubmit: e => {
     e.preventDefault();
-    if (!campo.value.trim()) return campo.focus();
-    const nombres = paraDespensa(nombresEscritos(campo.value).map(nombre => ({ nombre })), app.datos?.despensa);
+    const escritos = nombresEscritos(campo.value);
+    if (!escritos.length) return campo.focus();
+    const nombres = paraDespensa(escritos.map(nombre => ({ nombre })), app.datos?.despensa);
     if (!nombres.length) {
       avisar('Ya estaba en la despensa.');
       return campo.select();
@@ -51,15 +53,14 @@ export function montar(contenedor, { app, volver, editar, avisar }) {
         : h('p', { class: 'secundario' }, 'Todavía no se bajó la despensa.'));
     }
     sumar.hidden = false;
-    const filas = (app.datos.despensa || []).slice()
-      .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es', { sensitivity: 'base' }));
+    const filas = (app.datos.despensa || []).slice().sort((a, b) => alfabetico(a.nombre, b.nombre));
     if (!filas.length) {
       return rellenar(zonaLista, vacio({ figura: 'casa', titulo: 'Todavía no anotaron nada',
         texto: 'Sumá lo que tengan en casa. También se llena al tildar «lo tengo» y al limpiar lo comprado en la lista.' }));
     }
     rellenar(zonaLista, h('ul', { class: 'lista-lugares' }, filas.map((d, i) => h('li', null,
       h('span', null, capitalizar(d.nombre)),
-      h('button', { type: 'button', class: 'boton-texto', 'aria-label': 'Quitar ' + d.nombre + ' de la despensa',
+      h('button', { type: 'button', class: 'boton-texto', 'data-despensa': d.id, 'aria-label': 'Quitar ' + d.nombre + ' de la despensa',
         onclick: () => {
           editar(nuevaEdicion('despensa.quitar', { ids: [d.id] }));
           pintar();
@@ -70,6 +71,14 @@ export function montar(contenedor, { app, volver, editar, avisar }) {
   }
 
   pintar();
-  // Al sincronizar se repinta solo la lista: lo que estén escribiendo no se pierde.
-  return { actualizar: pintar };
+  // Al sincronizar se repinta solo la lista: lo que estén escribiendo no se pierde, y un
+  // «Quitar» con el foco lo recupera después de repintar.
+  return {
+    actualizar() {
+      const id = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.despensa;
+      pintar();
+      const boton = id && zonaLista.querySelector('[data-despensa="' + id + '"]');
+      if (boton) boton.focus({ preventScroll: true });
+    },
+  };
 }

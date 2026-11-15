@@ -753,6 +753,28 @@ test('despensa en la lista: lo que hay en casa va a «Revisá si tenés» con «
   assert.equal(armarLista(items, []).find(g => g.lugar === 'revisar'), undefined, 'sin despensa, como antes');
 });
 
+test('despensa en la lista: lo escrito a mano no va «En casa»; lo movido a «Revisá si tenés» sí lleva la marca', async () => {
+  const { armarLista, lugarDe } = await cargar('compras.js');
+  const despensa = [{ id: 'd_1', nombre: 'leche' }, { id: 'd_2', nombre: 'harina' }];
+  const aMano = itemCompra('c_leche02', '', 'leche condensada', null, 'a ojo', '');
+  assert.equal(lugarDe(aMano, [], despensa), 'supermercado', 'escribirlo a mano es porque hay que comprarlo');
+  const movida = itemCompra('c_harin01', 'r_1', 'harina', 500, 'g', 'almacén', 'principal', { lugar: 'revisar' });
+  assert.equal(armarLista([movida], [], despensa)[0].filas[0].enCasa, true);
+});
+
+test('haceFaltaMas no mira la despensa: lo tildado «En casa» se revisa de nuevo si la receta pide más', async () => {
+  const { aplicarEdicion, nuevaEdicion } = await cargar('ediciones.js');
+  const { lugarDe } = await cargar('compras.js');
+  const despensa = [{ id: 'd_1', nombre: 'azúcar' }];
+  const item = cantidad => ({ id: 'c_azuca01', nombre: 'azúcar', cantidad, unidad: 'g', gondola: 'almacén', rol: 'principal' });
+  let d = { recetas: [], compras: [], despensa };
+  d = aplicarEdicion(d, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 6, items: [item(100)] }));
+  d = aplicarEdicion(d, nuevaEdicion('compras.marcar', { ids: ['c_azuca01'], hecho: true }));
+  d = aplicarEdicion(d, nuevaEdicion('compras.agregar', { receta_id: 'r_brown', porciones: 12, items: [item(200)] }));
+  assert.equal(d.compras[0].hecho, false);
+  assert.equal(lugarDe(d.compras[0], [], despensa), 'revisar', 'sigue en «Revisá si tenés»');
+});
+
 test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios para revisar', async () => {
   const { indexar, aplicarDelta } = await cargar('datos.js');
   const c = await cargar('compras.js');

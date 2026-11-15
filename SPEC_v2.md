@@ -127,7 +127,7 @@ Dos botones arriba de la semana, **«Repetir una semana»** y **«Usar como mode
 
 ### 5.1 Pantalla `#/despensa`
 - Se llega desde Compras («Lo que hay en casa») y desde «Con lo que tengo» en la Biblioteca.
-- Una lista en orden alfabético con «Quitar» en cada ítem y «Sumar algo» arriba (acepta varios separados por coma: «harina, huevos, manteca»).
+- Una lista en orden alfabético con «Quitar» en cada ítem y «Sumar algo» arriba (acepta varios separados por coma, punto y coma, «y» o renglones: «harina, huevos y manteca»).
 - Arriba, un aviso corto: «Anotá lo que tenés para que la compra no lo repita».
 
 ### 5.2 Cómo se llena y cómo se vacía
@@ -138,7 +138,7 @@ Dos botones arriba de la semana, **«Repetir una semana»** y **«Usar como mode
 - La despensa no lleva cantidades ni fechas de vencimiento en la v2.
 
 ### 5.3 Dónde se usa
-- **Lista de compras:** un ítem que está en la despensa va a «Revisá si tenés» con la marca «En casa», salvo que lo hayan movido a mano. Si se compra igual, queda como está.
+- **Lista de compras:** un ítem de una receta que está en la despensa va a «Revisá si tenés» con la marca «En casa», salvo que lo hayan movido a mano. Si se compra igual, queda como está. Lo que escriben a mano en la lista no pasa por la despensa: escribirlo ya es decir que hay que comprarlo.
 - **«¿Qué cocino hoy?»:** «Con lo que tengo» arranca con la despensa (un chip «Usar lo de la despensa», prendido por defecto) más lo que escriban. La lógica de `queCocino()` no cambia: solo recibe más ingredientes.
 - **Compra de la semana:** ver §4.2.
 

@@ -75,7 +75,9 @@ export function montar(contenedor, { app, editar, avisar }) {
     pintar();
     agregarReceta.focus();
     if (ids.length) {
-      avisar('Pasé a la despensa: ' + unirConY(nombres) + '.', { texto: 'Deshacer', onclick: () => {
+      // Hasta tres nombres; con más, «tomate, cebolla y 10 más» (el aviso dura poco).
+      const muestra = nombres.length > 3 ? nombres.slice(0, 2).concat((nombres.length - 2) + ' más') : nombres;
+      avisar('Pasé a la despensa: ' + unirConY(muestra) + '.', { texto: 'Deshacer', onclick: () => {
         editar(nuevaEdicion('despensa.quitar', { ids }));
         pintar();
       } });
@@ -116,7 +118,7 @@ export function montar(contenedor, { app, editar, avisar }) {
     return h('li', { class: 'compra' + (f.hecho ? ' hecha' : '') + (f.opcional ? ' opcional' : '') + (f.clave === recien ? ' recien' : '') },
       h('label', null,
         h('input', { type: 'checkbox', checked: f.hecho, 'data-foco': 'c:' + f.clave,
-          'aria-label': (revisar ? 'Lo tengo: ' : 'Comprado: ') + f.nombre,
+          'aria-label': (revisar ? 'Lo tengo: ' : 'Comprado: ') + f.nombre + (f.enCasa ? ', en casa' : ''),
           onchange: e => marcar(f, e.target.checked, revisar) }),
         h('span', { class: 'compra-texto' },
           h('span', null, f.nombre, f.opcional ? h('span', { class: 'marca-opcional' }, 'opcional') : null,

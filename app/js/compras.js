@@ -114,12 +114,18 @@ export function enCasaDeReceta(receta, despensa) {
 const movido = item => item.lugar === REVISAR || LUGARES.includes(item.lugar);
 
 /**
- * Dónde va un ítem de la lista: adonde lo movieron; «Revisá si tenés» si está en la
- * despensa o es condimento o utensilio; si no, el de la regla.
+ * ¿Está «En casa»? Solo lo que viene de una receta: lo que escriben a mano en la lista
+ * («leche») es porque hay que comprarlo, aunque haya en la despensa.
+ */
+const enCasa = (item, despensa) => !!item.receta_id && !!enDespensa(item.nombre, despensa);
+
+/**
+ * Dónde va un ítem de la lista: adonde lo movieron; «Revisá si tenés» si es de una
+ * receta y está en la despensa, o es condimento o utensilio; si no, el de la regla.
  */
 export function lugarDe(item, lugares, despensa) {
   if (movido(item)) return item.lugar;
-  if (A_REVISAR.includes(item.rol) || enDespensa(item.nombre, despensa)) return REVISAR;
+  if (A_REVISAR.includes(item.rol) || enCasa(item, despensa)) return REVISAR;
   return lugarPorRegla(item, lugares);
 }
 
@@ -296,7 +302,7 @@ function desglose(items) {
  * La lista para mostrar: [{ lugar, nombre, filas }], con los lugares en el orden de
  * LUGARES y «Revisá si tenés» al final. Cada fila junta los ítems con el mismo
  * nombre en ese lugar: { clave, nombre, cantidad, desglose, ids, hecho, opcional, enCasa, items }.
- * `enCasa`: está en «Revisá si tenés» porque está en la despensa (no porque lo movieron).
+ * `enCasa`: está en «Revisá si tenés» y en la despensa (lo de recetas; lo escrito a mano, no).
  * Lo de «Revisá si tenés» que ya está para comprar se suma a esa fila. Dentro de
  * cada lugar, las filas van en orden alfabético (lo marcado no se mueve).
  */
@@ -328,7 +334,7 @@ export function armarLista(compras, lugares, despensa) {
         ids: f.items.map(i => i.id),
         hecho: f.items.every(i => i.hecho === true || i.hecho === 'true'),
         opcional: f.items.every(i => i.rol === 'opcional'),
-        enCasa: l === REVISAR && f.items.some(i => !movido(i) && enDespensa(i.nombre, despensa)),
+        enCasa: l === REVISAR && f.items.some(i => enCasa(i, despensa)),
         items: f.items,
       };
     }).sort((a, b) => alfabetico(a.nombre, b.nombre)),

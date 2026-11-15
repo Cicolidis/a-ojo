@@ -47,6 +47,7 @@ Las specs son `SPEC_v1.md` (el MVP, fases 1 a 6, en su §9) y `SPEC_v2.md` (fase
 - Los ingredientes se muestran por sección y rol con `rolDe()` / `seccionDe()` (`ingredientes.js`): lo editado por ellos gana sobre lo de `/recetas`.
 - **Cantidades escaladas:** para mostrar, `textoCantidad()` (`ingredientes.js`, elige la unidad cómoda y dice «7 u 8»); para la lista de compras, `paraComprar()` / `textoParaComprar()` (lo que se cuenta va para arriba). Las porciones en un texto, con `porcionesTexto()` («1 porción»).
 - **Compras:** el lugar de cada ítem lo calcula `lugarDe()` (`compras.js`) con las reglas de la hoja `Lugares`; en la Sheet solo se guarda adonde lo movieron. Los ids de los ítems (`c_…`) los genera la app.
+- **Despensa:** `todo` la manda siempre entera, como `Compras` y `Lugares`. Dos comparaciones: para sumar o sacar, el nombre entero (`mismoNombre`, y `mismoNombre_` en la API, con los mismos casos en los tests); para leer («En casa», «¿Se terminó algo?»), lo que empieza igual (`enDespensa`). Solo lo que viene de recetas va «En casa». Los ids (`d_…`) los genera la app.
 - **Capturas:** no van por la cola (pesan megas): se achican con `imagenes.js` y se mandan directo con un `lote` fijo por selección, así un reintento no las duplica. En Drive quedan privadas («A ojo/capturas»); `/recetas` las baja con `procesamiento/aojo api capturas <id>`.
 
 ## Tests

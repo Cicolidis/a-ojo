@@ -72,7 +72,7 @@ function claveDe_(url) {
 /**
  * GET todo { since? }
  * Sin `since`: todo. Con `since`: solo lo cambiado después de esa fecha, salvo
- * Compras y Lugares, que van siempre completas (son chicas y así cubren los borrados).
+ * Compras, Lugares y Despensa, que van siempre completas (son chicas y así cubren los borrados).
  * `ahora` es el valor a usar como próximo `since`.
  */
 function accionTodo_(req) {
@@ -974,6 +974,7 @@ function accionComprasAgregar_(req) {
 /**
  * ¿Un ítem marcado como comprado tiene que volver a la lista? Si ahora hace falta más
  * (misma unidad, más cantidad) y es algo que se compra: en «Revisá si tenés», «lo tengo» sigue valiendo.
+ * No mira la despensa (la calcula la app): lo que está «En casa» y se tildó, si ahora hace falta más, se revisa de nuevo.
  */
 function haceFaltaMas_(viejo, nuevo) {
   const aRevisar = viejo.lugar === REVISAR || (!viejo.lugar && (nuevo.rol === 'condimento' || nuevo.rol === 'utensilio'));
