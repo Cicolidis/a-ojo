@@ -152,7 +152,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Compra de la semana
 - [x] «Repetir una semana» y «Usar como modelo», con el selector de semanas
 - [x] Demo con la API falsa (§8, Fase 10b)
-- [ ] Deploy de la API 0.13.0, `setup()` (hoja `Plan`) y smoke
+- [x] Deploy de la API 0.13.0, `setup()` (hoja `Plan`) y smoke
 
 ### Fase 11: pruebas en dispositivos
 
