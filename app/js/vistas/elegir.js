@@ -11,6 +11,7 @@ import { buscar, esPropia } from '../datos.js';
 import { porcionesTexto } from '../formato.js';
 import { recetasEnLista } from '../compras.js';
 import { textoLugar } from './semana.js';
+import { textoSemana } from '../plan.js';
 import { cargando, vacio } from './controles.js';
 
 /** El destino como consulta de la dirección: «?fecha=…&comida=…» (o nada, si es «Sin día»). */
@@ -52,7 +53,8 @@ export function montar(contenedor, { app, volver, reemplazar }, ruta = {}) {
       h('button', { type: 'button', class: 'boton-redondo', 'aria-label': enSemana ? 'Volver a la semana' : 'Volver a compras',
         onclick: () => volver(origen) }, icono('volver'))),
     h('h1', { class: 'titulo-pantalla', tabindex: '-1' }, enSemana ? 'Elegir una receta' : 'Agregar una receta'),
-    enSemana ? h('p', { class: 'secundario' }, 'Para ' + textoLugar(ruta.destino.fecha, ruta.destino.comida).replace('Sin día', 'esta semana, sin día')) : null,
+    enSemana ? h('p', { class: 'secundario' }, ruta.destino.fecha ? 'Para ' + textoLugar(ruta.destino.fecha, ruta.destino.comida)
+      : 'Para la ' + textoSemana(ruta.semana).toLowerCase() + ', sin día') : null,
     h('label', { class: 'buscador' }, icono('buscar', 18), buscador),
     nuestra,
     lista,

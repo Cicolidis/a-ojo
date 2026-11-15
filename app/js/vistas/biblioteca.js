@@ -3,9 +3,8 @@
 import { h, icono, foto } from '../dom.js';
 import { FILTROS, FILTRO_DESCARTADAS, FILTRO_NUESTRAS, buscar, cuantasFilas, esPropia, etiquetasFrecuentes, filtroEtiqueta, motivoVacio, queCocino, resumenBandeja, tengoConDespensa } from '../datos.js';
 import { formatearMinutos } from '../formato.js';
-import { unirConY } from '../ingredientes.js';
+import { porcionesIniciales, unirConY } from '../ingredientes.js';
 import { cargando, navegacion, segmentado, sumarALaSemana, vacio } from './controles.js';
-import { porcionesIniciales } from '../ingredientes.js';
 
 const PISTAS = {
   buscar: { placeholder: 'Nombre o ingrediente… (ej: garbanzos)', etiqueta: 'Buscar recetas' },
@@ -129,7 +128,15 @@ export function montar(contenedor, ctx) {
     ));
   }
 
+  /** Repinta la grilla; si el foco estaba en el botón «Sumar a la semana» de una tarjeta, vuelve al mismo. */
   function pintarGrilla() {
+    const foco = document.activeElement && document.activeElement.getAttribute('data-foco');
+    pintarTarjetas();
+    const el = foco && grilla.querySelector('[data-foco="' + foco + '"]');
+    if (el) el.focus({ preventScroll: true });
+  }
+
+  function pintarTarjetas() {
     // «Con lo que tengo»: de la receta más cercana a la más lejana, con lo que falta.
     const tengoTexto = estado.modo === 'tengo' ? tengoConDespensa(estado.tengo, despensa(), estado.usarDespensa) : '';
     if (tengoTexto) {
@@ -234,7 +241,7 @@ function tarjeta(r, faltan, ctx) {
       : meta ? h('span', { class: 'tarjeta-meta' }, meta) : null,
     valoracion,
   );
-  const semana = r.estado === 'descartada' ? null : h('button', { type: 'button', class: 'boton-redondo boton-semana',
+  const semana = r.estado === 'descartada' ? null : h('button', { type: 'button', class: 'boton-redondo boton-semana', 'data-foco': 'semana:' + r.id,
     'aria-label': 'Sumar ' + r.titulo + ' a la semana',
     onclick: () => sumarALaSemana(ctx, r, { porciones: porcionesIniciales(r) }) }, icono('calendario-mas', 20));
   return h('div', { class: 'tarjeta-caja' }, link, semana);

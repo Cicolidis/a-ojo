@@ -5,7 +5,7 @@ import { h, icono } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
 import { armarLista, cuantasPorComprar } from '../compras.js';
 import { cuantasFilas, resumenBandeja } from '../datos.js';
-import { hoyIso, lunesDe, nuevaEntrada, platosQueFaltan, sumarDias, diaYMes } from '../plan.js';
+import { COMIDAS, diaCorto, diaYMes, diasDe, hoyIso, lunesDe, nuevaEntrada, platosQueFaltan, sumarDias, textoDia } from '../plan.js';
 import { nuevaEdicion } from '../ediciones.js';
 
 /** Un <dialog> que se cierra al tocar afuera (en el fondo oscuro), como las hojas inferiores. */
@@ -19,6 +19,38 @@ export function tocarAfueraCierra(dialogo) {
 }
 
 /**
+ * Elegir el día de una semana (o «Sin día») y, si hay día, la comida: «Mover» en la semana y «Elegir día
+ * y comida». Devuelve { el, valor() → { fecha, comida }, enfocar(), cambiarSemana(semana) }; al cambiar
+ * de semana conserva el mismo día de la semana (el jueves sigue siendo jueves).
+ */
+export function elegirDia(semana, fecha = '', comida = 'cena') {
+  let actual = { semana, fecha: diasDe(semana).includes(fecha) ? fecha : '', comida: comida || 'cena' };
+  const comidas = segmentado('Comida', COMIDAS, actual.comida, v => { actual.comida = v; }, 'chico');
+  const dias = h('div', { class: 'opciones-dias', role: 'group', 'aria-label': 'Día' });
+  function pintar() {
+    const opciones = [''].concat(diasDe(actual.semana));
+    dias.replaceChildren(...opciones.map(f => h('button', { type: 'button', class: 'opcion-lugar opcion-dia',
+      'aria-pressed': String(f === actual.fecha), 'aria-label': f ? textoDia(f) : 'Sin día', onclick: () => {
+        actual.fecha = f;
+        dias.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(opciones[i] === f)));
+        comidas.hidden = !f;
+      } }, f ? diaCorto(f) : 'Sin día')));
+    comidas.hidden = !actual.fecha;
+  }
+  pintar();
+  return {
+    el: h('div', { class: 'elegir-dia' }, dias, comidas),
+    valor: () => ({ fecha: actual.fecha, comida: actual.fecha ? actual.comida : '' }),
+    enfocar: () => (dias.querySelector('[aria-pressed="true"]') || dias.querySelector('button')).focus(),
+    cambiarSemana(nueva) {
+      const i = diasDe(actual.semana).indexOf(actual.fecha);
+      actual = Object.assign({}, actual, { semana: nueva, fecha: i >= 0 ? diasDe(nueva)[i] : '' });
+      pintar();
+    },
+  };
+}
+
+/**
  * «Sumar a la semana» (SPEC_v2 §4.1), desde la ficha y desde las tarjetas de la Biblioteca: una hoja
  * con «Esta semana» y «La que viene» que pone la receta en «Sin día» (con `porciones`, o sin número
  * si la receta no las dice). `conElegir`: también «Elegir día y comida» (la ficha). Al cerrar, el foco
@@ -26,8 +58,13 @@ export function tocarAfueraCierra(dialogo) {
  */
 export function sumarALaSemana({ app, editar, avisar }, receta, { porciones = null, conElegir = false } = {}) {
   const previo = document.activeElement;
-  const esta = lunesDe(hoyIso());
+  const hoy = hoyIso();
+  const esta = lunesDe(hoy);
   const queViene = sumarDias(esta, 7);
+  // El domingo (cuando suelen planificar) la principal es «La que viene»: «Esta semana» termina ese día.
+  const domingo = sumarDias(esta, 6) === hoy;
+  const botonSemana = (semana, principal) => h('button', { type: 'button', class: principal ? 'boton-principal' : 'boton-secundario',
+    onclick: () => poner(semana) }, (semana === esta ? 'Esta semana' : 'La que viene') + ' (del ' + diaYMes(semana) + ')');
   const poner = semana => {
     editar(nuevaEdicion('plan.poner', { quien: app.config.quien,
       items: [nuevaEntrada({ semana, receta_id: receta.id, porciones })] }));
@@ -38,8 +75,7 @@ export function sumarALaSemana({ app, editar, avisar }, receta, { porciones = nu
     h('h2', { id: 'titulo-sumar' }, 'Sumar ' + receta.titulo),
     h('p', { class: 'secundario' }, 'Queda en «Sin día»: después la repartís en la semana.'),
     h('div', { class: 'hoja-botones' },
-      h('button', { type: 'button', class: 'boton-principal', onclick: () => poner(esta) }, 'Esta semana (del ' + diaYMes(esta) + ')'),
-      h('button', { type: 'button', class: 'boton-secundario', onclick: () => poner(queViene) }, 'La que viene (del ' + diaYMes(queViene) + ')'),
+      domingo ? [botonSemana(queViene, true), botonSemana(esta, false)] : [botonSemana(esta, true), botonSemana(queViene, false)],
       conElegir ? h('a', { class: 'boton-texto', href: '#/semana/poner/' + receta.id, onclick: () => dialogo.close() }, icono('calendario', 18), 'Elegir día y comida') : null,
       h('button', { type: 'button', class: 'boton-texto', onclick: () => dialogo.close() }, 'Cancelar'))));
   dialogo.addEventListener('close', () => {

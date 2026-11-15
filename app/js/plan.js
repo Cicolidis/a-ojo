@@ -184,7 +184,11 @@ function copiar(entradas, destino, porId, lugar) {
 
 /** «Repetir una semana»: el mismo día de la semana, la misma comida y las mismas porciones; «Sin día» sigue sin día. */
 export function repetir(entradas, destino, porId) {
-  return copiar(entradas, destino, porId, e => (e.fecha ? { fecha: sumarDias(destino, diasEntre(e.semana, e.fecha)), comida: e.comida } : {}));
+  return copiar(entradas, destino, porId, e => {
+    const dias = diasEntre(e.semana, e.fecha);
+    // Una fecha que no es de su semana (editada a mano en la Sheet) va a «Sin día»: la API rechazaría el lote.
+    return e.fecha && dias >= 0 && dias <= 6 ? { fecha: sumarDias(destino, dias), comida: e.comida } : {};
+  });
 }
 
 /** «Usar como modelo»: todos los platos, con sus porciones, a «Sin día» de la semana de destino. */

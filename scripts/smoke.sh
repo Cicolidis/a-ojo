@@ -134,7 +134,7 @@ revisar "receta.escribir responde no_encontrada (corré setup() si dice falta_co
 R=$(api_post "{\"action\":\"plan.poner\",\"t\":\"$A_OJO_TOKEN\",\"quien\":\"camilo\",\"items\":[{\"id\":\"s_humo0\",\"semana\":\"2026-11-16\",\"receta_id\":\"r_nada0\"}]}")
 revisar "plan.poner responde no_encontrada (corré setup() si dice falta_hoja)" "$(echo "$R" | campo error)" "no_encontrada"
 R=$(api_post "{\"action\":\"plan.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"s_humo0\"]}")
-revisar "plan.quitar ignora lo que no está" "$(echo "$R" | campo data.quitados)" "0"
+revisar "plan.quitar ignora lo que no está (corré setup() si falla)" "$(echo "$R" | campo data.quitados)" "0"
 R=$(api_post "{\"action\":\"lugares.asignar\",\"t\":\"$A_OJO_TOKEN\",\"por\":\"nada\",\"clave\":\"x\",\"lugar\":\"feria\"}")
 revisar "lugares.asignar valida" "$(echo "$R" | campo error)" "por_invalido"
 

@@ -6,10 +6,9 @@
 
 import { h, icono, foto, rellenar } from '../dom.js';
 import { nuevaEdicion } from '../ediciones.js';
-import { hayQueGuardarVista } from '../ingredientes.js';
-import { COMIDAS, armarSemana, comoModelo, diaCorto, diasDe, hayCompra, hoyIso, lunesDe, repetir, semanasAnteriores, sumarDias, textoDia, textoSemana } from '../plan.js';
-import { unirConY } from '../ingredientes.js';
-import { cargando, contadorPorciones, navegacion, segmentado, tocarAfueraCierra, vacio } from './controles.js';
+import { hayQueGuardarVista, unirConY } from '../ingredientes.js';
+import { COMIDAS, armarSemana, comoModelo, hayCompra, hoyIso, lunesDe, repetir, semanasAnteriores, sumarDias, textoDia, textoSemana } from '../plan.js';
+import { cargando, contadorPorciones, elegirDia, navegacion, tocarAfueraCierra, vacio } from './controles.js';
 
 /** «Lunes 16 · Cena» o «Sin día». */
 export function textoLugar(fecha, comida) {
@@ -96,10 +95,14 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
       entradas.length ? h('ul', { class: 'entradas' }, entradas.map(entrada)) : null);
   }
 
-  /** Manda la entrada con otros datos (otro día, comida o porciones): plan.poner la reemplaza por id. */
+  /**
+   * Manda la entrada con otros datos (otro día, comida o porciones): plan.poner la reemplaza por id. Parte
+   * de la entrada como está ahora en el plan (si el otro celular la movió con la hoja abierta, no la devuelve).
+   */
   function poner(e, cambios) {
-    const nueva = Object.assign({ id: e.id, semana: e.semana, fecha: e.fecha, comida: e.comida, receta_id: e.receta_id,
-      porciones: e.porciones }, cambios);
+    const ahora = (app.datos.plan || []).find(x => x.id === e.id) || e;
+    const nueva = Object.assign({ id: ahora.id, semana: ahora.semana, fecha: ahora.fecha, comida: ahora.comida, receta_id: ahora.receta_id,
+      porciones: ahora.porciones }, cambios);
     editar(nuevaEdicion('plan.poner', { items: [nueva], quien: app.config.quien }));
     return nueva;
   }
@@ -127,7 +130,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
         dialogo.close();
       } }, icono('cocinar', 22), 'Empezar a cocinar'));
     }
-    if (r) acciones.push(h('button', { type: 'button', class: 'boton-secundario', onclick: () => elegirLugar(e) }, icono('mover', 20), 'Mover'));
+    if (r) acciones.push(h('button', { type: 'button', class: 'boton-secundario', onclick: () => elegirLugar(e, () => porciones) }, icono('mover', 20), 'Mover'));
     acciones.push(h('button', { type: 'button', class: 'boton-secundario alerta-texto', onclick: () => {
       editar(nuevaEdicion('plan.quitar', { ids: [e.id] }));
       foco = claveMas(e.fecha, e.comida);
@@ -143,37 +146,31 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
       h('div', { class: 'hoja-botones' }, acciones));
     dialogo.onclose = () => {
       dialogo.onclose = null;
-      if (porciones && porciones !== Number(e.porciones) && (app.datos.plan || []).some(x => x.id === e.id)) poner(e, { porciones });
+      const ahora = (app.datos.plan || []).find(x => x.id === e.id);
+      if (ahora && porciones && porciones !== Number(ahora.porciones)) poner(e, { porciones });
       pintar(foco);
     };
     dialogo.showModal();
   }
 
-  /** «Mover»: primero el día (o «Sin día») y después la comida; «Mover» confirma. */
-  function elegirLugar(e) {
-    let fecha = e.fecha;
-    let cual = e.comida || 'cena';
-    const comidas = segmentado('Comida', COMIDAS, cual, v => { cual = v; }, 'chico');
-    const dias = [''].concat(diasDe(semana));
-    const botones = dias.map(f => h('button', { type: 'button', class: 'opcion-lugar opcion-dia', 'aria-pressed': String(f === fecha),
-      'aria-label': f ? textoDia(f) : 'Sin día', onclick: () => {
-        fecha = f;
-        botones.forEach((b, i) => b.setAttribute('aria-pressed', String(dias[i] === fecha)));
-        comidas.hidden = !fecha;
-      } }, f ? diaCorto(f) : 'Sin día'));
-    comidas.hidden = !fecha;
+  /**
+   * «Mover»: primero el día (o «Sin día») y después la comida; «Mover» confirma. Las porciones que se
+   * cambiaron en la hoja (`porcionesAhora()`) van en el mismo plan.poner.
+   */
+  function elegirLugar(e, porcionesAhora) {
+    const elegir = elegirDia(semana, e.fecha, e.comida);
     rellenar(dialogo,
       h('h2', { id: 'titulo-entrada' }, '¿Cuándo hacemos ' + e.receta.titulo + '?'),
-      h('div', { class: 'opciones-dias', role: 'group', 'aria-label': 'Día' }, botones),
-      comidas,
+      elegir.el,
       h('div', { class: 'form-botones' },
         h('button', { type: 'button', class: 'boton-secundario', onclick: () => dialogo.close() }, 'Cancelar'),
         h('button', { type: 'button', class: 'boton-principal', onclick: () => {
-          const destino = { fecha, comida: fecha ? cual : '' };
-          if (destino.fecha !== e.fecha || destino.comida !== e.comida) {
-            poner(e, destino);
-            avisar('Movida a ' + textoLugar(destino.fecha, destino.comida) + '.');
-          }
+          const destino = elegir.valor();
+          const n = porcionesAhora();
+          const cambios = Object.assign({}, destino, n && n !== Number(e.porciones) ? { porciones: n } : {});
+          const seMovio = destino.fecha !== e.fecha || destino.comida !== e.comida;
+          if (seMovio || 'porciones' in cambios) poner(e, cambios);
+          if (seMovio) avisar('Movida a ' + textoLugar(destino.fecha, destino.comida) + '.');
           // Ya está mandada con su lugar nuevo: al cerrar no se vuelve a mandar.
           e = Object.assign({}, e, destino);
           dialogo.onclose = () => {
@@ -182,7 +179,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
           };
           dialogo.close();
         } }, 'Mover')));
-    botones.find(b => b.getAttribute('aria-pressed') === 'true').focus();
+    elegir.enfocar();
   }
 
   const anteriores = () => semanasAnteriores(app.datos ? app.datos.plan : [], semana, app.indice.porId);
@@ -267,7 +264,7 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
         h('div', { class: 'semana-comida-cabeza' }, h('h2', null, 'Sin día'), botonMas('', '')),
         h('ul', { class: 'entradas' }, s.sinDia.map(entrada))) : null,
       s.dias.map(d => h('section', { class: 'semana-dia' + (d.fecha === hoy ? ' hoy' : ''), 'aria-label': textoDia(d.fecha) },
-        h('h2', null, textoDia(d.fecha), d.fecha === hoy ? h('span', { class: 'marca-hoy' }, 'Hoy') : null),
+        h('h2', null, textoDia(d.fecha), d.fecha === hoy ? [' ', h('span', { class: 'marca-hoy' }, 'Hoy')] : null),
         comida(d.fecha, 'almuerzo', d.almuerzo),
         comida(d.fecha, 'cena', d.cena))),
     );
@@ -289,9 +286,19 @@ export function montar(contenedor, { app, editar, avisar, reemplazar }, semanaPe
   }
 
   actualizar();
+  // Volver a la semana (desde una ficha, el «+» o la compra) la deja donde estaba; la primera vez, con hoy a la vista.
+  const recordado = app.semanaScroll && app.semanaScroll.semana === semana ? app.semanaScroll.y : null;
+  requestAnimationFrame(() => {
+    if (recordado !== null) return window.scrollTo(0, recordado);
+    const elHoy = zona.querySelector('.semana-dia.hoy');
+    if (elHoy) elHoy.scrollIntoView({ block: 'nearest' });
+  });
   return {
     actualizar,
+    // Con la hoja abierta (porciones sin mandar), una versión nueva de la app espera para recargar.
+    ocupada: () => dialogo.open,
     desmontar() {
+      app.semanaScroll = { semana, y: window.scrollY };
       if (dialogo.open) dialogo.close();
     },
   };

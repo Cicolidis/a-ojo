@@ -1750,3 +1750,10 @@ test('semanasAnteriores, repetir y comoModelo: ids nuevos, mismo día y comida, 
   assert.ok(m.items.every(i => i.fecha === '' && i.comida === '' && i.semana === '2026-11-23'));
   assert.deepEqual(m.items.map(i => i.porciones), [4, 2, null]);
 });
+
+test('repetir: una entrada con una fecha que no es de su semana (editada a mano) va a «Sin día»', async () => {
+  const p = await cargar('plan.js');
+  const porId = new Map([['r_x', { id: 'r_x', titulo: 'X' }]]);
+  const { items } = p.repetir([{ id: 's_1', semana: '2026-11-02', fecha: '2026-11-12', comida: 'cena', receta_id: 'r_x', porciones: 2 }], '2026-11-16', porId);
+  assert.deepEqual([items[0].fecha, items[0].comida], ['', '']);
+});

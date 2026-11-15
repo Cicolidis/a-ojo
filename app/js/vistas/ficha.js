@@ -35,9 +35,9 @@ export function montar(contenedor, { app, volver, editar, avisar }, id) {
     pintar();
   };
 
-  // Vuelve adonde estaban: la semana (si se llegó desde ahí) o, si no, la Biblioteca.
+  // Vuelve adonde estaban: la semana o su compra (si se llegó desde ahí) o, si no, la Biblioteca.
   const desde = history.state && history.state.desde;
-  const origen = typeof desde === 'string' && leerRuta(desde).nombre === 'semana' ? desde : '#/';
+  const origen = typeof desde === 'string' && ['semana', 'semana-compra'].includes(leerRuta(desde).nombre) ? desde : '#/';
   const portada = foto(r, 'ficha-foto');
   portada.prepend(h('button', { type: 'button', class: 'boton-redondo', 'aria-label': 'Volver', onclick: () => volver(origen) },
     icono('volver')),

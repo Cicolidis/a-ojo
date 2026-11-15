@@ -107,7 +107,7 @@ Cambios en acciones que ya existen:
 - Cada día, en una fila, con **almuerzo** y **cena**. Cada receta muestra su foto chica, el título y las porciones («Pollo marroquí · 4»); tocarla abre la ficha.
 - En cada comida (y en «Sin día»), «+» abre el buscador de recetas (el de «Agregar una receta» en Compras: `elegir.js`), que arriba ofrece **«Una receta nuestra»** (§6), y después un paso para elegir las porciones (las de la última vista de esa receta, con −/+).
 - Cada entrada se puede **mover** (a otro día, a la otra comida o a «Sin día», con una hoja como la de mover en Compras), **cambiar las porciones** o **quitar**.
-- **«Sumar a la semana»**, desde la ficha (en la barra fija de abajo, al lado de «Empezar a cocinar») y desde cada tarjeta de la Biblioteca (un calendario con «+»; no en las descartadas): una hoja con «Esta semana (del 16/11)» y «La que viene (del 23/11)» que pone la receta en «Sin día» con las porciones que se están viendo (o las de su última vista). Desde la ficha, la hoja también ofrece «Elegir día y comida» (la semana, el día, la comida y las porciones).
+- **«Sumar a la semana»**, desde la ficha (en la barra fija de abajo, al lado de «Empezar a cocinar») y desde cada tarjeta de la Biblioteca (un calendario con «+»; no en las descartadas): una hoja con «Esta semana (del 16/11)» y «La que viene (del 23/11)» (el domingo, «La que viene» primero) que pone la receta en «Sin día» con las porciones que se están viendo (o las de su última vista). Desde la ficha, la hoja también ofrece «Elegir día y comida» (la semana, el día, la comida y las porciones).
 - «Mover» elige primero el día (Sin día, Lu…Do) y después la comida.
 - Una entrada cuya receta ya no está se muestra «Receta que ya no está», con solo «Quitar». Una descartada se muestra con la marca «Descartada» y entra en la compra.
 - Si una receta de hoy tiene pasos, su entrada ofrece «Empezar a cocinar» con esas porciones.
@@ -279,7 +279,7 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
 - **Despensa (Fase 9):** «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa.
-- **Plan semanal (Fase 10b, 15/11):** lunes a domingo, almuerzo y cena; cuatro pestañas con Semana segunda; historial de 8 semanas; al repetir sobre una semana con algo se pregunta «Sumar» o «Reemplazar»; «Usar como modelo» trae todos los platos; «Sumar a la semana» también desde las tarjetas de la Biblioteca, a esta semana o a la que viene.
+- **Plan semanal (Fase 10b, 15/11):** lunes a domingo, almuerzo y cena; cuatro pestañas con Semana segunda; historial de 8 semanas; al repetir sobre una semana con algo se pregunta «Sumar» o «Reemplazar»; «Usar como modelo» trae todos los platos; «Sumar a la semana» también desde las tarjetas de la Biblioteca, a esta semana o a la que viene. El domingo, la hoja ofrece primero «La que viene». Los platos que quedan en «Sin día» de una semana pasada quedan como historial (se revisa con el uso, en la Fase 11).
 - **Recetas propias (Fase 10a, 15/11):** arrancan en 2 porciones y como saladas, sin foto. En «Editar», las porciones se llaman «Rinde». No se borran: se descartan.
 - **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
