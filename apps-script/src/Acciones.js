@@ -96,6 +96,8 @@ function accionTodo_(req) {
     const compras = leerDatos_('Compras');
     // Antes de correr setup() la hoja no existe: la app usa el lugar por defecto.
     const lugares = planilla_().getSheetByName('Lugares') ? leerDatos_('Lugares') : [];
+    // Siempre entera, como Compras y Lugares: así los borrados llegan al otro celular.
+    const despensa = planilla_().getSheetByName('Despensa') ? leerDatos_('Despensa') : [];
 
     if (since) {
       recetas = recetas.filter(r => cambio(r.actualizado));
@@ -117,6 +119,7 @@ function accionTodo_(req) {
       notas: notas,
       compras: compras,
       lugares: lugares,
+      despensa: despensa,
       bandeja: bandeja,
     };
   });
@@ -859,14 +862,18 @@ function accionNotaBorrar_(req) {
 const ID_COMPRA_ = /^c_[0-9a-z]{5,12}$/;
 const MAX_ITEMS_COMPRA_ = 150;
 
-/** Los `ids` de la petición, validados. */
-function idsCompras_(req) {
+/** Los `ids` de la petición, validados con `patron` (de compras, de la despensa…). */
+function idsValidos_(req, patron, que) {
   const ids = Array.isArray(req.ids) ? req.ids.map(id => String(id || '').trim()) : [];
   if (!ids.length) throw errorApi_('sin_ids', 400, 'Falta «ids».');
   if (ids.length > MAX_ITEMS_COMPRA_) throw errorApi_('demasiados', 400, 'Son demasiados ítems de una vez.');
-  const malos = ids.filter(id => !ID_COMPRA_.test(id));
-  if (malos.length) throw errorApi_('id_invalido', 400, 'No son ids de compras: ' + malos.join(', ') + '.');
+  const malos = ids.filter(id => !patron.test(id));
+  if (malos.length) throw errorApi_('id_invalido', 400, 'No son ids de ' + que + ': ' + malos.join(', ') + '.');
   return ids;
+}
+
+function idsCompras_(req) {
+  return idsValidos_(req, ID_COMPRA_, 'compras');
 }
 
 /** Filas de Compras con esos ids (las que ya no existen se ignoran: las borró el otro celular). */
@@ -1014,6 +1021,77 @@ function accionComprasQuitar_(req) {
   return conLock_(() => {
     const filas = filasCompras_(ids);
     borrarFilas_('Compras', filas.map(f => f.fila));
+    return { quitados: filas.length };
+  });
+}
+
+// Despensa (SPEC_v2 §2 y §5): lo que hay en casa. Los ids d_… los genera la app.
+
+const ID_DESPENSA_ = /^d_[0-9a-z]{5,12}$/;
+
+/** La misma palabra en singular o plural: huevo/huevos, limón/limones (como mismaPalabra de app/js/compras.js). */
+function mismaPalabra_(a, b) {
+  return a === b || a + 's' === b || b + 's' === a || a + 'es' === b || b + 'es' === a;
+}
+
+/** ¿Es el mismo nombre? Sin tildes ni mayúsculas y tolerante a plurales simples (como mismoNombre de la app). */
+function mismoNombre_(a, b) {
+  const x = claveTexto_(a).split(' ').filter(String);
+  const y = claveTexto_(b).split(' ').filter(String);
+  return x.length > 0 && x.length === y.length && x.every((p, i) => mismaPalabra_(p, y[i]));
+}
+
+/**
+ * POST despensa.sumar { items: [{ id, nombre }], quien }
+ * Suma lo que todavía no está: ni por id ni por nombre (sin tildes, tolerando plurales;
+ * «huevo» y «Huevos» son lo mismo). Un reintento no duplica nada. Devuelve { ids, nuevos }:
+ * los ids que quedaron sumados ahora.
+ */
+function accionDespensaSumar_(req) {
+  const lista = Array.isArray(req.items) ? req.items : [];
+  if (!lista.length) throw errorApi_('sin_items', 400, 'Falta «items».');
+  if (lista.length > MAX_ITEMS_COMPRA_) throw errorApi_('demasiados', 400, 'Son demasiados ítems de una vez.');
+  const quien = String(req.quien || '').trim().toLowerCase();
+  if (ENUMS.quien.indexOf(quien) === -1) {
+    throw errorApi_('quien_invalido', 400, '«quien» tiene que ser ' + ENUMS.quien.join(' o ') + '.');
+  }
+  const errores = [];
+  const items = lista.map((it, i) => {
+    const donde = 'ítem ' + (i + 1);
+    it = it || {};
+    const id = String(it.id || '').trim();
+    if (!ID_DESPENSA_.test(id)) errores.push(donde + ': «' + id + '» no es un id de la despensa');
+    const nombre = vacio_(it.nombre) ? '' : String(it.nombre).trim().replace(/\s+/g, ' ');
+    if (!nombre) errores.push(donde + ': falta el nombre');
+    if (nombre.length > 80) errores.push(donde + ': el nombre es muy largo');
+    return { id: id, nombre: nombre };
+  });
+  if (errores.length) {
+    const err = errorApi_('items_invalidos', 400, 'Revisá la lista: ' + errores.join('; ') + '.');
+    err.detalles = errores;
+    throw err;
+  }
+
+  return conLock_(() => {
+    exigirColumnas_('Despensa', ['id', 'nombre', 'desde', 'quien', 'actualizado']);
+    const hay = leerDatos_('Despensa');
+    const ahora = ahoraIso_();
+    const nuevos = [];
+    items.forEach(it => {
+      const ya = hay.concat(nuevos).some(d => d.id === it.id || mismoNombre_(d.nombre, it.nombre));
+      if (!ya) nuevos.push({ id: it.id, nombre: it.nombre, desde: ahora, quien: quien, actualizado: ahora });
+    });
+    if (nuevos.length) agregarFilas_('Despensa', nuevos);
+    return { ids: nuevos.map(d => d.id), nuevos: nuevos.length };
+  });
+}
+
+/** POST despensa.quitar { ids }: lo que se terminó o se sacó a mano. Los que ya no están se ignoran. */
+function accionDespensaQuitar_(req) {
+  const ids = idsValidos_(req, ID_DESPENSA_, 'la despensa');
+  return conLock_(() => {
+    const filas = leerFilas_('Despensa').filter(f => ids.indexOf(f.datos.id) !== -1);
+    borrarFilas_('Despensa', filas.map(f => f.fila));
     return { quitados: filas.length };
   });
 }

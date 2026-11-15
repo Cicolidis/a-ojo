@@ -664,6 +664,73 @@ test('textoParaComprar: lo que va a quedar en la lista', async () => {
   assert.equal(textoParaComprar({ cantidad: 3, unidad: 'cda' }, 1.3), '¼ taza');
 });
 
+test('despensa: aplicarEdicion suma sin duplicar (por id o por nombre) y quita por id, como la API', async () => {
+  const { aplicarEdicion, nuevaEdicion } = await cargar('ediciones.js');
+  let d = { recetas: [], compras: [], despensa: [{ id: 'd_sal0001', nombre: 'sal' }] };
+  const sumar = nuevaEdicion('despensa.sumar', { quien: 'pareja', items: [
+    { id: 'd_huevo01', nombre: ' Huevos ' }, { id: 'd_huevo02', nombre: 'huevo' }, { id: 'd_sal0002', nombre: 'Sal' },
+  ] }, new Date('2026-11-14T12:00:00Z'));
+  d = aplicarEdicion(d, sumar);
+  assert.deepEqual(d.despensa.map(x => [x.id, x.nombre]), [['d_sal0001', 'sal'], ['d_huevo01', 'Huevos']]);
+  assert.deepEqual([d.despensa[1].quien, d.despensa[1].desde, d.despensa[1].actualizado], ['pareja', '2026-11-14T12:00:00.000Z', '2026-11-14T12:00:00.000Z']);
+  assert.deepEqual(aplicarEdicion(d, sumar), d, 'aplicarla dos veces da lo mismo');
+  const quitar = nuevaEdicion('despensa.quitar', { ids: ['d_sal0001', 'd_noesta1'] });
+  d = aplicarEdicion(d, quitar);
+  assert.deepEqual(d.despensa.map(x => x.id), ['d_huevo01']);
+  assert.deepEqual(aplicarEdicion(d, quitar), d);
+  assert.deepEqual(aplicarEdicion({ recetas: [], compras: [] }, sumar).despensa.length, 2, 'sin despensa todavía (datos viejos)');
+});
+
+test('despensa: aplicarDelta y trajoCambios la tratan entera, y una API vieja que no la manda no la borra', async () => {
+  const { aplicarDelta, trajoCambios } = await cargar('datos.js');
+  const datos = aplicarDelta(null, fixture());
+  assert.equal(datos.despensa.length, 3);
+  const vacio = { ahora: '2026-11-14T00:00:00Z', completo: false, recetas: [], notas: [], bandeja: [], compras: datos.compras, lugares: datos.lugares };
+  assert.equal(trajoCambios(datos, vacio), false);
+  assert.equal(aplicarDelta(datos, vacio).despensa.length, 3, 'una API de antes de la Fase 9 no la manda');
+  const otra = Object.assign({}, vacio, { despensa: [{ id: 'd_x00001', nombre: 'leche' }] });
+  assert.equal(trajoCambios(datos, otra), true);
+  assert.deepEqual(aplicarDelta(datos, otra).despensa.map(d => d.nombre), ['leche']);
+  assert.deepEqual(aplicarDelta(null, Object.assign({}, fixture(), { despensa: undefined })).despensa, []);
+});
+
+test('despensa: «En casa» vale para lo que empieza igual; para sumar o sacar, el nombre entero', async () => {
+  const c = await cargar('compras.js');
+  const despensa = [{ id: 'd_1', nombre: 'yogur' }, { id: 'd_2', nombre: 'Harina 0000' }, { id: 'd_3', nombre: 'huevos' }];
+  assert.equal(c.enDespensa('yogur griego', despensa)?.id, 'd_1');
+  assert.equal(c.enDespensa('Huevo', despensa)?.id, 'd_3');
+  assert.equal(c.enDespensa('harina', despensa), null, '«harina 0000» no cubre «harina»');
+  assert.equal(c.filaDeDespensa('Yogures', despensa)?.id, 'd_1');
+  assert.equal(c.filaDeDespensa('yogur griego', despensa), null, 'destildar «yogur griego» no saca «yogur»');
+  assert.deepEqual(c.paraDespensa([
+    { nombre: 'Leche', rol: 'principal' }, { nombre: 'leches', rol: 'principal' }, { nombre: 'papel manteca', rol: 'utensilio' },
+    { nombre: 'Huevo', rol: 'principal' }, { nombre: 'servilletas', rol: 'principal' }, { nombre: '  ', rol: 'principal' },
+  ], despensa), ['Leche', 'servilletas'], 'sin utensilios, sin lo que ya está, sin repetidos');
+  const receta = { ingredientes: [
+    { nombre: 'yogur griego', rol: 'principal' }, { nombre: 'huevos', rol: 'principal' }, { nombre: 'huevo', rol: 'principal' },
+    { nombre: 'sal', rol: 'condimento' }, { nombre: 'harina', rol: 'principal' },
+  ] };
+  assert.deepEqual(c.enCasaDeReceta(receta, despensa).map(d => d.id), ['d_1', 'd_3'], 'una vez cada fila, solo principales');
+});
+
+test('despensa en la lista: lo que hay en casa va a «Revisá si tenés» con «En casa», salvo lo movido a mano', async () => {
+  const { armarLista, cuantasPorComprar, lugarDe } = await cargar('compras.js');
+  const despensa = [{ id: 'd_1', nombre: 'yogur' }, { id: 'd_2', nombre: 'leche' }];
+  const items = [
+    itemCompra('c_yogur01', 'r_1', 'yogur griego', 200, 'g', 'lácteos y huevos'),
+    itemCompra('c_leche01', 'r_1', 'leche', 1, 'l', 'lácteos y huevos', 'principal', { lugar: 'supermercado' }),
+    itemCompra('c_papa001', 'r_1', 'papa', 1, 'kg', 'verdulería'),
+  ];
+  assert.equal(lugarDe(items[0], [], despensa), 'revisar');
+  assert.equal(lugarDe(items[1], [], despensa), 'supermercado', 'lo movido a mano gana');
+  const grupos = armarLista(items, [], despensa);
+  const revisar = grupos.find(g => g.lugar === 'revisar');
+  assert.deepEqual(revisar.filas.map(f => [f.nombre, f.enCasa]), [['Yogur griego', true]]);
+  assert.equal(grupos.find(g => g.lugar === 'supermercado').filas[0].enCasa, false);
+  assert.equal(cuantasPorComprar(grupos), 2, 'lo que está en casa no cuenta para comprar');
+  assert.equal(armarLista(items, []).find(g => g.lugar === 'revisar'), undefined, 'sin despensa, como antes');
+});
+
 test('itemsDeReceta: lo elegido, escalado, más los condimentos y utensilios para revisar', async () => {
   const { indexar, aplicarDelta } = await cargar('datos.js');
   const c = await cargar('compras.js');

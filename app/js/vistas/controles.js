@@ -146,7 +146,7 @@ export function navegacion(activa, app) {
   });
   const el = h('nav', { class: 'navegacion', 'aria-label': 'Secciones' }, secciones.map(s => s.link));
   el.actualizar = () => {
-    const comprar = app.datos ? cuantasPorComprar(armarLista(app.datos.compras, app.datos.lugares)) : 0;
+    const comprar = app.datos ? cuantasPorComprar(armarLista(app.datos.compras, app.datos.lugares, app.datos.despensa)) : 0;
     const ayuda = resumenBandeja(app.datos?.bandeja).ayuda;
     const numeros = {
       compras: [comprar, comprar === 1 ? '1 cosa por comprar' : comprar + ' cosas por comprar'],

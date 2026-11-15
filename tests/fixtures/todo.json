@@ -982,6 +982,11 @@
       "actualizado": "2026-10-11T10:00:00.000Z"
     }
   ],
+  "despensa": [
+    { "id": "d_aceite1", "nombre": "aceite de oliva", "desde": "2026-10-10T10:00:00.000Z", "quien": "camilo", "actualizado": "2026-10-10T10:00:00.000Z" },
+    { "id": "d_azucar1", "nombre": "Azúcar", "desde": "2026-10-10T10:00:00.000Z", "quien": "pareja", "actualizado": "2026-10-10T10:00:00.000Z" },
+    { "id": "d_sal0001", "nombre": "sal", "desde": "2026-10-10T10:00:00.000Z", "quien": "pareja", "actualizado": "2026-10-10T10:00:00.000Z" }
+  ],
   "bandeja": [
     {
       "id": "b_00066",

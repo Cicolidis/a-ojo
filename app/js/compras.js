@@ -39,7 +39,7 @@ export function mismoNombre(a, b) {
 }
 
 /** ¿El nombre empieza con las palabras de la regla? «yogur» vale para «yogur griego». */
-function empiezaCon(nombre, clave) {
+export function empiezaCon(nombre, clave) {
   const x = palabras(nombre);
   const y = palabras(clave);
   return y.length > 0 && y.length <= x.length && y.every((p, i) => mismaPalabra(p, x[i]));
@@ -67,10 +67,54 @@ export function lugarPorRegla(item, lugares) {
   return tipo ? tipo.lugar : POR_DEFECTO;
 }
 
-/** Dónde va un ítem de la lista: adonde lo movieron, «Revisá si tenés» (condimentos y utensilios) o el de la regla. */
-export function lugarDe(item, lugares) {
-  if (item.lugar === REVISAR || LUGARES.includes(item.lugar)) return item.lugar;
-  if (A_REVISAR.includes(item.rol)) return REVISAR;
+// La despensa (SPEC_v2 §5). Para leer («En casa», «¿Se terminó algo?») vale lo que empieza
+// igual, como las reglas de Lugares: «yogur» en la despensa vale para «yogur griego». Para
+// escribir (sumar, sacar), el nombre entero (mismoNombre): «harina» no tapa «harina de garbanzos».
+
+/** La fila de la despensa que cubre ese ingrediente («yogur» para «yogur griego»), o null. */
+export function enDespensa(nombre, despensa) {
+  return (despensa || []).find(d => empiezaCon(nombre, d.nombre)) || null;
+}
+
+/** La fila de la despensa con ese mismo nombre (sin tildes, tolerando plurales), o null. */
+export function filaDeDespensa(nombre, despensa) {
+  return (despensa || []).find(d => mismoNombre(d.nombre, nombre)) || null;
+}
+
+/**
+ * Los nombres que pasan a la despensa de una tanda de ítems de compras (lo marcado al
+ * limpiar, lo tildado en «Revisá si tenés»): sin utensilios, sin lo que ya está y sin repetidos.
+ */
+export function paraDespensa(items, despensa) {
+  const nombres = [];
+  for (const it of items || []) {
+    const nombre = String(it.nombre || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    if (!nombre || it.rol === 'utensilio' || filaDeDespensa(nombre, despensa) || nombres.some(n => mismoNombre(n, nombre))) continue;
+    nombres.push(nombre);
+  }
+  return nombres;
+}
+
+/** Las filas de la despensa que tocan a los principales de la receta («¿Se terminó algo?»), una vez cada una. */
+export function enCasaDeReceta(receta, despensa) {
+  const filas = [];
+  for (const ing of receta?.ingredientes || []) {
+    if (rolDe(ing) !== 'principal') continue;
+    const fila = enDespensa(ing.nombre, despensa);
+    if (fila && !filas.includes(fila)) filas.push(fila);
+  }
+  return filas;
+}
+
+const movido = item => item.lugar === REVISAR || LUGARES.includes(item.lugar);
+
+/**
+ * Dónde va un ítem de la lista: adonde lo movieron; «Revisá si tenés» si está en la
+ * despensa o es condimento o utensilio; si no, el de la regla.
+ */
+export function lugarDe(item, lugares, despensa) {
+  if (movido(item)) return item.lugar;
+  if (A_REVISAR.includes(item.rol) || enDespensa(item.nombre, despensa)) return REVISAR;
   return lugarPorRegla(item, lugares);
 }
 
@@ -246,12 +290,13 @@ function desglose(items) {
 /**
  * La lista para mostrar: [{ lugar, nombre, filas }], con los lugares en el orden de
  * LUGARES y «Revisá si tenés» al final. Cada fila junta los ítems con el mismo
- * nombre en ese lugar: { clave, nombre, cantidad, desglose, ids, hecho, opcional, items }.
+ * nombre en ese lugar: { clave, nombre, cantidad, desglose, ids, hecho, opcional, enCasa, items }.
+ * `enCasa`: está en «Revisá si tenés» porque está en la despensa (no porque lo movieron).
  * Lo de «Revisá si tenés» que ya está para comprar se suma a esa fila. Dentro de
  * cada lugar, las filas van en orden alfabético (lo marcado no se mueve).
  */
-export function armarLista(compras, lugares) {
-  const conLugar = (compras || []).map(c => ({ c, lugar: lugarDe(c, lugares) }));
+export function armarLista(compras, lugares, despensa) {
+  const conLugar = (compras || []).map(c => ({ c, lugar: lugarDe(c, lugares, despensa) }));
   const orden = conLugar.filter(x => x.lugar !== REVISAR).concat(conLugar.filter(x => x.lugar === REVISAR));
   const grupos = new Map();
   const todas = [];
@@ -278,6 +323,7 @@ export function armarLista(compras, lugares) {
         ids: f.items.map(i => i.id),
         hecho: f.items.every(i => i.hecho === true || i.hecho === 'true'),
         opcional: f.items.every(i => i.rol === 'opcional'),
+        enCasa: l === REVISAR && f.items.some(i => !movido(i) && enDespensa(i.nombre, despensa)),
         items: f.items,
       };
     }).sort((a, b) => alfabetico(a.nombre, b.nombre)),

@@ -116,6 +116,12 @@ R=$(api_post "{\"action\":\"compras.agregar\",\"t\":\"$A_OJO_TOKEN\",\"items\":[
 revisar "compras.agregar suma un ítem" "$(echo "$R" | campo data.nuevos)" "1"
 R=$(api_post "{\"action\":\"compras.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"$COMPRA\"]}")
 revisar "compras.quitar lo saca" "$(echo "$R" | campo data.quitados)" "1"
+# Despensa (Fase 9): una fila de prueba que se suma y se quita enseguida.
+DESPENSA="d_humo$(echo "$SELLO" | tail -c 7)"
+R=$(api_post "{\"action\":\"despensa.sumar\",\"t\":\"$A_OJO_TOKEN\",\"quien\":\"camilo\",\"items\":[{\"id\":\"$DESPENSA\",\"nombre\":\"Prueba de humo $SELLO\"}]}")
+revisar "despensa.sumar suma una fila (corré setup() si no)" "$(echo "$R" | campo data.nuevos)" "1"
+R=$(api_post "{\"action\":\"despensa.quitar\",\"t\":\"$A_OJO_TOKEN\",\"ids\":[\"$DESPENSA\"]}")
+revisar "despensa.quitar la saca" "$(echo "$R" | campo data.quitados)" "1"
 R=$(api_post "{\"action\":\"lugares.asignar\",\"t\":\"$A_OJO_TOKEN\",\"por\":\"nada\",\"clave\":\"x\",\"lugar\":\"feria\"}")
 revisar "lugares.asignar valida" "$(echo "$R" | campo error)" "por_invalido"
 

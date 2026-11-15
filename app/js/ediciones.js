@@ -5,7 +5,7 @@
 // Puro, sin DOM ni IndexedDB.
 
 import { rolUsuario, seccionUsuario, nuevasVistas } from './ingredientes.js';
-import { claveIngrediente } from './compras.js';
+import { claveIngrediente, mismoNombre } from './compras.js';
 import { extraerLink, mismoLink, plataformaDe, unirPedido } from './bandeja.js';
 
 const ALFABETO = '0123456789abcdefghijklmnopqrstuvwxyz';
@@ -129,6 +129,19 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       if (!lugares.some(misma)) return Object.assign({}, datos, { lugares: lugares.concat({ id: '', por: d.por, clave, lugar: d.lugar }) });
       return Object.assign({}, datos, { lugares: lugares.map(l => (misma(l) ? Object.assign({}, l, { lugar: d.lugar }) : l)) });
     }
+    case 'despensa.sumar': {
+      // Como la API: lo que ya está (por id o por nombre, también dentro del mismo pedido) no se toca.
+      const despensa = (datos.despensa || []).slice();
+      const cuando = creada || new Date().toISOString();
+      for (const it of d.items || []) {
+        const nombre = String(it.nombre || '').trim().replace(/\s+/g, ' ');
+        if (!nombre || despensa.some(x => x.id === it.id || mismoNombre(x.nombre, nombre))) continue;
+        despensa.push({ id: it.id, nombre, desde: cuando, quien: d.quien || '', actualizado: cuando });
+      }
+      return Object.assign({}, datos, { despensa });
+    }
+    case 'despensa.quitar':
+      return Object.assign({}, datos, { despensa: (datos.despensa || []).filter(x => !d.ids.includes(x.id)) });
     case 'bandeja.actualizar':
       return Object.assign({}, datos, {
         bandeja: datos.bandeja.map(b => {
@@ -214,7 +227,10 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
   }
 }
 
-/** Como haceFaltaMas_ de la API: un ítem marcado vuelve a la lista si ahora hace falta más de algo que se compra. */
+/**
+ * Como haceFaltaMas_ de la API: un ítem marcado vuelve a la lista si ahora hace falta más de algo que se compra.
+ * No mira la despensa (ni la API): lo que está «En casa» y se tildó, si la receta ahora pide más, se revisa de nuevo.
+ */
 function haceFaltaMas(viejo, nuevo) {
   const aRevisar = viejo.lugar === 'revisar' || (!viejo.lugar && (nuevo.rol === 'condimento' || nuevo.rol === 'utensilio'));
   return !aRevisar && viejo.unidad === nuevo.unidad && Number(nuevo.cantidad) > Number(viejo.cantidad || 0);

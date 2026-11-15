@@ -72,13 +72,14 @@ function dentroDe(raiz, ruta) {
 // Los datos de la API falsa, en memoria: las ediciones los cambian.
 let datosFalsos = null;
 // Con --vacia quedan solo las reglas de Lugares, que setup() siembra siempre.
-const VACIOS = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], bandeja: [] };
+const VACIOS = { recetas: [], ingredientes: [], pasos: [], notas: [], compras: [], despensa: [], bandeja: [] };
 const datos = () => (datosFalsos ||= Object.assign(
   JSON.parse(fs.readFileSync(path.join(FIXTURES, 'todo.json'), 'utf8')), VACIA ? VACIOS : {}));
 let cortadaHasta = 0;
 let demoraMs = 600;
 const EDICIONES = ['receta.estado', 'receta.porciones', 'receta.ingredientes', 'nota.agregar',
-  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir', 'nota.editar', 'nota.borrar'];
+  'compras.agregar', 'compras.marcar', 'compras.mover', 'compras.quitar', 'lugares.asignar', 'bandeja.actualizar', 'receta.corregir', 'nota.editar', 'nota.borrar',
+  'despensa.sumar', 'despensa.quitar'];
 
 /** API falsa: mismas respuestas que la de Apps Script, con un poco de demora. */
 async function apiFalsa(req, url, res) {
@@ -127,6 +128,7 @@ async function apiFalsa(req, url, res) {
       notas: todo.notas.filter(n => cambio(n.creado || n.fecha) || (n.actualizado && cambio(n.actualizado))),
       compras: todo.compras,
       lugares: todo.lugares || [],
+      despensa: todo.despensa || [],
       bandeja: todo.bandeja.filter(b => cambio(b.actualizado)),
     },
   });

@@ -173,6 +173,18 @@ const ESQUEMA = {
       col_('actualizado', 'fecha'),
     ],
   },
+  // Lo que hay en casa (SPEC_v2 §2): nombres, sin cantidades. Los ids d_… los genera la app.
+  Despensa: {
+    prefijo: 'd',
+    columnas: [
+      col_('id'),
+      // Como lo escribieron («harina 0000»): no hay dos con el mismo nombre (sin tildes, tolerando plurales).
+      col_('nombre'),
+      col_('desde', 'fecha'),
+      col_('quien', 'texto', { enum: 'quien' }),
+      col_('actualizado', 'fecha'),
+    ],
+  },
 };
 
 function col_(nombre, tipo, extra) {

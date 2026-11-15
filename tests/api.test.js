@@ -78,10 +78,10 @@ function receta(cambios = {}) {
 // Un JPEG mínimo en base64 (solo importa que decodifique).
 const FOTO = { base64: Buffer.from('foto de prueba').toString('base64'), mime: 'image/jpeg' };
 
-test('setup crea las 7 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
+test('setup crea las 8 hojas en orden, con encabezados, y borra la hoja por defecto', () => {
   const p = proyecto();
   assert.deepEqual(p.planilla.getSheets().map(h => h.getName()),
-    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras', 'Lugares']);
+    ['Bandeja', 'Recetas', 'Ingredientes', 'Pasos', 'Notas', 'Compras', 'Lugares', 'Despensa']);
   const enc = p.planilla.getSheetByName('Bandeja').getRange(1, 1, 1, 11).getValues()[0];
   assert.deepEqual(enc, ['id', 'creado', 'url', 'plataforma', 'quien', 'estado', 'motivo', 'receta_id', 'intentos', 'actualizado', 'capturas']);
   assert.deepEqual(p.planilla.getSheetByName('Compras').getRange(1, 9, 1, 3).getValues()[0], ['rol', 'lugar', 'porciones']);
@@ -333,7 +333,7 @@ test('todo: completo sin since; con since solo lo cambiado (compras y lugares si
   const completo = p.get({ action: 'todo', t: p.token });
   assert.equal(completo.data.completo, true);
   assert.equal(completo.data.bandeja.length, 1);
-  for (const k of ['recetas', 'ingredientes', 'pasos', 'notas', 'compras']) assert.deepEqual(completo.data[k], []);
+  for (const k of ['recetas', 'ingredientes', 'pasos', 'notas', 'compras', 'despensa']) assert.deepEqual(completo.data[k], []);
   assert.equal(completo.data.lugares.length, 9, 'el mapa inicial');
 
   const desde = completo.data.ahora;
@@ -341,6 +341,9 @@ test('todo: completo sin since; con since solo lo cambiado (compras y lugares si
   const sinCambios = p.get({ action: 'todo', t: p.token, since: desde }).data;
   assert.equal(sinCambios.bandeja.length, 0);
   assert.equal(sinCambios.lugares.length, 9);
+  p.postJson({ action: 'despensa.sumar', t: p.token, quien: 'pareja', items: [{ id: 'd_harina1', nombre: 'harina' }] });
+  assert.deepEqual(p.get({ action: 'todo', t: p.token, since: desde }).data.despensa.map(d => d.nombre), ['harina'],
+    'la despensa llega siempre entera');
 
   p.postJson({ action: 'bandeja.actualizar', t: p.token, id, estado: 'procesando' });
   const delta = p.get({ action: 'todo', t: p.token, since: desde });
@@ -1035,6 +1038,70 @@ test('receta.upsert manda a la papelera las capturas de la fila cuando queda lis
 
   // Reprocesar sin capturas no manda nada.
   assert.equal(p.upsert(receta({ fuente_url: 'https://www.instagram.com/reel/Ddthx0exm4L/' }), { bandeja_id: id }).data.capturas_papelera, undefined);
+});
+
+test('despensa.sumar: suma lo que no está (por id o por nombre), sin duplicar en un reintento', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const r = accion('despensa.sumar', { quien: 'camilo', items: [
+    { id: 'd_harina1', nombre: '  Harina   0000 ' },
+    { id: 'd_huevo01', nombre: 'Huevos' },
+    { id: 'd_huevo02', nombre: 'huevo' },
+  ] });
+  assert.deepEqual(r.data, { ids: ['d_harina1', 'd_huevo01'], nuevos: 2 }, 'el segundo huevo del mismo pedido no se suma');
+  const filas = p.filas('Despensa');
+  assert.deepEqual(filas.map(d => [d.id, d.nombre, d.quien]), [['d_harina1', 'Harina 0000', 'camilo'], ['d_huevo01', 'Huevos', 'camilo']]);
+  assert.match(filas[0].desde, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(filas[0].actualizado, filas[0].desde);
+
+  // Un reintento, o lo mismo desde el otro celular con otro id: no hace nada.
+  assert.deepEqual(accion('despensa.sumar', { quien: 'camilo', items: [{ id: 'd_harina1', nombre: 'Harina 0000' }] }).data, { ids: [], nuevos: 0 });
+  assert.deepEqual(accion('despensa.sumar', { quien: 'pareja', items: [{ id: 'd_otro001', nombre: 'HUEVOS' }, { id: 'd_limon01', nombre: 'Limones' }] }).data,
+    { ids: ['d_limon01'], nuevos: 1 });
+  assert.equal(accion('despensa.sumar', { quien: 'pareja', items: [{ id: 'd_limon02', nombre: 'limón' }] }).data.nuevos, 0, 'limón / limones');
+  assert.equal(accion('despensa.sumar', { quien: 'pareja', items: [{ id: 'd_harina2', nombre: 'harina' }] }).data.nuevos, 1,
+    '«harina» no es «harina 0000»: el dedupe es por el nombre entero');
+  assert.equal(p.filas('Despensa').length, 4);
+
+  assert.equal(accion('despensa.sumar', { quien: 'camilo', items: [] }).error, 'sin_items');
+  assert.equal(accion('despensa.sumar', { quien: 'laura', items: [{ id: 'd_abcde1', nombre: 'sal' }] }).error, 'quien_invalido');
+  const malo = accion('despensa.sumar', { quien: 'camilo', items: [{ id: 'c_abcde1', nombre: 'sal' }, { id: 'd_abcde1', nombre: '' }, { id: 'd_abcde2', nombre: 'x'.repeat(81) }] });
+  assert.equal(malo.error, 'items_invalidos');
+  assert.equal(malo.status, 400);
+  assert.equal(p.filas('Despensa').length, 4, 'un lote con errores no suma nada');
+});
+
+test('mismoNombre_ de la API compara igual que mismoNombre de la app', async () => {
+  const p = proyecto();
+  const { mismoNombre } = await import(require('node:url').pathToFileURL(require('node:path').join(__dirname, '..', 'app', 'js', 'compras.js')).href);
+  const casos = [
+    ['huevo', 'Huevos', true], ['limón', 'LIMONES', true], ['harina 0000', ' Harina  0000 ', true], ['pan', 'panes', true],
+    ['harina', 'harina 0000', false], ['yogur', 'yogur griego', false], ['sal', 'salsa', false], ['', '', false], ['ají', 'ajíes', true],
+  ];
+  for (const [a, b, igual] of casos) {
+    assert.equal(p.ctx.mismoNombre_(a, b), igual, `API: ${a} / ${b}`);
+    assert.equal(mismoNombre(a, b), igual, `app: ${a} / ${b}`);
+  }
+});
+
+test('despensa.quitar: saca por id e ignora los que ya no están', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('despensa.sumar', { quien: 'camilo', items: [{ id: 'd_sal0001', nombre: 'sal' }, { id: 'd_azucar1', nombre: 'azúcar' }] });
+  assert.equal(accion('despensa.quitar', { ids: ['d_sal0001'] }).data.quitados, 1);
+  assert.equal(accion('despensa.quitar', { ids: ['d_sal0001'] }).data.quitados, 0, 'un reintento no falla');
+  assert.deepEqual(p.get({ action: 'todo', t: p.token }).data.despensa.map(d => d.id), ['d_azucar1']);
+  assert.equal(accion('despensa.quitar', { ids: ['c_abcde1'] }).error, 'id_invalido');
+  assert.equal(accion('despensa.quitar', {}).error, 'sin_ids');
+});
+
+test('la despensa sin la hoja: todo anda y las acciones piden setup() (la cola reintenta)', () => {
+  const p = proyecto();
+  p.planilla.deleteSheet(p.planilla.getSheetByName('Despensa'));
+  assert.deepEqual(p.get({ action: 'todo', t: p.token }).data.despensa, []);
+  const r = p.postJson({ action: 'despensa.sumar', t: p.token, quien: 'camilo', items: [{ id: 'd_sal0001', nombre: 'sal' }] });
+  assert.deepEqual([r.error, r.status], ['falta_hoja', 500]);
+  assert.equal(p.postJson({ action: 'despensa.quitar', t: p.token, ids: ['d_sal0001'] }).error, 'falta_hoja');
 });
 
 test('compras y capturas piden correr setup() si faltan sus columnas; todo anda sin la hoja Lugares', () => {

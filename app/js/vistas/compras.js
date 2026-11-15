@@ -42,7 +42,7 @@ export function montar(contenedor, { app, editar }) {
     dialogo,
   ), nav);
 
-  const lista = () => armarLista(app.datos?.compras, app.datos?.lugares);
+  const lista = () => armarLista(app.datos?.compras, app.datos?.lugares, app.datos?.despensa);
 
   function marcar(fila, hecho) {
     editar(nuevaEdicion('compras.marcar', { ids: fila.ids, hecho }));
