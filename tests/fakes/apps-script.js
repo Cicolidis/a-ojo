@@ -2,9 +2,10 @@
  * Versión mínima, en memoria, de los servicios de Apps Script que usa el código
  * de apps-script/src. Alcanza para probar la API en Node sin desplegar.
  *
- * Imita a propósito dos trampas reales de Sheets: si una celda no tiene formato
- * de texto (@), las fechas ISO y los números escritos como texto se convierten;
- * y las columnas insertadas copian la validación de la de al lado.
+ * Imita a propósito tres trampas reales: si una celda no tiene formato de texto
+ * (@), las fechas ISO y los números escritos como texto se convierten; las
+ * columnas insertadas copian la validación de la de al lado; y makeCopy() de la
+ * planilla copia también el script ligado (`conScript`).
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,8 +15,9 @@ const crypto = require('node:crypto');
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 class HojaFalsa {
-  constructor(nombre) {
+  constructor(nombre, planilla) {
     this.nombre = nombre;
+    this.planilla = planilla;
     this.maxFilas = 1000;
     this.maxCols = 26;
     this.celdas = new Map(); // "fila,col" → { valor, formato }
@@ -27,6 +29,19 @@ class HojaFalsa {
     return this.celdas.get(k);
   }
   getName() { return this.nombre; }
+  setName(n) {
+    if (this.planilla.hojas.some(h => h !== this && h.nombre === n)) throw new Error('Ya existe una hoja con el nombre «' + n + '».');
+    this.nombre = n;
+    return this;
+  }
+  /** Como Sheets: la copia va al final de `destino`, como «Copia de …», con valores, formatos y validaciones. */
+  copyTo(destino) {
+    const h = new HojaFalsa('Copia de ' + this.nombre, destino);
+    Object.assign(h, { maxFilas: this.maxFilas, maxCols: this.maxCols, filasFijas: this.filasFijas });
+    for (const [k, v] of this.celdas) h.celdas.set(k, { ...v });
+    destino.hojas.push(h);
+    return h;
+  }
   getMaxRows() { return this.maxFilas; }
   getMaxColumns() { return this.maxCols; }
   getLastRow() {
@@ -123,22 +138,29 @@ class RangoFalso {
 }
 
 class PlanillaFalsa {
-  constructor() {
-    this.hojas = [new HojaFalsa('Hoja 1')];
+  constructor(id = 'planilla-a-ojo', nombre = 'A ojo — datos') {
+    this.id = id;
+    this.nombre = nombre;
+    this.zona = 'America/Argentina/Buenos_Aires';
+    this.hojas = [new HojaFalsa('Hoja 1', this)];
     this.activa = this.hojas[0];
   }
   getSheetByName(n) { return this.hojas.find(h => h.nombre === n) || null; }
   getSheets() { return [...this.hojas]; }
-  insertSheet(n) { const h = new HojaFalsa(n); this.hojas.push(h); return h; }
-  deleteSheet(h) { this.hojas = this.hojas.filter(x => x !== h); }
+  insertSheet(n) { const h = new HojaFalsa(n, this); this.hojas.push(h); return h; }
+  deleteSheet(h) {
+    if (this.hojas.length === 1) throw new Error('No se pueden quitar todas las hojas de un documento.');
+    this.hojas = this.hojas.filter(x => x !== h);
+  }
   setActiveSheet(h) { this.activa = h; return h; }
   moveActiveSheet(pos) {
     this.hojas = this.hojas.filter(x => x !== this.activa);
     this.hojas.splice(pos - 1, 0, this.activa);
   }
-  setSpreadsheetTimeZone() {}
-  getId() { return 'planilla-a-ojo'; }
-  getName() { return 'A ojo — datos'; }
+  setSpreadsheetTimeZone(z) { this.zona = z; }
+  getSpreadsheetTimeZone() { return this.zona; }
+  getId() { return this.id; }
+  getName() { return this.nombre; }
 }
 
 function constructorValidacion() {
@@ -168,12 +190,19 @@ class DriveFalso {
   nuevoId(prefijo) { return prefijo + this.siguiente++; }
   /** Reloj de Drive: cada archivo nuevo es 1 s más nuevo que el anterior (así se pueden ordenar). */
   ahora() { this.reloj = (this.reloj || Date.parse('2026-11-01T00:00:00Z')) + 1000; return this.reloj; }
-  /** La planilla también es un archivo de Drive (para makeCopy); sin bytes, no cuenta en archivosVivos(). */
-  registrarPlanilla(planilla) {
+  /**
+   * Una planilla también es un archivo de Drive; sin bytes, no cuenta en
+   * archivosVivos(). `conScript`: la de la API tiene el script ligado; las que
+   * crea SpreadsheetApp.create(), no.
+   */
+  registrarPlanilla(planilla, carpeta, conScript) {
     const a = this.archivo({ getName: () => planilla.getName(), getContentType: () => 'application/vnd.google-apps.spreadsheet', getBytes: () => null });
     this.porId.delete(a.id);
     a.id = planilla.getId();
+    a.planilla = planilla;
+    a.conScript = conScript;
     this.porId.set(a.id, a);
+    if (carpeta) { carpeta.archivos.push(a); a.padre = carpeta; }
     return a;
   }
   carpeta(nombre) {
@@ -188,7 +217,7 @@ class DriveFalso {
       createFolder: n => { const nueva = drive.carpeta(n); c.carpetas.push(nueva); return nueva; },
       getFilesByName: n => iterador(c.archivos.filter(x => x.nombre === n && !x.papelera)),
       getFiles: () => iterador(c.archivos.filter(x => !x.papelera)),
-      createFile: blob => { const a = drive.archivo(blob); c.archivos.push(a); return a; },
+      createFile: blob => { const a = drive.archivo(blob); c.archivos.push(a); a.padre = c; return a; },
     };
     this.porId.set(c.id, c);
     return c;
@@ -203,8 +232,16 @@ class DriveFalso {
       getDateCreated: () => new Date(a.creado),
       makeCopy: (nombre, carpeta) => {
         const copia = drive.archivo({ getName: () => nombre, getContentType: () => a.mime, getBytes: () => a.bytes });
+        copia.conScript = a.conScript;
         carpeta.archivos.push(copia);
+        copia.padre = carpeta;
         return copia;
+      },
+      moveTo: carpeta => {
+        if (a.padre) a.padre.archivos = a.padre.archivos.filter(x => x !== a);
+        carpeta.archivos.push(a);
+        a.padre = carpeta;
+        return a;
       },
       isTrashed: () => a.papelera,
       setTrashed: x => { a.papelera = x; return a; },
@@ -239,13 +276,19 @@ class DriveFalso {
 function cargarProyecto() {
   const planilla = new PlanillaFalsa();
   const drive = new DriveFalso();
-  drive.registrarPlanilla(planilla);
+  drive.registrarPlanilla(planilla, null, true);
   const triggers = [];
   const propiedades = new Map();
   const registro = [];
   const contexto = {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => planilla,
+      /** Como en Drive: la planilla nueva queda en la raíz, con una hoja vacía y sin script. */
+      create: nombre => {
+        const nueva = new PlanillaFalsa(drive.nuevoId('planilla'), nombre);
+        drive.registrarPlanilla(nueva, drive.raiz, false);
+        return nueva;
+      },
       newDataValidation: constructorValidacion,
       flush: () => {},
     },

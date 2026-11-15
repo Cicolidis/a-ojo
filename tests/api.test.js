@@ -141,6 +141,47 @@ test('hacerBackup conserva las últimas 8 copias', () => {
   assert.equal(p.drive.archivosVivos().length, 0, 'las copias no cuentan como fotos ni capturas');
 });
 
+test('hacerBackup arma una planilla sin script con cada hoja copiada, en orden y en «A ojo/backups»', () => {
+  const p = proyecto();
+  p.capturar('https://youtube.com/shorts/cyTOswdJ4TY');
+  const backups = p.drive.raiz.carpetas[0].carpetas.find(c => c.nombre === 'backups');
+  const r = p.ctx.hacerBackup();
+  const archivo = p.drive.porId.get(r.id);
+  assert.ok(backups.archivos.includes(archivo), 'queda en A ojo/backups');
+  assert.ok(!p.drive.raiz.archivos.includes(archivo), 'no queda en la raíz de Drive');
+  assert.equal(archivo.conScript, false, 'sin el script de la API (no usa makeCopy)');
+  assert.equal(archivo.getName(), r.nombre);
+
+  const copia = archivo.planilla;
+  assert.deepEqual(copia.getSheets().map(h => h.getName()), p.planilla.getSheets().map(h => h.getName()),
+    'los mismos nombres, en el mismo orden, sin la hoja por defecto');
+  const original = p.planilla.getSheetByName('Bandeja');
+  const copiada = copia.getSheetByName('Bandeja');
+  assert.deepEqual(copiada.getDataRange().getValues(), original.getDataRange().getValues());
+  assert.equal(copiada.getRange(2, 2).getNumberFormats()[0][0], '@', 'conserva el formato de texto de las fechas');
+  assert.equal(copia.getSpreadsheetTimeZone(), p.planilla.getSpreadsheetTimeZone());
+});
+
+test('hacerBackup: una hoja que se llama como la hoja por defecto no choca', () => {
+  const p = proyecto();
+  p.planilla.insertSheet('Hoja 1');
+  const r = p.ctx.hacerBackup();
+  assert.deepEqual(p.drive.porId.get(r.id).planilla.getSheets().map(h => h.getName()),
+    p.planilla.getSheets().map(h => h.getName()));
+});
+
+test('hacerBackup: si falla a mitad de camino, no deja una planilla a medias', () => {
+  const p = proyecto();
+  const backups = p.drive.raiz.carpetas[0].carpetas.find(c => c.nombre === 'backups');
+  const antes = backups.archivos.length;
+  p.planilla.getSheetByName('Pasos').copyTo = () => { throw new Error('Servicio no disponible'); };
+  assert.throws(() => p.ctx.hacerBackup(), /Servicio no disponible/);
+  assert.equal(backups.archivos.length, antes);
+  const sueltas = p.drive.raiz.archivos.filter(a => a.planilla);
+  assert.equal(sueltas.length, 1);
+  assert.ok(sueltas[0].papelera, 'la planilla a medias, a la papelera');
+});
+
 test('setup es idempotente y suma columnas nuevas sin tocar datos', () => {
   const p = proyecto();
   p.capturar('https://youtube.com/shorts/cyTOswdJ4TY');
