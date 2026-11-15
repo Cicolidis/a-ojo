@@ -15,6 +15,7 @@ import * as ingredientes from './vistas/ingredientes.js';
 import * as agregar from './vistas/agregar.js';
 import * as compras from './vistas/compras.js';
 import * as lugares from './vistas/lugares.js';
+import * as despensa from './vistas/despensa.js';
 import * as bandeja from './vistas/bandeja.js';
 import * as elegir from './vistas/elegir.js';
 import * as bienvenida from './vistas/bienvenida.js';
@@ -100,6 +101,7 @@ function mostrar({ enfocar = false } = {}) {
   else if (ruta.nombre === 'compras') vista = compras.montar(contenedor, ctx);
   else if (ruta.nombre === 'elegir') vista = elegir.montar(contenedor, ctx);
   else if (ruta.nombre === 'lugares') vista = lugares.montar(contenedor, ctx);
+  else if (ruta.nombre === 'despensa') vista = despensa.montar(contenedor, ctx);
   else if (ruta.nombre === 'bandeja') vista = bandeja.montar(contenedor, ctx);
   else vista = biblioteca.montar(contenedor, ctx);
 

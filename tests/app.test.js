@@ -713,6 +713,16 @@ test('despensa: «En casa» vale para lo que empieza igual; para sumar o sacar, 
   assert.deepEqual(c.enCasaDeReceta(receta, despensa).map(d => d.id), ['d_1', 'd_3'], 'una vez cada fila, solo principales');
 });
 
+test('despensa: la ruta, el título y lo escrito a mano separado por coma', async () => {
+  const { leerRuta, tituloDe } = await cargar('rutas.js');
+  const { nombresEscritos } = await cargar('compras.js');
+  assert.deepEqual(leerRuta('#/despensa'), { nombre: 'despensa' });
+  assert.equal(tituloDe({ nombre: 'despensa' }), 'Lo que hay en casa · A ojo');
+  assert.deepEqual(nombresEscritos(' harina,  huevos y manteca;dulce   de leche\nsal,, '), ['harina', 'huevos', 'manteca', 'dulce de leche', 'sal']);
+  assert.deepEqual(nombresEscritos(''), []);
+  assert.equal(nombresEscritos('x'.repeat(90))[0].length, 80);
+});
+
 test('despensa en la lista: lo que hay en casa va a «Revisá si tenés» con «En casa», salvo lo movido a mano', async () => {
   const { armarLista, cuantasPorComprar, lugarDe } = await cargar('compras.js');
   const despensa = [{ id: 'd_1', nombre: 'yogur' }, { id: 'd_2', nombre: 'leche' }];

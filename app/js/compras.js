@@ -95,6 +95,11 @@ export function paraDespensa(items, despensa) {
   return nombres;
 }
 
+/** Los nombres escritos a mano, separados por coma, punto y coma, «y» o renglones: «harina, huevos y manteca». */
+export function nombresEscritos(texto) {
+  return String(texto || '').split(/[,;\n]+|\s+y\s+/i).map(s => s.trim().replace(/\s+/g, ' ').slice(0, 80)).filter(Boolean);
+}
+
 /** Las filas de la despensa que tocan a los principales de la receta («¿Se terminó algo?»), una vez cada una. */
 export function enCasaDeReceta(receta, despensa) {
   const filas = [];
