@@ -1632,3 +1632,33 @@ test('el plan sin la hoja: todo anda y plan.poner pide setup() (la cola reintent
   assert.equal(p.postJson({ action: 'plan.poner', t: p.token, quien: 'camilo',
     items: [{ id: 's_entrada1', semana: '2026-11-16', receta_id: 'r_nada0' }] }).error, 'falta_hoja');
 });
+
+test('podarPlan_ deja la semana actual, las 8 anteriores y las futuras; una semana rota no se toca', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  const semanas = ['2026-09-14', '2026-09-21', '2026-11-16', '2026-11-23', '2025-01-06'];
+  p.postJson({ action: 'plan.poner', t: p.token, quien: 'camilo',
+    items: semanas.map((semana, i) => ({ id: 's_semana0' + i, semana, receta_id: id })) });
+  p.editar('Plan', 's_semana04', { semana: 'basura' });
+  // Miércoles 18/11: el lunes es el 16 y el de hace 8 semanas, el 21/9.
+  assert.equal(p.ctx.podarPlan_('2026-11-18'), 1);
+  assert.deepEqual(p.filas('Plan').map(f => f.semana).sort(), ['2026-09-21', '2026-11-16', '2026-11-23', 'basura']);
+  assert.equal(p.ctx.podarPlan_('2026-11-22'), 0, 'el domingo sigue siendo la misma semana');
+  assert.equal(p.ctx.podarPlan_('2026-11-23'), 1, 'el lunes siguiente se va la del 21/9');
+  p.planilla.deleteSheet(p.planilla.getSheetByName('Plan'));
+  assert.equal(p.ctx.podarPlan_('2026-11-23'), 0, 'sin la hoja, nada');
+});
+
+test('hacerBackup copia el plan entero y después poda lo viejo', () => {
+  const p = proyecto();
+  const id = p.upsert(receta()).data.id;
+  p.postJson({ action: 'plan.poner', t: p.token, quien: 'camilo', items: [
+    { id: 's_vieja001', semana: '2020-01-06', receta_id: id },
+    { id: 's_futura01', semana: '2099-01-05', receta_id: id },
+  ] });
+  const r = p.ctx.hacerBackup();
+  assert.equal(r.plan, 1);
+  assert.deepEqual(p.filas('Plan').map(f => f.id), ['s_futura01']);
+  const copia = p.drive.porId.get(r.id).planilla.getSheetByName('Plan');
+  assert.equal(copia.getLastRow(), 3, 'el backup tiene las dos (más el encabezado)');
+});

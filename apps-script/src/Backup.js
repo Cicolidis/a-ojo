@@ -10,6 +10,9 @@
  * semana aparecía un proyecto de Apps Script nuevo con todo el código de la
  * API. sheet.copyTo() copia valores, formatos y validaciones, pero no el script.
  *
+ * Después de copiar, poda el plan semanal: borra las entradas de más de
+ * SEMANAS_PLAN_ semanas (el backup recién hecho todavía las tiene).
+ *
  * Usa ScriptApp (los triggers), un permiso que el web app no pedía antes de la
  * Fase 6: después del push hay que correr setup() en el editor y aceptarlo
  * ANTES del deploy, o el web app deja de responder.
@@ -17,6 +20,8 @@
 
 const BACKUPS_A_GUARDAR_ = 8;
 const FUNCION_BACKUP_ = 'hacerBackup';
+// Cuántas semanas anteriores a la actual quedan en la hoja Plan (SPEC_v2 §2): el historial para copiar.
+const SEMANAS_PLAN_ = 8;
 
 /** Carpeta "A ojo/backups". */
 function carpetaBackups_() {
@@ -35,9 +40,18 @@ function hacerBackup() {
   // Con el lock, nadie escribe mientras se copia: Recetas, Ingredientes y Pasos quedan
   // parejas. Lo que llegue en esos segundos espera o recibe «ocupado» (la cola reintenta).
   const id = conLock_(() => copiarHojas_(ss, nombre, carpeta));
+  // Si podar el plan falla, igual se podan los backups viejos (y el próximo domingo se vuelve a intentar).
+  let plan = 0;
+  try {
+    const hoy = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone() || 'America/Argentina/Buenos_Aires', 'yyyy-MM-dd');
+    plan = conLock_(() => podarPlan_(hoy));
+  } catch (err) {
+    console.error('No pude podar el plan: ' + (err && err.stack ? err.stack : err));
+  }
   const borrados = podarBackups_(carpeta, BACKUPS_A_GUARDAR_);
-  console.log('Backup: «' + nombre + '» en A ojo/backups' + (borrados ? ' (' + borrados + ' viejos a la papelera)' : '') + '.');
-  return { nombre: nombre, id: id, borrados: borrados };
+  console.log('Backup: «' + nombre + '» en A ojo/backups' + (borrados ? ' (' + borrados + ' viejos a la papelera)' : '') +
+    (plan ? '; ' + plan + ' entradas viejas del plan borradas' : '') + '.');
+  return { nombre: nombre, id: id, borrados: borrados, plan: plan };
 }
 
 /**
@@ -66,6 +80,26 @@ function copiarHojas_(ss, nombre, carpeta) {
     }
     throw err;
   }
+}
+
+/**
+ * Borra del plan las entradas de semanas anteriores al lunes de hace SEMANAS_PLAN_ semanas, contando
+ * desde la semana de `hoy` («2026-11-18»): quedan la semana actual, las 8 anteriores y las futuras.
+ * Una fila con `semana` que no es una fecha no se toca. Sin la hoja, no hace nada. Devuelve cuántas borró.
+ */
+function podarPlan_(hoy) {
+  if (!planilla_().getSheetByName('Plan')) return 0;
+  const dia = diaNumero_(hoy);
+  if (isNaN(dia)) throw errorApi_('fecha_invalida', 500, 'No entiendo la fecha de hoy: «' + hoy + '».');
+  // (dia + 4) % 7 es el día de la semana (0 = domingo): cuántos días pasaron desde el lunes.
+  const lunes = dia - ((dia + 4) % 7 + 6) % 7;
+  const limite = lunes - 7 * SEMANAS_PLAN_;
+  const viejas = leerFilas_('Plan').filter(f => {
+    const semana = diaNumero_(f.datos.semana);
+    return !isNaN(semana) && semana < limite;
+  });
+  borrarFilas_('Plan', viejas.map(f => f.fila));
+  return viejas.length;
 }
 
 /** Deja las `cuantos` copias más nuevas de la carpeta y manda las demás a la papelera. Devuelve cuántas mandó. */

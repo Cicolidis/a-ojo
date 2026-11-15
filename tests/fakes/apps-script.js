@@ -325,6 +325,11 @@ function cargarProyecto() {
     },
     Utilities: {
       getUuid: () => crypto.randomUUID(),
+      // Solo el formato que usa el proyecto: el día del calendario en esa zona.
+      formatDate: (fecha, zona, formato) => {
+        if (formato !== 'yyyy-MM-dd') throw new Error('El falso de formatDate solo sabe «yyyy-MM-dd».');
+        return new Intl.DateTimeFormat('en-CA', { timeZone: zona || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(fecha);
+      },
       base64Decode: s => {
         if (s.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) throw new Error('Could not decode string.');
         return [...Buffer.from(s, 'base64')];
