@@ -280,14 +280,11 @@ function accionBandejaActualizar_(req) {
 function accionRecetaUpsert_(req) {
   const r = req.receta;
   if (!r || typeof r !== 'object' || Array.isArray(r)) throw errorApi_('sin_receta', 400, 'Falta «receta».');
-  const v = validarReceta_(r);
   const imagen = req.foto ? leerImagen_(req.foto) : null;
   const bandejaId = String(req.bandeja_id || '').trim();
   const validar = req.validar === true || req.validar === 'true';
 
   return conLock_(() => {
-    // Sin la columna, los ingredientes de los pasos se perderían en silencio.
-    if (v.pasos.some(p => p.ingredientes)) exigirColumnas_('Pasos', ['ingredientes']);
     const recetas = leerFilas_('Recetas');
     const porId = id => recetas.filter(f => f.datos.id === id)[0] || null;
     let bandeja = null;
@@ -295,14 +292,24 @@ function accionRecetaUpsert_(req) {
       bandeja = leerFilas_('Bandeja').filter(f => f.datos.id === bandejaId)[0];
       if (!bandeja) throw errorApi_('no_encontrada', 404, 'No encontré la fila «' + bandejaId + '» en la bandeja.');
     }
+    // Primero por id y por la fila: así se sabe si es una receta propia (sin link) antes de validar.
+    const idPedido = vacio_(r.id) ? '' : String(r.id).trim();
     let existente = null;
-    if (v.id) {
-      existente = porId(v.id);
-      if (!existente) throw errorApi_('no_encontrada', 404, 'No encontré la receta «' + v.id + '».');
+    if (idPedido) {
+      existente = porId(idPedido);
+      if (!existente) throw errorApi_('no_encontrada', 404, 'No encontré la receta «' + idPedido + '».');
     }
     if (!existente && bandeja && bandeja.datos.receta_id) existente = porId(bandeja.datos.receta_id);
-    if (!existente) existente = recetas.filter(f => claveDe_(f.datos.fuente_url) === v.clave)[0] || null;
+    const propia = existente && esPropia_(existente.datos) ? existente.datos : null;
+    const v = validarReceta_(r, propia);
+    // Sin la columna, los ingredientes de los pasos se perderían en silencio.
+    if (v.pasos.some(p => p.ingredientes)) exigirColumnas_('Pasos', ['ingredientes']);
+    // Por link, solo si tiene: con el link vacío coincidiría con cualquier receta propia.
+    if (!existente && v.clave) existente = recetas.filter(f => f.datos.fuente_url && claveDe_(f.datos.fuente_url) === v.clave)[0] || null;
 
+    // Una propia que reescribieron mientras la Mac la ordenaba: la fila ya no está `procesando`.
+    // La receta se guarda igual, pero la fila queda `pendiente` para ordenar el texto nuevo.
+    const reescrita = !!(propia && bandeja && bandeja.datos.estado !== 'procesando');
     const resumen = Object.assign({ nueva: !existente, ingredientes: v.ingredientes.length, pasos: v.pasos.length },
       ecoPasos_(v));
     if (validar) {
@@ -324,17 +331,21 @@ function accionRecetaUpsert_(req) {
     reemplazarDeReceta_('Pasos', id, v.pasos);
 
     let capturasPapelera = 0;
-    if (bandeja) {
+    if (bandeja && reescrita) {
+      Object.assign(bandeja.datos, { receta_id: id, actualizado: ahora });
+      escribirFila_('Bandeja', bandeja.fila, bandeja.datos);
+    } else if (bandeja) {
       const capturas = listaCapturas_(bandeja.datos.capturas);
-      // Si era un pedido de corrección («Algo está mal»), ya está resuelto.
+      // Si era un pedido de corrección («Algo está mal»), ya está resuelto. El texto de una propia queda.
       Object.assign(bandeja.datos, { estado: 'lista', motivo: '', receta_id: id, pedido: '', actualizado: ahora });
       if (capturas.length) bandeja.datos.capturas = '';
       escribirFila_('Bandeja', bandeja.fila, bandeja.datos);
       // Ya cumplieron: quedan 30 días en la papelera, por si hay que reprocesar.
       if (capturas.length) capturasPapelera = capturasAPapelera_(capturas);
     }
-    return Object.assign({ id: id, foto_url: datos.foto_url, mensaje: '✓ Receta guardada' }, resumen,
-      capturasPapelera ? { capturas_papelera: capturasPapelera } : {});
+    return Object.assign({ id: id, foto_url: datos.foto_url,
+      mensaje: reescrita ? '✓ Receta guardada. La reescribieron mientras tanto: queda pendiente para la próxima corrida.' : '✓ Receta guardada' },
+    resumen, reescrita ? { reescrita: true } : {}, capturasPapelera ? { capturas_papelera: capturasPapelera } : {});
   });
 }
 
@@ -408,9 +419,11 @@ function claveTexto_(s) {
 /**
  * Valida y normaliza la receta que manda /recetas. Junta todos los errores en uno
  * solo (receta_invalida, con `detalles`) para que se puedan corregir de una vez.
+ * `propia`: la receta propia guardada (plataforma manual), si es una. Entonces no lleva link
+ * ni autor, y el título, el tipo y las porciones vacíos conservan los que pusieron ellos.
  * Devuelve { id, clave, campos, ingredientes, pasos }.
  */
-function validarReceta_(r) {
+function validarReceta_(r, propia) {
   const errores = [];
   const vacio = v => v === null || v === undefined || String(v).trim() === '';
   const texto = v => (vacio(v) ? '' : String(v).trim());
@@ -430,9 +443,9 @@ function validarReceta_(r) {
     }
   };
 
-  const titulo = texto(r.titulo);
+  const titulo = texto(r.titulo) || (propia ? texto(propia.titulo) : '');
   if (!titulo) errores.push('falta el título');
-  const tipo = texto(r.tipo);
+  const tipo = texto(r.tipo) || (propia ? texto(propia.tipo) : '');
   enLista(tipo, 'tipo', 'tipo');
   const confianza = texto(r.confianza);
   enLista(confianza, 'confianza', 'confianza');
@@ -441,8 +454,8 @@ function validarReceta_(r) {
   origen.forEach(c => enLista(c, 'capa', 'origen_datos'));
   const idioma = texto(r.idioma_original).toLowerCase();
   if (!/^[a-z]{2,3}$/.test(idioma)) errores.push('idioma_original tiene que ser un código como «es» o «en»');
-  const norm = normalizarUrl(r.fuente_url);
-  if (!norm) errores.push('falta fuente_url (el link original)');
+  const norm = propia ? null : normalizarUrl(r.fuente_url);
+  if (!norm && !propia) errores.push('falta fuente_url (el link original)');
 
   const ingredientes = Array.isArray(r.ingredientes) ? r.ingredientes : [];
   if (!ingredientes.length) errores.push('falta al menos un ingrediente');
@@ -487,12 +500,12 @@ function validarReceta_(r) {
     titulo: titulo,
     tipo: tipo,
     etiquetas: lista(r.etiquetas).join(', '),
-    porciones: numero(r.porciones, 'porciones'),
+    porciones: vacio(r.porciones) && propia ? propia.porciones : numero(r.porciones, 'porciones'),
     tiempo_min: numero(r.tiempo_min, 'tiempo_min'),
     molde: texto(r.molde),
-    autor: texto(r.autor),
+    autor: propia ? '' : texto(r.autor),
     fuente_url: norm ? norm.url : '',
-    plataforma: norm ? norm.plataforma : '',
+    plataforma: propia ? 'manual' : norm ? norm.plataforma : '',
     confianza: confianza,
     origen_datos: origen.join(','),
     idioma_original: idioma,
@@ -505,7 +518,7 @@ function validarReceta_(r) {
     err.detalles = errores;
     throw err;
   }
-  return { id: texto(r.id), clave: norm.clave, campos: campos, ingredientes: ings, pasos: ps };
+  return { id: texto(r.id), clave: norm ? norm.clave : '', campos: campos, ingredientes: ings, pasos: ps };
 }
 
 /**
@@ -614,10 +627,14 @@ function accionRecetaCorregir_(req) {
   return conLock_(() => {
     exigirColumnas_('Bandeja', ['pedido']);
     const receta = filaReceta_(req.id).datos;
+    const propia = esPropia_(receta);
+    // La fila de una propia lleva su texto (y plataforma manual, que la Sheet acepta después de setup()).
+    if (propia) exigirColumnas_('Bandeja', ['texto']);
     const filas = leerFilas_('Bandeja');
     let suyas = filas.filter(f => f.datos.receta_id === receta.id);
     // Una receta guardada sin bandeja_id: puede haber una fila con su link que no la tiene anotada.
-    if (!suyas.length) suyas = filas.filter(f => claveDe_(f.datos.url) === claveDe_(receta.fuente_url));
+    // Nunca con un link vacío (una propia): coincidiría con las filas de las otras propias.
+    if (!suyas.length && receta.fuente_url) suyas = filas.filter(f => claveDe_(f.datos.url) === claveDe_(receta.fuente_url));
     suyas.sort((a, b) => porCreado_(b.datos, a.datos));
     const fila = suyas[0] || null;
     const ahora = ahoraIso_();
@@ -638,6 +655,20 @@ function accionRecetaCorregir_(req) {
       return { id: d.id, receta_id: receta.id, estado: d.estado, pedido: '' };
     }
 
+    // Una propia sin ordenar, o con un texto esperando a la Mac: se corrige cambiando el texto.
+    if (propia) {
+      const esperaTexto = fila && !fila.datos.pedido && (fila.datos.estado === 'pendiente' || fila.datos.estado === 'ayuda');
+      const sinOrdenar = !leerDatos_('Ingredientes').some(i => i.receta_id === receta.id);
+      if (sinOrdenar || esperaTexto) {
+        throw errorApi_('texto_pendiente', 409, 'Esa receta todavía no está ordenada: cambiá el texto en lugar de pedir una corrección.');
+      }
+    }
+    if (!fila && propia) {
+      const id = nuevoId_(ESQUEMA.Bandeja.prefijo, filas.map(f => f.datos.id));
+      const datos = Object.assign(filaPropia_(id, receta.id, quien || 'camilo', '', ahora), { pedido: texto });
+      agregarFila_('Bandeja', datos);
+      return { id: id, receta_id: receta.id, estado: 'pendiente', pedido: texto };
+    }
     if (!fila) {
       const norm = normalizarUrl(receta.fuente_url);
       if (!norm) throw errorApi_('sin_fuente', 400, 'La receta no tiene un link de origen para reprocesarla.');

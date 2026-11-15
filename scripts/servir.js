@@ -170,6 +170,11 @@ async function editarFalsa(pedido, ahora) {
     if (suya && suya.estado === 'procesando') {
       return { ok: false, error: 'procesando', mensaje: 'Esa receta se está procesando justo ahora. Probá de nuevo en un rato.', status: 409 };
     }
+    // Como la API: una propia sin ordenar (o con un texto esperando) se corrige cambiando el texto.
+    const propia = todo.recetas.find(r => r.id === recetaId).plataforma === 'manual';
+    if (propia && String(cuerpo.texto || '').trim() && aplicarEdicion(todo, { id: 'x', accion: action, datos: cuerpo, creada: ahora }) === todo) {
+      return { ok: false, error: 'texto_pendiente', mensaje: 'Esa receta todavía no está ordenada: cambiá el texto en lugar de pedir una corrección.', status: 409 };
+    }
   }
   // Las filas nuevas (las de receta.corregir) llevan el id de la edición: acá se les pone uno de la Sheet.
   const nuevaId = 'b_' + String(todo.bandeja.length + 90000);

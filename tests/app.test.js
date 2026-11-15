@@ -1476,3 +1476,23 @@ test('receta.editar y receta.escribir, como la API: solo propias, y el mismo tex
   const nueva = otra.bandeja.find(b => b.receta_id === 'r_tarta001');
   assert.deepEqual([nueva.id, nueva.texto, nueva.estado, nueva.motivo, nueva.pedido, nueva.intentos], [fila.id, 'Masa, acelga y huevos', 'pendiente', '', '', 0]);
 });
+
+test('receta.corregir de una propia, como la API: su fila o una sin link, nunca la de otra propia, y no sin ordenar', async () => {
+  const { aplicarEdicion, nuevaCorreccion } = await cargar('ediciones.js');
+  const datos = {
+    recetas: [{ id: 'r_milanesa', plataforma: 'manual', fuente_url: '' }, { id: 'r_guiso001', plataforma: 'manual', fuente_url: '' },
+      { id: 'r_tarta001', plataforma: 'manual', fuente_url: '' }],
+    ingredientes: [{ id: 'i_1', receta_id: 'r_milanesa' }, { id: 'i_2', receta_id: 'r_guiso001' }],
+    bandeja: [{ id: 'b_guiso001', receta_id: 'r_guiso001', url: '', plataforma: 'manual', estado: 'lista', creado: '2026-11-14T10:00:00Z', texto: 'Lentejas' }],
+  };
+  const ahora = new Date('2026-11-15T12:00:00Z');
+  const m = aplicarEdicion(datos, nuevaCorreccion('r_milanesa', 'La leche es una taza', 'pareja', ahora));
+  const nueva = m.bandeja.find(b => b.receta_id === 'r_milanesa');
+  assert.deepEqual([nueva.url, nueva.plataforma, nueva.pedido, nueva.texto, nueva.local], ['', 'manual', 'La leche es una taza', '', true]);
+  assert.equal(m.bandeja.find(b => b.id === 'b_guiso001').pedido, undefined, 'no tocó la fila de la otra propia');
+  const g = aplicarEdicion(datos, nuevaCorreccion('r_guiso001', 'Son 6', 'pareja', ahora));
+  assert.deepEqual([g.bandeja[0].estado, g.bandeja[0].pedido], ['pendiente', 'Son 6']);
+  assert.equal(aplicarEdicion(datos, nuevaCorreccion('r_tarta001', 'x', 'pareja', ahora)), datos, 'sin ordenar: 409');
+  const esperando = Object.assign({}, datos, { bandeja: [Object.assign({}, datos.bandeja[0], { estado: 'pendiente' })] });
+  assert.equal(aplicarEdicion(esperando, nuevaCorreccion('r_guiso001', 'x', 'pareja', ahora)), esperando, 'texto esperando: 409');
+});

@@ -1430,3 +1430,93 @@ test('bandeja.actualizar con desde: el aviso de una fila de receta propia no hab
   assert.equal(r.status, 409);
   assert.equal(r.mensaje, 'Esa receta ya está ordenada: no la cambié.');
 });
+
+/** Lo que manda /recetas para una propia: sin link, sin autor, y título, tipo y porciones vacíos si el texto no los dice. */
+function ordenada(cambios = {}) {
+  return receta(Object.assign({ titulo: '', tipo: '', porciones: null, autor: '', fuente_url: '', molde: '', etiquetas: [],
+    origen_datos: ['texto'], confianza: 'media', notas_proceso: 'Las cantidades de la leche y la manteca no estaban: quedaron a ojo.' }, cambios));
+}
+
+test('receta.upsert de una propia: sin link, conserva título, tipo y porciones, y deja la fila lista con su texto', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('receta.crear', { id: 'r_milanesa', titulo: 'Milanesas con puré', tipo: 'salado', porciones: 2, texto: '4 milanesas…', bandeja_id: 'b_milanesa' });
+  accion('receta.crear', { id: 'r_guiso001', titulo: 'Guiso', tipo: 'salado', porciones: 4, texto: 'Lentejas…', bandeja_id: 'b_guiso001' });
+  accion('bandeja.tomar', { id: 'b_milanesa' });
+
+  const prueba = p.upsert(ordenada(), { bandeja_id: 'b_milanesa', validar: true });
+  assert.equal(prueba.ok, true, prueba.mensaje);
+  assert.deepEqual([prueba.data.validar, prueba.data.id, prueba.data.nueva], [true, 'r_milanesa', false]);
+  assert.equal(p.filas('Ingredientes').length, 0, 'validar no escribe');
+
+  const r = p.upsert(ordenada({ autor: '@alguien', fuente_url: 'https://youtu.be/cyTOswdJ4TY' }), { bandeja_id: 'b_milanesa' });
+  assert.equal(r.ok, true, r.mensaje);
+  assert.equal(r.data.reescrita, undefined);
+  const guardada = p.filas('Recetas').find(x => x.id === 'r_milanesa');
+  assert.deepEqual([guardada.titulo, guardada.tipo, guardada.porciones, guardada.plataforma, guardada.fuente_url, guardada.autor, guardada.origen_datos, guardada.confianza],
+    ['Milanesas con puré', 'salado', 2, 'manual', '', '', 'texto', 'media'], 'una propia no toma link ni autor');
+  assert.equal(p.filas('Ingredientes').filter(i => i.receta_id === 'r_milanesa').length, 4);
+  const fila = p.filas('Bandeja').find(b => b.id === 'b_milanesa');
+  assert.deepEqual([fila.estado, fila.texto], ['lista', '4 milanesas…'], 'el texto queda para reescribirla');
+  assert.equal(p.filas('Ingredientes').filter(i => i.receta_id === 'r_guiso001').length, 0, 'no pisó la otra propia');
+  assert.equal(p.filas('Recetas').length, 2);
+
+  // Si el texto dice otro nombre o para cuántas es, /recetas lo manda y gana.
+  accion('bandeja.tomar', { id: 'b_guiso001' });
+  p.upsert(ordenada({ titulo: 'Guiso de lentejas', porciones: 6 }), { bandeja_id: 'b_guiso001' });
+  const guiso = p.filas('Recetas').find(x => x.id === 'r_guiso001');
+  assert.deepEqual([guiso.titulo, guiso.porciones, guiso.tipo], ['Guiso de lentejas', 6, 'salado']);
+});
+
+test('receta.upsert de una propia reescrita mientras la Mac la ordenaba: guarda la receta y la fila queda pendiente', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  accion('receta.crear', { id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado', texto: 'Masa y acelga', bandeja_id: 'b_tarta001' });
+  accion('bandeja.tomar', { id: 'b_tarta001' });
+  accion('receta.escribir', { id: 'r_tarta001', texto: 'Masa, acelga y huevos', bandeja_id: 'b_tarta001' });
+  const r = p.upsert(ordenada(), { bandeja_id: 'b_tarta001' });
+  assert.equal(r.data.reescrita, true);
+  assert.match(r.data.mensaje, /próxima corrida/);
+  const fila = p.filas('Bandeja')[0];
+  assert.deepEqual([fila.estado, fila.texto], ['pendiente', 'Masa, acelga y huevos']);
+  assert.equal(p.filas('Ingredientes').length, 4, 'la receta se guardó igual');
+  assert.equal(p.get({ action: 'bandeja.pendientes', t: p.token }).data.filas.length, 1, 'la próxima corrida la ve');
+});
+
+test('receta.upsert: una receta de link sigue necesitando fuente_url, y una sin link no se confunde con una propia', () => {
+  const p = proyecto();
+  p.postJson({ action: 'receta.crear', t: p.token, id: 'r_tarta001', titulo: 'Tarta', tipo: 'salado' });
+  const sinLink = p.upsert(ordenada({ titulo: 'Tarta' }));
+  assert.equal(sinLink.error, 'receta_invalida');
+  assert.match(sinLink.mensaje, /fuente_url/);
+  const id = p.capturar('https://youtu.be/cyTOswdJ4TY').data.id;
+  assert.equal(p.upsert(ordenada({ titulo: 'Tarta' }), { bandeja_id: id }).error, 'receta_invalida', 'la fila es de un link');
+  assert.equal(p.upsert(ordenada(), { bandeja_id: id }).detalles.some(e => /título/.test(e)), true, 'sin propia no hay título que conservar');
+  assert.equal(p.upsert(receta()).ok, true);
+  assert.equal(p.filas('Recetas').length, 2);
+});
+
+test('receta.corregir de una propia: usa su fila (o la crea sin link), nunca la de otra propia, y no se pide sin ordenar', () => {
+  const p = proyecto();
+  const accion = (action, cuerpo) => p.postJson(Object.assign({ action, t: p.token }, cuerpo));
+  const corregir = (id, texto) => accion('receta.corregir', { id, texto, quien: 'pareja' });
+  accion('receta.crear', { id: 'r_milanesa', titulo: 'Milanesas', tipo: 'salado' });
+  accion('receta.crear', { id: 'r_guiso001', titulo: 'Guiso', tipo: 'salado', texto: 'Lentejas…', bandeja_id: 'b_guiso001' });
+
+  assert.equal(corregir('r_milanesa', 'La leche es una taza').error, 'texto_pendiente', 'sin ordenar: se cambia el texto');
+  assert.equal(corregir('r_guiso001', 'Son 6').error, 'texto_pendiente', 'esperando a la Mac');
+  p.editar('Bandeja', 'b_guiso001', { estado: 'ayuda', motivo: 'No entendí' });
+  assert.equal(corregir('r_guiso001', 'Son 6').error, 'texto_pendiente', 'en ayuda, sin pedido');
+
+  // Ya ordenadas: la del guiso usa su fila; la de las milanesas (escrita sin texto, ordenada a mano) crea una sin link.
+  accion('bandeja.tomar', { id: 'b_guiso001' });
+  p.upsert(ordenada(), { bandeja_id: 'b_guiso001' });
+  p.upsert(ordenada({ id: 'r_milanesa' }));
+  const g = corregir('r_guiso001', 'Son 6 porciones');
+  assert.deepEqual([g.data.id, g.data.estado, g.data.pedido], ['b_guiso001', 'pendiente', 'Son 6 porciones']);
+  const m = corregir('r_milanesa', 'La leche es una taza');
+  assert.notEqual(m.data.id, 'b_guiso001', 'no toma la fila de otra propia (las dos sin link)');
+  const nueva = p.filas('Bandeja').find(b => b.id === m.data.id);
+  assert.deepEqual([nueva.url, nueva.plataforma, nueva.receta_id, nueva.pedido, nueva.quien], ['', 'manual', 'r_milanesa', 'La leche es una taza', 'pareja']);
+  assert.equal(corregir('r_milanesa', '').data.pedido, '', 'se cancela como siempre');
+});

@@ -263,8 +263,10 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
       const bandeja = datos.bandeja || [];
       const texto = unaLinea(d.texto);
       const receta = (datos.recetas || []).find(r => r.id === d.id);
+      const propia = !!receta && receta.plataforma === 'manual';
       let suyas = bandeja.filter(b => b.receta_id === d.id);
-      if (!suyas.length && receta) suyas = bandeja.filter(b => mismoLink(b.url, receta.fuente_url));
+      // Nunca con un link vacío (una propia): coincidiría con las filas de las otras propias.
+      if (!suyas.length && receta && receta.fuente_url) suyas = bandeja.filter(b => mismoLink(b.url, receta.fuente_url));
       const fila = suyas
         .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
       const cambiar = cambios => Object.assign({}, datos, {
@@ -277,13 +279,17 @@ export function aplicarEdicion(datos, { id, accion, datos: d, creada }) {
         const vuelve = fila.estado === 'pendiente' || fila.estado === 'ayuda';
         return cambiar(Object.assign({ pedido: '', motivo: '', actualizado: creada }, vuelve ? { estado: 'lista', intentos: 0 } : {}));
       }
+      // Como la API: una propia sin ordenar, o con un texto esperando, se corrige cambiando el texto (409).
+      if (propia && (!(datos.ingredientes || []).some(i => i.receta_id === d.id) ||
+        (fila && !fila.pedido && (fila.estado === 'pendiente' || fila.estado === 'ayuda')))) return datos;
       if (!fila) {
         if (!receta) return datos;
         return Object.assign({}, datos, {
-          bandeja: bandeja.concat({
-            id, local: true, creado: creada, actualizado: creada, url: receta.fuente_url, plataforma: plataformaDe(receta.fuente_url),
+          bandeja: bandeja.concat(Object.assign({
+            id, local: true, creado: creada, actualizado: creada, url: receta.fuente_url || '',
+            plataforma: propia ? 'manual' : plataformaDe(receta.fuente_url),
             quien: d.quien || '', estado: 'pendiente', motivo: '', receta_id: d.id, intentos: 0, capturas: '', pedido: texto,
-          }),
+          }, propia ? { texto: '' } : {})),
         });
       }
       const pedido = unirPedido(fila.pedido, texto);
