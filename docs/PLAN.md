@@ -122,7 +122,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Familias de unidades y reglas al escalar (§7.1 y §7.2)
 - [x] Avisos de molde y de cocción (§7.3)
 - [x] Sumas de compras entre unidades de la misma familia (§7.4)
-- [ ] Demo con la API falsa: 6 porciones llevadas a 2 y a 15
+- [x] Demo con la API falsa: 6 porciones llevadas a 2 y a 15
 
 ### Fase 9: despensa
 

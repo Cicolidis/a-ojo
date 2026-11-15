@@ -842,6 +842,9 @@ textarea:focus, input[type="text"]:focus, select:focus {
   margin-top: 24px;
 }
 
+/* Los avisos de las porciones (molde, cocción), arriba del texto del paso. */
+.cocina-paso .alerta { margin: 8px 0 0; }
+
 .paso-n {
   font-size: 14px;
   font-weight: 600;

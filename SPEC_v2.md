@@ -174,26 +174,34 @@ Todo es lógica pura de la app (`ingredientes.js`, `formato.js`, `compras.js`), 
 - **Peso:** `g` · `kg`.
 - **Volumen:** `cdita` (5 ml) · `cda` (15 ml) · `taza` (240 ml, la misma equivalencia que usa `/recetas` al convertir cups) · `ml` · `l`.
 - **Contables:** `u`, `diente`, `lata`, `paquete`, `ramo`.
-- **Sin escala:** `pizca` y `a ojo`. Una pizca escalada sigue siendo «una pizca» (o «2 pizcas» desde el doble).
+- **Sin escala:** `pizca` y `a ojo`. Una pizca escalada sigue siendo «una pizca» (o «2 pizcas» desde el doble, y no más).
 
 ### 7.2 Reglas al escalar
-- **Volumen:** después de escalar se elige la unidad más cómoda, sin pasar de cucharas a mililitros ni al revés si la receta no lo hacía:
-  - menos de 1 cda → cditas (½ cda → «1 ½ cdita»);
-  - 4 cdas o más → tazas cuando da una fracción común («4 cdas» → «¼ taza»);
+- **Volumen:** después de escalar se elige la unidad más cómoda, sin pasar de cucharas a mililitros ni al revés:
+  - menos de 1 cda → cditas (½ cda → «1 ½ cditas»), nunca menos de ¼ cdita;
+  - de 4 cdas a 1 taza → tazas cuando da una fracción común («4 cdas» → «¼ taza») o si la receta ya decía tazas; si no, cdas enteras o medias;
+  - 1 taza o más → tazas;
   - menos de ¼ taza → cdas;
-  - ml: desde 1000, litros, como hoy.
-- **Peso:** como hoy (redondeo a gramos y paso a kilos desde 1000).
-- **Contables:** se redondea a enteros. Si el resultado cae entre dos números, se muestran los dos: «3 o 4 huevos». Los dientes de ajo y las latas, igual. Nunca menos de 1.
-- **Fracciones:** solo las comunes (¼, ⅓, ½, ⅔, ¾), como hoy.
+  - ml: desde 1000, litros; y un litro escalado por debajo de 1, en ml.
+  - Si el redondeo toca un umbral, se vuelve a elegir (3,9 cdas → «¼ taza»).
+- **Peso:** redondeo a gramos (a entero desde 10), kilos desde 1000 y gramos por debajo de 1 kg.
+- **Contables:** si la receta dice enteros, se redondea a enteros. Si el resultado cae entre dos números, se muestran los dos: «3 o 4 huevos» («7 u 8» antes del 8). Los dientes de ajo y las latas, igual. Nunca menos de 1. Si la receta usa medios (½ cebolla), se escala de a medios; con otra fracción (¼), al cuarto o al tercio.
+- **Fracciones:** solo las comunes (¼, ⅓, ½, ⅔, ¾), como hoy, también en kilos y litros («1 ½ kg»). El plural va con el número que se muestra: «1 ½ cditas», «1 ¼ tazas», pero «1 cda» aunque el cálculo dé 1,005.
+- Con las porciones originales, las cantidades quedan como las dejó `/recetas`.
 
 ### 7.3 Avisos en la ficha y en el modo cocina
-- Con un factor distinto de 1 y la receta con `molde`: «Para 12 porciones, el molde de 20×30 cm no alcanza: usá dos, o uno de unos 28×42 cm» (el área se escala con el factor). Si el molde no se puede leer, solo «Revisá el tamaño del molde».
-- Con un factor distinto de 1 y pasos con tiempo de horno: «Los tiempos de cocción no se escalan: controlá la cocción» (una vez, arriba de los pasos).
+- Con un factor distinto de 1 y la receta con `molde`: «Para 12 porciones, el molde de 20×30 cm no alcanza: usá dos, o uno de unos 28×42 cm» (el área se escala con el factor). Las medidas se leen del texto libre («budinera de 25 cm», «20 x 30»).
+  - «usá dos/tres…» solo con un factor entero desde 2; con uno no entero desde 2, «usá dos o tres del mismo tamaño»; entre 1 y 2, «usá uno de unos 24×37 cm».
+  - Con menos porciones: «Para 2 porciones alcanza un molde de unos 12×17 cm (la receta usa uno de 20×30 cm)».
+  - Si el molde no se puede leer, solo «Revisá el tamaño del molde».
+- Con un factor distinto de 1 y pasos con tiempo de horno (no de la hornalla): «Los tiempos de cocción no se escalan: controlá la cocción» (una vez, arriba de los pasos; en el modo cocina, en el primer paso y en los de horno).
+- Los dos avisos también van en la receta compartida por WhatsApp.
 - Los pasos siguen diciendo las cantidades originales (como hoy), con la aclaración de cuántas porciones son.
 
 ### 7.4 Compras
-- `sumarCantidades()` suma dentro de cada familia aunque cambie la unidad («1 taza + 4 cdas» → «1 ¼ taza»; «2 cdas + 1 cdita» → «2 ⅓ cdas»), y muestra el total en la unidad más cómoda con las reglas de §7.2.
+- `sumarCantidades()` suma dentro de cada familia aunque cambie la unidad («1 taza + 4 cdas» → «1 ¼ tazas»; «2 cdas + 1 cdita» → «2 ⅓ cdas»), y muestra el total en la unidad más cómoda con las reglas de §7.2. Si en la suma hay ml o l, el total va en ml o l.
 - Entre peso y volumen no se convierte (harina en tazas y en gramos siguen separados: «200 g + 1 taza»).
+- Lo que se cuenta se guarda en la lista redondeado para arriba (7,5 huevos → «8»; los medios, al medio de arriba), y el paso para elegir muestra eso mismo.
 
 ---
 
@@ -261,13 +269,13 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - **Copiar semanas:** «Repetir una semana» (igual) y «Usar como modelo» (a «Sin día», para repartir), desde cualquier semana guardada, hacia la semana que se está mirando.
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
+- **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
 **Supuestos de este borrador, para revisar antes de empezar:**
 - La semana empieza el lunes, y solo hay almuerzo y cena (sin desayuno ni merienda).
 - La navegación pasa a cuatro pestañas, con Semana en segundo lugar.
 - La despensa no lleva cantidades y no se descuenta sola al cocinar: se pregunta en «¿Cómo salió?».
 - «Limpiar marcados» pasa lo comprado a la despensa (con «Deshacer»), en lugar de preguntar cada vez.
-- 1 taza = 240 ml, como las conversiones de `/recetas`. Muchas recetas argentinas usan tazas de 250 ml: la diferencia es menor al 5 %.
 - El historial del plan se guarda 26 semanas (medio año).
 - Al repetir sobre una semana que ya tiene algo, se pregunta si reemplazar o sumar.
 - «Usar como modelo» trae todos los platos, aunque alguno ya esté en la semana de destino.
