@@ -1,8 +1,8 @@
 # A ojo
 
-App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. La spec completa está en [`SPEC_v1.md`](SPEC_v1.md).
+App personal de recetas para dos personas. Captura links de YouTube e Instagram, los convierte en recetas estructuradas y los muestra en una PWA. Las specs están en [`SPEC_v1.md`](SPEC_v1.md) (el MVP) y [`SPEC_v2.md`](SPEC_v2.md) (plan semanal, recetas propias, despensa y escalado); las casillas, en [`docs/PLAN.md`](docs/PLAN.md).
 
-**Estado: Fase 6 (correcciones e infraestructura), en curso.** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Instalada en Android, aparece en el menú Compartir; en la Bandeja también se puede pegar un link. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
+**Estado: v2 hecha (fases 7 a 10); siguen las pruebas en dispositivos (Fase 11).** Sheet + API de Apps Script + extensión de Chrome + atajo de Android + el comando `/recetas`, que convierte los links de la bandeja en recetas, y la app (PWA) para buscarlas, cocinarlas, anotarlas y armar la compra, también sin conexión: estados, valoración, notas, vistas de porciones, ingredientes por sección y rol, la lista de compras por lugar (para mandar por WhatsApp) y la bandeja, con la subida de capturas cuando un link necesita ayuda. Instalada en Android, aparece en el menú Compartir; en la Bandeja también se puede pegar un link. Además: el plan semanal (con la compra de la semana y copiar semanas), las recetas propias (escritas en la app y ordenadas por `/recetas`), la despensa y el escalado con conversión de unidades. Tiene modo oscuro (según el sistema), estados vacíos, microanimaciones que respetan «reducir movimiento» y contraste AA revisado por un test.
 
 ```
 app/                        la PWA: HTML, CSS y JS sin build, publicada en GitHub Pages
@@ -208,11 +208,16 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 |---|---|---|---|
 | GET/POST | `ping` | — | `{ version, ahora, hojas_faltantes }` |
 | POST | `capturar` | `{ url, quien }`; `url` puede ser un texto con un link adentro | `{ id, estado }` o `{ duplicada: true, id, estado }`. Con `formato=texto`: solo el mensaje |
-| GET | `todo` | `since?` (ISO) | `{ ahora, completo, recetas, ingredientes, pasos, notas, compras, lugares, bandeja }`. Usá `ahora` como próximo `since`; `compras` y `lugares` van siempre completas |
+| GET | `todo` | `since?` (ISO) | `{ ahora, completo, recetas, ingredientes, pasos, notas, compras, lugares, despensa, plan, bandeja }`. Usá `ahora` como próximo `since`; `compras`, `lugares`, `despensa` y `plan` van siempre completos |
 | GET | `bandeja.pendientes` | — | `{ filas }`, de la más vieja a la más nueva. Incluye las `procesando` sin cambios hace más de 30 minutos (una corrida que se cortó) |
-| POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento; volver a `pendiente` desde `ayuda` o `descartada` los reinicia |
+| GET | `bandeja.fila` | `{ id }` | `{ fila }`: una fila cualquiera (`/recetas <id>`) |
+| POST | `bandeja.tomar` | `{ limite?, id? }` | `{ filas, quedan }`: las reserva en `procesando` dentro del lock (dos corridas a la vez no toman la misma) |
+| POST | `bandeja.actualizar` | `{ id, estado, motivo?, receta_id?, desde? }` | `{ id, estado, intentos }`. Pasar a `procesando` suma un intento; volver a `pendiente` desde `ayuda` o `descartada` los reinicia. Con `desde`, si la fila cambió mientras tanto, `409 estado_cambio` |
 | POST | `receta.upsert` | `{ receta, bandeja_id?, foto?, validar? }` | `{ id, nueva, foto_url, ingredientes, pasos }`. Ver abajo |
 | POST | `receta.estado` | `{ id, estado?, valoracion? }` | `{ id, estado, valoracion }` |
+| POST | `receta.crear` | `{ id, titulo, tipo, porciones?, texto?, bandeja_id?, quien? }` | `{ id, bandeja_id, repetida }`. Una receta propia (`plataforma = manual`); con `texto`, su fila `pendiente` en la bandeja |
+| POST | `receta.editar` | `{ id, titulo?, tipo?, porciones? }` | `{ id, titulo, tipo, porciones }`. Solo propias |
+| POST | `receta.escribir` | `{ id, texto, bandeja_id, quien? }` | `{ bandeja_id, estado }`. El texto de una propia, `pendiente` para `/recetas` |
 | POST | `receta.corregir` | `{ id, texto, quien? }` | `{ id, receta_id, estado, pedido }`. «Algo está mal en esta receta»: deja el pedido en la fila de la receta, en `pendiente`. Sin `texto`, lo cancela |
 | POST | `receta.porciones` | `{ id, porciones, quitar? }` | `{ id, porciones_vistas }`: la vista pasa al frente (o se saca) |
 | POST | `receta.ingredientes` | `{ id, ingredientes: [{ id, seccion, rol }] }` | `{ id, ingredientes }`. Lo que cambian ellos: va a `rol_usuario` y `seccion_usuario` |
@@ -225,6 +230,10 @@ Todas las llamadas llevan `action` y el token `t`, en la query o en el cuerpo. L
 | POST | `compras.mover` | `{ ids, lugar }` | `{ ids, lugar }`. `lugar`: uno de los 7, `revisar` o vacío (el de la regla) |
 | POST | `compras.quitar` | `{ ids }` | `{ quitados }` |
 | POST | `lugares.asignar` | `{ por: tipo \| ingrediente, clave, lugar }` | `{ por, clave, lugar }`. Por ingrediente, `lugar` vacío borra la regla |
+| POST | `despensa.sumar` | `{ items: [{ id, nombre }], quien }` | `{ ids, nuevos }`. Lo que ya está (por id o por nombre) no se toca |
+| POST | `despensa.quitar` | `{ ids }` | `{ quitados }` |
+| POST | `plan.poner` | `{ items: [{ id, semana, fecha?, comida?, receta_id, porciones? }], quitar?, quien }` | `{ ids, nuevos, actualizados, quitados }`. Crea o reemplaza por id; `quitar` se borra en el mismo lote |
+| POST | `plan.quitar` | `{ ids }` | `{ quitados }` |
 | POST | `capturas.subir` | `{ bandeja_id, lote, imagenes: [{ base64, mime }] }` (hasta 6) | `{ id, estado, capturas }`. Privadas en «A ojo/capturas»; la fila vuelve a `pendiente` con los intentos en 0 |
 | GET | `capturas.bajar` | `{ bandeja_id }` | `{ id, imagenes: [{ id, nombre, mime, base64 }] }` |
 

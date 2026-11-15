@@ -1,7 +1,7 @@
 # A ojo — Spec v2
 
 > Segunda versión de A ojo: planificar la semana (también con los platos de siempre), saber qué hay en casa y escalar las recetas con unidades que se entiendan.
-> Documento para llevar a Claude Code. Versión 2 · borrador del 14/11/2026.
+> Documento para llevar a Claude Code. Versión 2 · 14/11/2026, actualizada el 15/11/2026.
 
 `SPEC_v1.md` sigue vigente: todo lo que no cambia acá (arquitectura, datos, API, captura, procesamiento, guía visual y convenciones de `CLAUDE.md`) se mantiene. Las fases siguen la numeración de la v1: arrancan en la 7.
 
@@ -68,7 +68,7 @@ Las dos hojas nuevas son chicas: `todo` las manda **siempre enteras**, como `Com
 
 ### Recetas propias (cambios en hojas que ya existen)
 - `Recetas.plataforma` suma el valor `manual`: sin `fuente_url`, con `autor` vacío. `origen_datos` suma la capa `texto` (la receta escrita por ellos) y `confianza` puede quedar vacía mientras no tenga ingredientes.
-- `Bandeja` suma la columna `texto`: la receta escrita en la app, para que `/recetas` la ordene. Una fila de una receta propia tiene `plataforma = manual`, `url` vacía y `receta_id` ya cargado.
+- `Bandeja` suma la columna `texto`: la receta escrita en la app, para que `/recetas` la ordene. El texto queda en la fila aunque pase a `lista`: es lo que se carga al reescribirla. Una fila de una receta propia tiene `plataforma = manual`, `url` vacía y `receta_id` ya cargado.
 - La deduplicación por link no aplica a las propias (no tienen link). Dos con el mismo título se permiten.
 
 ---
@@ -83,9 +83,9 @@ Todas idempotentes, con su caso en `aplicarEdicion()` y su test, como pide `CLAU
 | POST | `plan.quitar` | `{ids}` | `{quitados}` |
 | POST | `despensa.sumar` | `{items: [{id, nombre}], quien}` | `{ids, nuevos}`. Los que ya estaban (por id o por nombre, también dentro del mismo pedido) no se tocan |
 | POST | `despensa.quitar` | `{ids}` | `{quitados}` |
-| POST | `receta.crear` | `{id, titulo, tipo, porciones?, texto?, bandeja_id?, quien}` | `{id, bandeja_id?}`. Crea una receta propia (`plataforma = manual`). Con `texto`, también la fila de la bandeja (`pendiente`) para que `/recetas` la ordene. Los ids los genera la app. Si la receta ya existe (un reintento), no la toca, pero suma la fila si faltaba |
-| POST | `receta.editar` | `{id, titulo?, tipo?, porciones?}` | `{id}`. Solo para recetas propias: las demás las cambia `/recetas` |
-| POST | `receta.escribir` | `{id, texto, bandeja_id, quien?}` | `{bandeja_id}`. Escribe (o reescribe) el texto de una receta propia y la deja `pendiente` en la bandeja, en su fila (o en una nueva con `bandeja_id`). Reescribir vacía el pedido de corrección. Si la Mac la está ordenando, el texto se guarda igual y queda para la corrida siguiente |
+| POST | `receta.crear` | `{id, titulo, tipo, porciones?, texto?, bandeja_id?, quien?}` | `{id, bandeja_id, repetida}`. Nombre hasta 80 caracteres y texto hasta 5000. Crea una receta propia (`plataforma = manual`). Con `texto`, también la fila de la bandeja (`pendiente`) para que `/recetas` la ordene. Los ids los genera la app. Si la receta ya existe (un reintento), no la toca, pero suma la fila si faltaba |
+| POST | `receta.editar` | `{id, titulo?, tipo?, porciones?}` | `{id, titulo, tipo, porciones}`. Solo para recetas propias: las demás las cambia `/recetas` |
+| POST | `receta.escribir` | `{id, texto, bandeja_id, quien?}` | `{bandeja_id, estado}`. Escribe (o reescribe) el texto de una receta propia y la deja `pendiente` en la bandeja, en su fila (o en una nueva con `bandeja_id`). Reescribir vacía el pedido de corrección. Si la Mac la está ordenando, el texto se guarda igual y queda para la corrida siguiente |
 
 `todo` suma `plan` y `despensa` a su respuesta, siempre enteras.
 
@@ -104,7 +104,7 @@ Cambios en acciones que ya existen:
 - La semana va en la dirección (`#/semana/2026-11-16`): una versión nueva de la app no cambia de semana. Cada día lleva «Almuerzo» y «Cena» apilados (en 360 px no entran lado a lado).
 - Arriba, «Semana del 16/11» con flechas para la anterior y la siguiente. La semana va de lunes a domingo y abre en la actual; hoy se destaca.
 - Arriba de los días, la fila **«Sin día»**: los platos de esa semana sin día decidido. Si está vacía, no se muestra (salvo como destino al mover).
-- Cada día, en una fila, con **almuerzo** y **cena**. Cada receta muestra su foto chica, el título y las porciones («Pollo marroquí · 4»); tocarla abre la ficha.
+- Cada día, en un bloque, con **almuerzo** y **cena** apilados. Cada receta muestra su foto chica, el título y las porciones («Pollo marroquí · 4»); tocarla abre la ficha.
 - En cada comida (y en «Sin día»), «+» abre el buscador de recetas (el de «Agregar una receta» en Compras: `elegir.js`), que arriba ofrece **«Una receta nuestra»** (§6), y después un paso para elegir las porciones (las de la última vista de esa receta, con −/+).
 - Cada entrada se puede **mover** (a otro día, a la otra comida o a «Sin día», con una hoja como la de mover en Compras), **cambiar las porciones** o **quitar**.
 - **«Sumar a la semana»**, desde la ficha (en la barra fija de abajo, al lado de «Empezar a cocinar») y desde cada tarjeta de la Biblioteca (un calendario con «+»; no en las descartadas): una hoja con «Esta semana (del 16/11)» y «La que viene (del 23/11)» (el domingo, «La que viene» primero) que pone la receta en «Sin día» con las porciones que se están viendo (o las de su última vista). Desde la ficha, la hoja también ofrece «Elegir día y comida» (la semana, el día, la comida y las porciones).
@@ -114,7 +114,7 @@ Cambios en acciones que ya existen:
 
 ### 4.2 Compra de la semana
 - «Armar la compra de la semana» (abajo de la pantalla) junta las recetas de los días que **todavía no pasaron** y las de «Sin día». Las recetas propias que todavía no tienen ingredientes se listan aparte: «Sin ingredientes: Milanesas con puré» (con «Escribir la receta»). Si una receta está dos veces, se suman sus porciones.
-- Lleva a un paso para elegir, como «Agregar a compras» pero para varias recetas: una sección por receta (plegable), con sus porciones, los principales marcados y los opcionales sin marcar. Lo que está en la **despensa** arranca **desmarcado** con la marca «En casa».
+- Lleva a un paso para elegir, como «Agregar a compras» pero para varias recetas: una sección por receta (plegable), con sus porciones, los principales marcados y los opcionales sin marcar. Lo que está en la **despensa** arranca **desmarcado** con la marca «En casa». Si la receta ya está en la lista, su sección arranca con lo que tiene ahí, con el aviso «Ya está en la lista: arranca con lo que tiene ahí».
 - Guardar llama a `compras.agregar` una vez por receta, con las porciones sumadas: el mismo mecanismo de la v1, que reusa los ids y conserva lo marcado. Una receta que ya estaba en la lista se reemplaza, como hoy.
 - Al terminar vuelve a la lista de compras con el aviso «✓ Compra de la semana armada».
 
@@ -139,8 +139,8 @@ Dos botones arriba de la semana, **«Repetir una semana»** y **«Usar como mode
 
 ### 5.2 Cómo se llena y cómo se vacía
 - **A mano**, en la pantalla de la despensa.
-- **Desde la lista de compras:** «Limpiar marcados» pasa a la despensa lo que se compró (salvo los utensilios y lo que ya estaba), con el aviso «Pasé a la despensa: …» y «Deshacer». «Deshacer» saca de la despensa lo que se acaba de sumar; los marcados se van de la lista igual. Si no queda nada para pasar, no hay aviso.
-- **Desde «Revisá si tenés»:** marcar «lo tengo» lo suma a la despensa; desmarcarlo lo saca (si está con ese mismo nombre).
+- **Desde la lista de compras:** «Limpiar marcados» pasa a la despensa lo que se compró de las recetas (salvo los utensilios y lo que ya estaba; lo escrito a mano en la lista, como «servilletas», no pasa), con el aviso «Pasé a la despensa: …» y «Deshacer». «Deshacer» saca de la despensa lo que se acaba de sumar; los marcados se van de la lista igual. Si no queda nada para pasar, no hay aviso.
+- **Desde «Revisá si tenés»:** marcar «lo tengo» lo suma a la despensa; desmarcarlo lo saca (si está con ese mismo nombre). Solo lo que viene de una receta.
 - **Al terminar de cocinar:** «¿Cómo salió?» suma una pregunta opcional, «¿Se terminó algo?», con los principales de la receta que están en la despensa como casillas. Lo marcado sale de la despensa.
 - La despensa no lleva cantidades ni fechas de vencimiento en la v2.
 
@@ -166,7 +166,7 @@ Los platos que ya hacemos, sin video ni web: se cargan rápido para ponerlos en 
 - Con el texto escrito y todavía sin procesar: «La Mac la va a ordenar en la próxima corrida», y el texto se ve tal cual, para cocinar igual.
 - «Editar» (solo en las propias) cambia el nombre, el tipo y cuánto rinde («Rinde: para cuántas porciones son las cantidades de la receta»; para cocinar para otras está el −/+ de la ficha). Los ingredientes y los pasos se corrigen como cualquier receta: «Algo está mal» (solo en las ya ordenadas) o reescribiendo el texto.
 - Una creada por error se descarta, como cualquier receta.
-- En la Bandeja, la fila de una propia no ofrece capturas ni «Descartar»: «Cambiar el texto» (lleva a la ficha), «Probar de nuevo» y, si la Mac no pudo ordenarla, «Dejarla sin ordenar» (la saca de la Bandeja; la receta queda con el nombre y se puede volver a escribir).
+- En la Bandeja, la fila de una propia no ofrece capturas ni «Descartar». Esperando a la Mac: «Ver la receta». En «Necesita ayuda»: «Cambiar el texto» (lleva a la ficha), «Probar de nuevo» y «Dejarla sin ordenar» (la saca de la Bandeja; la receta queda con el nombre y se puede volver a escribir).
 
 ### 6.3 En `/recetas`
 - Una fila con `plataforma = manual` no baja nada: su única capa es `texto`. Se estructura con las mismas reglas de §6.2 de la v1 (rioplatense, voseo en los pasos, **nunca inventar cantidades**, roles, secciones e ingredientes por paso) y se manda con `receta.upsert` sobre la receta que ya existe.
@@ -219,7 +219,7 @@ Todo es lógica pura de la app (`ingredientes.js`, `formato.js`, `compras.js`), 
 Cada fase termina con un commit y su tilde en `docs/PLAN.md`. **Las pruebas en dispositivos reales de la Fase 6 y de toda la v2 se juntan en la Fase 11**, al final.
 
 ### Fase 7: arrastre de la v1
-- **Backup sin script:** `hacerBackup()` hoy copia la planilla con `makeCopy`, que también copia el script ligado: cada semana aparece un proyecto de Apps Script nuevo con el código de la API. Pasar a una planilla nueva con las hojas copiadas una por una (`sheet.copyTo()`), sin script. Sin permisos nuevos.
+- **Backup sin script:** copiar la planilla con `makeCopy` también copiaba el script ligado (cada semana aparecía un proyecto de Apps Script nuevo con el código de la API). El backup arma una planilla nueva con las hojas copiadas una por una (`sheet.copyTo()`), sin script. Sin permisos nuevos.
 - **Paridad entre Python y JavaScript:** `procesamiento/obsidian.py` repite el formato de `formato.js` e `ingredientes.js` (cantidades, fracciones, plurales y `NOMBRES`). Un test con los mismos casos de los dos lados, para que no se desfasen. Como la Fase 8 cambia ese formato, va antes.
 - **Una sola lista de pendientes:** las specs dicen qué se pide y `docs/PLAN.md` lleva las casillas. Sacar de §9 de `SPEC_v1.md` los estados («hecho», «falta la demo») que hoy repiten lo de `PLAN.md`.
 - **Listo cuando:** el backup a mano (`hacerBackup()` en el editor) deja una planilla sin script en «A ojo/backups»; el test de paridad pasa y falla si se cambia un plural de un solo lado.
@@ -278,10 +278,8 @@ Todo lo que pide un celular, la computadora de Laura o la API desplegada. Las de
 - **Copiar semanas:** «Repetir una semana» (igual) y «Usar como modelo» (a «Sin día», para repartir), desde cualquier semana guardada, hacia la semana que se está mirando.
 - La v2 tiene su propia spec (este documento); `SPEC_v1.md` queda como registro del MVP.
 - Las pruebas en dispositivos se juntan al final (Fase 11).
-- **Despensa (Fase 9):** «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa.
+- **Despensa (Fase 9):** no lleva cantidades y no se descuenta sola al cocinar: se pregunta en «¿Cómo salió?». «Limpiar marcados» pasa lo comprado a la despensa sin preguntar, y su «Deshacer» solo deshace ese paso. Los utensilios no pasan a la despensa; lo escrito a mano en la lista, tampoco (decidido el 15/11).
 - **Plan semanal (Fase 10b, 15/11):** lunes a domingo, almuerzo y cena; cuatro pestañas con Semana segunda; historial de 8 semanas; al repetir sobre una semana con algo se pregunta «Sumar» o «Reemplazar»; «Usar como modelo» trae todos los platos; «Sumar a la semana» también desde las tarjetas de la Biblioteca, a esta semana o a la que viene. El domingo, la hoja ofrece primero «La que viene». Los platos que quedan en «Sin día» de una semana pasada quedan como historial (se revisa con el uso, en la Fase 11).
 - **Recetas propias (Fase 10a, 15/11):** arrancan en 2 porciones y como saladas, sin foto. En «Editar», las porciones se llaman «Rinde». No se borran: se descartan.
 - **Escalado (Fase 8):** 1 taza = 240 ml; lo que se cuenta va de a medios si la receta usa medios (½ cebolla) y, en compras, redondeado para arriba.
 
-**Supuestos de este borrador, para revisar antes de empezar:**
-- La despensa no lleva cantidades y no se descuenta sola al cocinar: se pregunta en «¿Cómo salió?».

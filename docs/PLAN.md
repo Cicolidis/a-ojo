@@ -106,7 +106,7 @@ Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 
 - [x] Las notas muestran quién las escribió («Laura», «Camilo»)
 - Laura corre `/recetas` en su computadora y la receta llega a la app → Fase 11
 - Dos corridas a la vez no toman la misma fila → Fase 11
-- [ ] La SPEC describe lo que hace el código
+- [x] La SPEC describe lo que hace el código
 
 ## v2 (`SPEC_v2.md`)
 

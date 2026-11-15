@@ -1,7 +1,7 @@
 # A ojo — Spec v1
 
 > App personal de recetas para dos personas (Camilo y Laura). Captura links de YouTube e Instagram, los convierte en recetas estructuradas en rioplatense y los muestra en una app instalable, cálida y editorial.
-> Documento para llevar a Claude Code. Versión 1 · 27/09/2026.
+> Documento para llevar a Claude Code. Versión 1 · 27/09/2026, actualizada el 15/11/2026.
 
 ---
 
@@ -20,13 +20,9 @@
 - Lista de compras consolidada por lugar (supermercado, verdulería…), exportable a WhatsApp.
 
 ### Queda para después (v2+)
-La v2 está en `SPEC_v2.md`: plan semanal, despensa y escalado con conversión. «¿Qué cocino hoy?» (la versión simple) y la exportación a Obsidian se hicieron en la Fase 6.
+La v2 está en `SPEC_v2.md`: plan semanal, recetas propias, despensa y escalado con conversión. «¿Qué cocino hoy?» (la versión simple) y la exportación a Obsidian se hicieron en la Fase 6.
 
-- Plan semanal.
-- "¿Qué cocino hoy?" a partir de lo que hay en casa.
-- Escalado inteligente de porciones con conversión de unidades (en v1 solo se multiplican las cantidades numéricas).
-- Exportación de recetas a Obsidian.
-- Procesamiento automático programado. **Decisión: en v1 el procesamiento se corre siempre a mano.**
+- Procesamiento automático programado. **Decisión: el procesamiento se corre siempre a mano.**
 
 ### Restricciones
 - **Costo: $0.** Solo servicios gratuitos, más la suscripción a Claude que ya existe.
@@ -46,7 +42,7 @@ La v2 está en `SPEC_v2.md`: plan semanal, despensa y escalado con conversión. 
 [Mac: Claude Code /recetas] --lee bandeja / escribe recetas (API) ----------+
         |  yt-dlp · Whisper · ffmpeg · web fetch · Claude
         v
-[Drive: carpeta "A ojo/fotos"]  (miniaturas)
+[Drive: "A ojo/fotos"] (miniaturas, públicas) · "A ojo/capturas" (privadas) · "A ojo/backups" (copia semanal)
 
 [PWA en GitHub Pages] <--GET/POST JSON--> [Apps Script API]
    (cache local en IndexedDB, funciona offline)
@@ -56,11 +52,11 @@ La v2 está en `SPEC_v2.md`: plan semanal, despensa y escalado con conversión. 
 |---|---|---|
 | Base de datos | Google Sheets | Drive de Camilo, compartida con Laura |
 | API | Apps Script, web app (`doGet`/`doPost`) que devuelve JSON | Proyecto ligado a la Sheet |
-| App | PWA: HTML, CSS y JS, sin framework pesado (vanilla o Preact) | GitHub Pages |
+| App | PWA: HTML, CSS y JS puro en módulos ES, sin framework, sin dependencias y sin build | GitHub Pages |
 | Captura Mac | Extensión de Chrome MV3 (desempaquetada) | Chrome de Camilo |
 | Captura Android | HTTP Shortcuts (Play Store / F-Droid) | Celular de Laura |
 | Procesamiento | Python + `yt-dlp` + `faster-whisper` + `ffmpeg` + Claude Code | Mac Mini M4 |
-| Fotos | Miniaturas copiadas a Drive (URL pública) o al repo | Drive |
+| Fotos | Miniaturas copiadas a Drive (URL pública) | Drive |
 
 **Principio clave:** la Sheet es la fuente de verdad. La PWA descarga todo al abrir, lo guarda localmente y sincroniza los cambios en segundo plano. Por eso la lentitud de Apps Script (1 a 3 segundos por llamada) no se nota en el uso.
 
@@ -77,7 +73,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | creado | fecha-hora ISO | |
 | url | texto | URL normalizada, sin `?si=`, `?stkn=` ni otros parámetros de tracking |
 | plataforma | `youtube` · `instagram` · `web` · `otro` | se detecta sola |
-| quien | `camilo` · `pareja` | según el origen: extensión o HTTP Shortcuts. `pareja` es el valor interno de Laura: en la interfaz y en los textos siempre se la nombra «Laura» |
+| quien | `camilo` · `pareja` | según quién guarda: lo fija el atajo de Android, las opciones de la extensión o el link de configuración de la app. `pareja` es el valor interno de Laura: en la interfaz y en los textos siempre se la nombra «Laura» |
 | estado | `pendiente` · `procesando` · `lista` · `ayuda` · `descartada` | |
 | motivo | texto | solo si `estado = ayuda` (ej.: "Instagram pide login") |
 | receta_id | texto | se completa cuando está `lista` |
@@ -86,7 +82,7 @@ Todas las hojas llevan `id` como primera columna: texto corto único (ej.: `r_7f
 | capturas | texto | ids de Drive de las capturas que subieron desde la app (capa 6), separados por coma. Cuando la fila queda `lista`, van a la papelera de Drive (30 días) y la columna se vacía |
 | pedido | texto | «Algo está mal en esta receta»: lo que pidieron corregir desde la ficha (`receta.corregir`), una línea por pedido. `/recetas` lo lee como instrucción; se vacía cuando la fila vuelve a quedar `lista`. Cada pedido es una línea (los saltos de línea del texto se juntan). Cancelarlo deja la fila en `lista` con `intentos` en 0: así la Bandeja sabe que no la procesó la Mac (no cuenta como «Recién llegada» ni como su última corrida) |
 
-**Deduplicación:** si la URL normalizada ya existe, no se crea una fila nueva y la API responde `duplicada`.
+**Deduplicación:** si la URL normalizada ya existe, no se crea una fila nueva y la API responde `duplicada`. Si esa fila estaba `descartada`, vuelve a `pendiente` con los intentos en 0 (guardarla de nuevo es querer cocinarla).
 
 ### `Recetas`
 | Columna | Tipo | Notas |
@@ -158,21 +154,22 @@ Dónde se compra cada cosa, compartido por los dos:
 ## 4. API (Apps Script web app)
 
 - Se despliega como **"Ejecutar como: yo · Acceso: cualquiera"**.
-- La seguridad se resuelve con un **token compartido** en cada llamada (parámetro `t`), guardado en `PropertiesService`. Sin token válido, la API responde `401`.
-- Formato: JSON. Todas las respuestas llevan `{ ok: bool, data?, error? }`.
+- La seguridad se resuelve con un **token compartido** en cada llamada (parámetro `t`), guardado en `PropertiesService`.
+- Formato: JSON. Respuesta: `{ ok: true, data }` o `{ ok: false, error, mensaje, detalles?, status }`. Apps Script responde siempre HTTP 200: el `401` (token inválido), los `400`, `404` y `409` van en `status`. Con `formato=texto` responde solo el mensaje en texto plano (lo usa el atajo de Android).
+- La tabla lista los campos principales de cada salida. Las acciones de la v2 (`receta.crear`, `receta.editar`, `receta.escribir`, `despensa.*`, `plan.*`) están en §3 de `SPEC_v2.md`.
 
 | Método | `action` | Entrada | Salida |
 |---|---|---|---|
 | GET o POST | `ping` | — | `{version, ahora, hojas_faltantes, mensaje}` (prueba la conexión y el token: lo usan `setup.sh` y `npm run smoke`) |
-| POST | `capturar` | `{url, quien}` | `{id, estado}` o `{duplicada: true}` |
-| GET | `todo` | `since?` (fecha ISO) | Recetas, ingredientes, pasos, notas, compras, lugares y bandeja (solo lo cambiado desde `since`; compras y lugares, siempre enteras) |
-| POST | `receta.upsert` | receta completa (con ingredientes y pasos), `bandeja_id?`, `foto?`, `validar?` | `{id}` (con `bandeja_id`, deja la fila en `lista`, vacía su `pedido` y manda sus capturas a la papelera: `capturas_papelera`; si los pasos traen ingredientes, devuelve `ingredientes_por_paso` con sus nombres y `sin_paso` con los que no están en ninguno, para que `/recetas` revise las posiciones) |
+| POST | `capturar` | `{url, quien}` (`url` puede ser un texto con un link adentro) | `{id, estado, mensaje}` o `{duplicada: true, id, estado, mensaje}` |
+| GET | `todo` | `since?` (fecha ISO) | `{ahora, completo, …}`: recetas, ingredientes, pasos, notas, compras, lugares, despensa, plan y bandeja (solo lo cambiado desde `since`; compras, lugares, despensa y plan, siempre enteros). `ahora` es el próximo `since` |
+| POST | `receta.upsert` | `{receta: {…con ingredientes y pasos}, bandeja_id?, foto?, validar?}` | `{id, nueva, ingredientes, pasos, foto_url, mensaje}`. Busca la receta por `id`, después por el `receta_id` de la fila y por último por el link (nunca por un link vacío); al actualizar conserva estado, valoración, vistas de porciones y foto (salvo que venga una nueva). Con `validar` no escribe nada. (Con `bandeja_id`, deja la fila en `lista`, vacía su `pedido` y manda sus capturas a la papelera: `capturas_papelera`; si los pasos traen ingredientes, devuelve `ingredientes_por_paso` con sus nombres y `sin_paso` con los que no están en ninguno, para que `/recetas` revise las posiciones) |
 | POST | `receta.estado` | `{id, estado?, valoracion?}` | `{id, estado, valoracion}` |
 | POST | `receta.corregir` | `{id, texto, quien?}` | `{id, receta_id, estado, pedido}`: suma `texto` al `pedido` de la fila de la receta (la más nueva; si no tiene, la crea con su `fuente_url`) y la deja en `pendiente` con los intentos en 0. Sin `texto`, cancela: vacía el pedido y la fila vuelve a `lista`. `409 procesando` si la tiene una corrida |
 | POST | `receta.porciones` | `{id, porciones, quitar?}` | `{id, porciones_vistas}` (pone la vista al frente, o la saca) |
-| POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (ediciones de ellos: `*_usuario`) |
-| POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id}` (`/recetas --clasificar`: todos los ingredientes) |
-| POST | `nota.agregar` | `{id?, receta_id, quien, texto, fecha?}` | `{id}` (con el id de la app, un reintento no la duplica) |
+| POST | `receta.ingredientes` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id, ingredientes}` (ediciones de ellos: `*_usuario`) |
+| POST | `receta.clasificar` | `{id, ingredientes: [{id, seccion, rol}]}` | `{id, ingredientes}` (`/recetas --clasificar`: todos los ingredientes) |
+| POST | `nota.agregar` | `{id?, receta_id, quien, texto, fecha?}` | `{id, fecha}` (con el id de la app, un reintento no la duplica: responde `repetida`) |
 | POST | `nota.editar` | `{id, texto}` | `{id, texto}` (con el mismo texto no escribe; una borrada da `409 nota_borrada`) |
 | POST | `nota.borrar` | `{id}` | `{id, borrada}` (la marca como borrada; idempotente) |
 | POST | `compras.agregar` | `{receta_id?, porciones?, items: [{id, nombre, cantidad, unidad, gondola, rol, lugar?}]}` | `{ids, nuevos, actualizados, quitados}` (suma lo que no está; lo de la receta que ya está, por id, se actualiza (cantidad, porciones, rol) sin tocar `lugar`, y sigue marcado salvo que ahora haga falta más de algo que se compra; con `receta_id`, lo de esa receta que no vino se borra) |
@@ -180,14 +177,14 @@ Dónde se compra cada cosa, compartido por los dos:
 | POST | `compras.mover` | `{ids, lugar}` | `{ids, lugar}` (`lugar` vacío: el de la regla) |
 | POST | `compras.quitar` | `{ids}` | `{quitados}` (limpiar los marcados, sacar una receta o un ítem) |
 | POST | `lugares.asignar` | `{por, clave, lugar}` | `{por, clave, lugar}` (por ingrediente, `lugar` vacío borra la regla) |
-| GET | `bandeja.pendientes` | — | filas `pendiente` (las usa `/recetas`) |
+| GET | `bandeja.pendientes` | — | `{filas}`: las `pendiente` más las que quedaron en `procesando` hace más de 30 minutos (una corrida cortada), de la más vieja a la más nueva (las usa `/recetas`) |
 | GET | `bandeja.fila` | `{id}` | `{fila}`: una fila cualquiera (`/recetas <id>`, para reprocesar) |
-| POST | `bandeja.tomar` | `{limite?, id?}` | `{filas, quedan}`: dentro del lock, pasa a `procesando` (y suma un intento) las próximas para procesar, o la del `id` (409 si otra corrida la tiene). `/recetas` la usa de a una: dos corridas a la vez nunca toman la misma fila |
+| POST | `bandeja.tomar` | `{limite?, id?}` | `{filas, quedan}`: dentro del lock, pasa a `procesando` (y suma un intento) las próximas para procesar (`limite` de 1 a 20, y también las trabadas hace más de 30 minutos), o la del `id` (409 si otra corrida la tomó hace menos de 30 minutos). `/recetas` la usa de a una: dos corridas a la vez nunca toman la misma fila |
 | POST | `bandeja.actualizar` | `{id, estado, motivo?, receta_id?, desde?}` | `{id, estado, intentos}` (volver a `pendiente` desde `ayuda` o `descartada` reinicia los intentos). Con `desde` (la app): si la fila ya no está en ese estado, `409 estado_cambio` sin tocarla; si ya está en `estado`, ok sin escribir |
 | POST | `capturas.subir` | `{bandeja_id, lote, imagenes: [{base64, mime}]}` (hasta 6) | `{id, estado, capturas}`: las guarda en Drive, privadas, y deja la fila en `pendiente` (el `lote` evita duplicarlas al reintentar) |
 | GET | `capturas.bajar` | `{bandeja_id}` | `{imagenes: [{id, nombre, mime, base64}]}` (las usa `/recetas`) |
 
-**Nota técnica:** HTTP Shortcuts, la extensión y la app mandan `POST` con `Content-Type: text/plain` para evitar el preflight de CORS, que Apps Script no maneja. El cuerpo es JSON como texto.
+**Nota técnica:** la extensión y la app mandan `POST` con JSON como `Content-Type: text/plain`, para evitar el preflight de CORS, que Apps Script no maneja. HTTP Shortcuts manda un formulario (form-urlencoded). La API acepta los dos.
 
 Las acciones que usa la app son **idempotentes**: la cola offline puede mandar dos veces la misma edición sin que se duplique nada. Las que editan una receta actualizan su `actualizado`, así el delta la lleva al otro celular.
 
@@ -197,17 +194,17 @@ Las acciones que usa la app son **idempotentes**: la cola offline puede mandar d
 
 ### 5.1 Android: HTTP Shortcuts
 - Atajo **"Guardar receta"**, configurado para **recibir texto compartido** (opción *Share → aceptar texto*).
-- Acción: `POST` a la URL del web app, con cuerpo `{"url":"{share_text}","quien":"pareja"}` más el token.
+- Acción: `POST` a `…/exec?action=capturar&formato=texto`, con un formulario de tres campos: `url` (el texto compartido), `quien` (`pareja`) y `t` (el token). Ver `docs/android-http-shortcuts.md`.
 - Respuesta: aviso breve ("✓ Guardada" o "Ya estaba guardada"). **Sin diálogos de confirmación.**
 - Flujo final: Reel → Compartir → "Compartir en…" → **Guardar receta** (3 toques).
-- Extraer la URL con una expresión regular del texto compartido: Instagram a veces suma texto alrededor.
+- El link lo extrae la API del texto compartido (Instagram a veces suma texto alrededor): `Url.js`.
 
 ### 5.2 Mac: extensión de Chrome (MV3)
 - Botón en la barra de herramientas: manda la URL de la pestaña activa.
 - Menú contextual sobre links: **"Guardar en A ojo"**.
 - Atajo de teclado opcional: `⌥⇧R`.
-- Feedback: insignia verde "✓" durante 2 segundos, o roja si hubo error.
-- Configuración (URL del web app y token) en la página de opciones de la extensión, guardada en `chrome.storage.local`.
+- Feedback: insignia verde "✓" durante 2 segundos, ámbar si ya estaba guardada, o un «!» rojo durante 5 segundos si hubo error.
+- Configuración (URL del web app, token y «¿Quién sos?») en la página de opciones de la extensión, guardada en `chrome.storage.local`.
 
 ### 5.3 Desde la app
 - **Compartir → A ojo:** el manifest declara un `share_target` (`GET` a `./?titulo=…&texto=…&link=…`). En Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Se abre en la Bandeja, con el aviso «✓ Guardada. Queda esperando a la Mac.» (sin conexión: «Se manda cuando vuelva la conexión.»).
@@ -226,7 +223,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
    - **Posts de fotos de Instagram** (`/p/…` sin video): `fetch meta` devuelve `sin_video: true`. No hay audio ni fotogramas: la receta sale del caption y, si no alcanza, se piden capturas.
    - **Comentarios del autor (YouTube):** si la descripción está vacía o remite al comentario fijado («receta en los comentarios»), `fetch comentarios` trae, entre los 30 más votados, los del autor o fijados. Se leen como parte de la descripción.
    - Instagram: siempre con las cookies de la **cuenta secundaria de Instagram dedicada al procesamiento**, nunca las de la cuenta principal de Laura. Esas cookies viven en un **perfil de Chrome separado** ("A ojo – procesamiento") en la computadora donde se corra `/recetas`: `--cookies-from-browser "chrome:A ojo – procesamiento"`. Como macOS no deja que Claude Code lea la carpeta de Chrome, las cookies se exportan desde la Terminal (`procesamiento/aojo fetch cookies`) a `~/.a-ojo/cookies-instagram.txt`, y ese archivo tiene prioridad. La cuenta secundaria tiene que estar configurada como **mayor de 18** para poder ver Reels con restricción de audiencia.
-3. **Capa 2: subtítulos** (solo YouTube). `--write-auto-subs --sub-langs "es.*,en.*"`.
+3. **Capa 2: subtítulos** (solo YouTube). Una sola pista, en español o inglés: la manual si hay; si no, la automática del idioma original (nunca una traducción automática).
 4. **Capa 3: link externo.** Si la descripción remite a una web con la receta (ej.: "RECIPE ⬇️ https://…"), se lee esa página.
 5. **Capa 4: audio.** Si con lo anterior faltan cantidades o pasos, se baja el audio y se transcribe con `faster-whisper` (modelo `small`, idioma autodetectado).
 6. **Capa 5: fotogramas.** Si todavía faltan datos, se extrae 1 cuadro cada 3 segundos con `ffmpeg`, se arman mosaicos y Claude lee el texto sobreimpreso.
@@ -240,7 +237,7 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - **Traducir** si el original está en otro idioma y guardar `idioma_original`.
 - **Convertir** unidades estadounidenses: °F → °C, cups → g o ml cuando sea razonable, oz → g.
 - **Nombres locales:** manteca (no mantequilla), crema de leche, harina 0000, zapallito, choclo, porotos, frutillas, palta.
-- **Corregir errores de transcripción por contexto** ("harina 4" → "harina 0000"; "polo para hornear" → "polvo de hornear") y **registrarlo** en una nota interna.
+- **Corregir errores de transcripción por contexto** ("harina 4" → "harina 0000"; "polo para hornear" → "polvo de hornear") y **registrarlo** en `notas_proceso` (la ven ellos en «Cómo se armó», en la ficha).
 - Ignorar el relleno del video: saludos, pedidos de suscripción, publicidad, menciones de marca innecesarias.
 - Si una cantidad no aparece: `cantidad` vacía y `unidad = "a ojo"`. **Nunca inventar cantidades.**
 - Pasos: frases cortas, un verbo principal por paso; temperatura y tiempo explícitos; `timer_min` cuando corresponda. Cada paso lleva sus `ingredientes`: todos los que se usan ahí, también los que el texto no nombra uno por uno («Sumá los secos»).
@@ -261,7 +258,8 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - Como las cookies son de la cuenta secundaria, **no hace falta procesar en la computadora de Laura**: alcanza con que el perfil "A ojo – procesamiento" exista en la computadora donde se corra.
 
 ### 6.4 Robustez
-- **Pausa de 2 a 5 segundos** entre links y **reintento con espera exponencial** ante `HTTP 429`: YouTube limitó las pruebas.
+- Sin número, `/recetas` procesa **hasta 10 filas** por corrida.
+- **Pausa de 2 a 5 segundos** entre links y **reintento** ante `HTTP 429` a los 30, 60 y 120 segundos: YouTube limitó las pruebas. Si sigue, la fila vuelve a `pendiente` y se corta la corrida.
 - `yt-dlp` se actualiza al inicio de cada corrida con `procesamiento/aojo fetch actualizar`. Como está instalado con pip dentro de `procesamiento/.venv`, `yt-dlp -U` no sirve: se actualiza el paquete en el venv (`uv pip install -U`, o pip si no hay uv). Sin conexión, sigue con la versión que hay.
 - Máximo 3 intentos por link; después pasa a `ayuda`.
 - Log local en `~/.a-ojo/log/AAAA-MM-DD.log`.
@@ -284,12 +282,12 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 ## 7. App (PWA)
 
 ### 7.1 Técnica
-- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/recetas`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`).
+- Una sola página con rutas por hash (`#/`, `#/receta/:id`, `#/cocina/:id`, `#/ingredientes/:id`, `#/compras`, `#/compras/recetas`, `#/compras/agregar/:id`, `#/lugares`, `#/bandeja`, `#/config?…`). Las de la v2 (`#/despensa`, `#/nueva`, `#/editar/:id`, `#/semana/…`) están en `SPEC_v2.md`.
 - `manifest.json` (nombre "A ojo", íconos, `display: standalone`, `theme_color #A6461F`, `background_color #F5EEE3`). Sin orientación fija: se puede girar el celular, por ejemplo apoyado de costado mientras cocinan.
 - **Modo oscuro** según el sistema, sin selector (§8).
 - Al cambiar de pantalla, un fundido corto (View Transitions). Todas las animaciones se apagan si el sistema pide reducir el movimiento.
 - Service worker: guarda la interfaz en caché y funciona offline.
-- Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`). Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
+- Datos: IndexedDB. Al abrir la app se piden solo los cambios (`todo?since=…`); también al volver a la app después de 5 minutos, al recuperar la conexión y cada 60 segundos mientras quede algo en la cola. Todo entero, una vez por semana o cuando cambia `VERSION_DATOS`. Las ediciones se ven al instante, se encolan y se reintentan si no hay conexión.
 - Búsqueda local, sin tildes y sin distinguir mayúsculas, sobre título, ingredientes y etiquetas.
 - «¿Qué cocino hoy?»: el mismo campo, en el modo «Con lo que tengo», lee lo que hay en casa («zapallo, huevos y crema») y ordena las recetas por cuántos ingredientes principales faltan (`queCocino()`, `datos.js`); los condimentos y lo opcional no cuentan.
 - **Wake Lock API** en el modo cocina: la pantalla no se apaga.
@@ -299,20 +297,20 @@ Un comando de Claude Code (en `.claude/commands/recetas.md`) que usa scripts de 
 - **`share_target`** (§5.3): la app abierta desde Compartir lee los parámetros, limpia la dirección y guarda el link por la cola. Mientras no llega a la API, la Bandeja muestra una fila provisoria (`local`), que se reemplaza por la de verdad cuando baja `todo`. Sin configuración, lo compartido se pierde: se ve la bienvenida, con el aviso «Primero abrí el link de configuración; después volvé a compartirlo».
 
 ### 7.2 Pantallas (referencia: lienzo "A ojo — maquetas", **variante A**)
-1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", un selector "Buscar" / "Con lo que tengo", buscador (en el segundo modo, las tarjetas dicen "Tenés todo lo principal" o "Faltan: crema y queso"), chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor y estado o valoración.
-2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota"), cada una con "Editar" y "Borrar" (pide confirmación; los dos pueden editar o borrar cualquiera) y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior.
+1. **Biblioteca:** saludo "¿Qué cocinamos hoy?", un selector "Buscar" / "Con lo que tengo", buscador (en el segundo modo, las tarjetas dicen "Tenés todo lo principal" o "Faltan: crema y queso"), chips de filtro (Todas / Para probar / Favoritas / Dulce / Salado / etiquetas), aviso de la bandeja con contador y grilla de 2 columnas, en orden alfabético, con foto, título, autor · tiempo y la valoración si tiene. Los chips de etiquetas son las 6 más usadas.
+2. **Ficha:** foto grande (con Volver y, del otro lado, Compartir: manda la receta por WhatsApp con las porciones que se están viendo, los ingredientes por sección, los pasos con sus tips y el link al video), título, autor con link a la fuente, tiempo y molde; selector de estado (Para probar / Probada / Favorita) y, si está probada o es favorita, las estrellas; pasos; notas con quién la escribió y la fecha ("Laura · 12/10"; sin `quien`, "Nuestra nota"), cada una con "Editar" y "Borrar" (pide confirmación; los dos pueden editar o borrar cualquiera) y "Sumar una nota"; advertencia si la confianza es baja; "Descartar receta" (se recupera desde la ficha o el filtro "Descartadas" de la Biblioteca); "Agregar a compras" (en los ingredientes; si ya está, "En compras para N" con "Ver la lista" y "Cambiar") y "Empezar a cocinar", justo encima de la navegación inferior (si quedó a mitad de camino, "Seguir cocinando (paso N)": el paso y los timers se guardan en el celular).
    - **Ingredientes** agrupados por sección y, dentro de cada una, por rol, en orden de uso: los principales con renglón propio, los condimentos en una línea, lo opcional tenue y los utensilios al final ("También vas a necesitar").
-   - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada.
+   - **Porciones:** −/+ para escalar y un chip por cada vista guardada ("6 · original", "12"). Empezar a cocinar con otro número lo guarda como vista; la ficha abre en la última usada. Una vista se saca con «Quitar la vista de N».
    - **"Editar ingredientes":** cambia el rol y la sección de cada ingrediente (no los nombres ni las cantidades).
    - **"Cómo se armó"** (plegado, después de los pasos): de qué capas salió ("Salió de la descripción del video y los subtítulos"), qué quiere decir su confianza y `notas_proceso`. No aparece si la receta no tiene ni capas ni notas.
-   - **"Algo está mal en esta receta"** (abajo, antes de "Descartar receta"): un texto para que `/recetas` la corrija ("Ej.: la harina son 300 g, no 200"); va por la cola. Mientras espera, un recuadro arriba muestra el pedido ("Pediste una corrección", "Corrigiéndose…" o el motivo si necesita ayuda) con "Cancelar el pedido", y el botón pasa a "Sumar algo al pedido".
+   - **"Algo está mal en esta receta"** (abajo, antes de "Descartar receta"): un texto para que `/recetas` la corrija ("Ej.: la harina son 300 g, no 200"); va por la cola. Mientras espera, un recuadro arriba muestra el pedido ("Hay una corrección pedida.", "Corrigiéndose…" o el motivo si necesita ayuda) con "Cancelar el pedido", y el botón pasa a "Sumar algo al pedido".
    - **"Agregar a compras":** un paso para elegir, con las porciones de la ficha (−/+). En "Para comprar", los principales marcados y los opcionales sin marcar; los condimentos y utensilios van aparte, a "Revisá si tenés". Se agrega solo lo marcado. Si la receta ya está en la lista, el paso arranca con lo que está en la lista y sus porciones, y guardar la actualiza: cada ingrediente conserva su ítem (el mismo id; se empareja por nombre, rol y cantidad), así lo movido sigue en su lugar y lo marcado sigue marcado, salvo lo que ahora lleva más (misma unidad, más cantidad) y no está en «Revisá si tenés». Si la receta cambió desde que se agregó, arrancan elegidos también sus principales nuevos, con un aviso ("Quitar de la lista" también está ahí). Desde la ficha, guardar vuelve a la receta con el aviso "✓ Agregada a compras" y su botón "Ver la lista"; desde Compras, vuelve a la lista.
-3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (los que guardó `/recetas`; en las recetas de antes, los que nombra el texto), con las cantidades de la vista de porciones, el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min`. Al terminar ofrece "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
+3. **Modo cocina:** barra de progreso, "PASO N DE M", texto grande en serif, los ingredientes de ese paso (los que guardó `/recetas`; en las recetas de antes, los que nombra el texto), con las cantidades de la vista de porciones, el tip del video, los pasos anteriores tachados y botones grandes Anterior / "Listo, siguiente"; timer cuando el paso tiene `timer_min` (el chip avisa «Suena con A ojo abierta»: en segundo plano el celular la suspende). El último paso dice "Terminé" y, al terminar, ofrece "Cocinarla de nuevo" y "¿Cómo salió?": estrellas y nota, opcionales. "Guardar" pasa la receta a `probada` (una favorita sigue siendo favorita); "Guardar y editar ingredientes" lleva al editor; "Ahora no" no cambia nada.
 4. **Lista de compras:** las recetas que están (con sus porciones y "Quitar"), "Agregar una receta" (un buscador de recetas, en orden alfabético, que marca las que ya están y lleva al paso para elegir), "Sumar algo" a mano y la lista agrupada por lugar, con "Revisá si tenés" al final y, dentro de cada lugar, en orden alfabético. Cantidades sumadas entre recetas (con el desglose "(3 + 1)"), checkboxes grandes y lo marcado tachado en su lugar.
    - Cada ítem se puede mover a otro lugar; la hoja de mover ofrece "Comprar siempre ahí", que guarda la regla del ingrediente. En "Revisá si tenés", la casilla es "lo tengo" y "Comprar" lo pasa al lugar de su regla.
    - "Mandar por WhatsApp": un título por lugar con lo que falta y, al final, "Revisá si tenés". "Limpiar marcados".
    - "Dónde compramos cada cosa" (`#/lugares`): el lugar de cada tipo de producto y los ingredientes con lugar fijo ("Olvidar").
-5. **Bandeja:** la hora del último procesamiento (cada tarjeta dice quién guardó el link: "Guardado por Laura · hoy 16:23"), «Pegar un link» (un campo y «Guardar»; si el texto no tiene link, lo dice abajo del campo) y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, con la foto y la marca de confianza). Un pedido de corrección se ve como "Corregir: <título>", con el pedido y "Cancelar el pedido" en lugar de "Descartar".
+5. **Bandeja:** la hora del último procesamiento (cada tarjeta dice quién guardó el link: "Guardado por Laura · hoy 16:23"), «Pegar un link» (un campo y «Guardar»; si el texto no tiene link, lo dice abajo del campo) y tarjetas por link: "Necesita ayuda" (el motivo, Subir capturas / Descartar y "Probar de nuevo sin capturas"), "Esperando a la Mac…" ("Procesando…" o "Con N capturas"; Descartar) y "Recién llegadas" (la última semana, hasta 10, con la foto y la marca de confianza). Un pedido de corrección se ve como "Corregir: <título>", con el pedido y "Cancelar el pedido" en lugar de "Descartar".
 
 **Estados vacíos y primera carga.**
 - Cada pantalla sin datos lleva un ícono, un título corto, una explicación y, si sirve, una acción: «Borrar la búsqueda», «Ver todas», «Ver las descartadas», «Probá de nuevo», «Volver a la receta».
@@ -333,15 +331,19 @@ Navegación inferior: **Recetas · Compras · Bandeja**, en la Biblioteca, la Fi
 | `--fondo` | `#F5EEE3` | fondo general (crema) |
 | `--superficie` | `#FFFBF5` | tarjetas, listas, barra de navegación |
 | `--superficie-2` | `#EFE2CF` | avisos, notas, selector segmentado |
-| `--borde` | `#E4D7C5` · `#D8C8B2` | bordes suaves y de controles |
+| `--borde` | `#E4D7C5` | bordes suaves |
+| `--borde-control` | `#D8C8B2` | bordes de botones y chips |
+| `--linea` | `#EFE6D9` | separadores entre renglones |
 | `--tinta` | `#2A211B` | texto principal, botón oscuro |
 | `--tinta-2` | `#6B5D52` | texto secundario |
+| `--tinta-nota` | `#4A3E35` | notas, tips y ayudas |
 | `--acento` | `#A6461F` | terracota: botón principal, activos, marca |
 | `--acento-hover` | `#7E3313` | |
 | `--ok` | `#4F6B2E` | confianza alta |
 | `--atencion` | `#8A5A10` | confianza media o "revisar" |
 | `--alerta` | `#8A3A1A` | necesita ayuda |
 | `--borde-campo` | `#907C6A` | borde de casillas, campos de texto, selects y del elegido en el segmentado (3:1 o más) |
+| `--relleno-1` a `--relleno-6` | `#5A3A28` · `#C99A5B` · `#7C8455` · `#D8B78A` · `#8A5A3C` · `#B5835A` | fondo de las fotos que faltan (uno por receta) |
 
 Todos los pares de texto y fondo tienen que cumplir un contraste de al menos 4,5:1 (WCAG AA), y los bordes que identifican un control, 3:1. Los revisa un test (`tests/app.test.js`) en los dos modos.
 
@@ -352,15 +354,16 @@ Todos los pares de texto y fondo tienen que cumplir un contraste de al menos 4,5
 | `--fondo` | `#1C1612` |
 | `--superficie` | `#28201B` |
 | `--superficie-2` | `#362B23` |
-| `--borde` · `--borde-control` · `--borde-campo` | `#43362C` · `#5A4A3D` · `#8A7867` |
+| `--borde` · `--borde-control` · `--borde-campo` · `--linea` | `#43362C` · `#5A4A3D` · `#8A7867` · `#3A2F27` |
 | `--tinta` · `--tinta-2` · `--tinta-nota` | `#F2E9DC` · `#BCAC9B` · `#DACDBD` |
 | `--acento` · `--acento-hover` | `#E58A60` · `#F0A27E` |
 | `--ok` · `--atencion` · `--alerta` | `#A9C27F` · `#E0B060` · `#F08A6A` |
+| `--relleno-1` a `--relleno-6` | `#4A2F20` · `#A67E48` · `#656C44` · `#B09470` · `#714930` · `#946B49` |
 
 El texto sobre el acento, la tinta o la alerta usa `--superficie`: en oscuro es oscura, así el botón principal y los avisos se invierten solos. La barra del sistema y el splash siguen en terracota y crema (el manifest no admite colores por modo).
 
 ### Tipografía
-- **Títulos:** Fraunces (Google Fonts), pesos 500 y 700. Títulos de pantalla de 32 px, de receta de 28 px, de tarjeta de 17 px. En el modo cocina, el paso va en Fraunces de 30 px.
+- **Títulos:** Fraunces, pesos 500 y 700 (las fuentes van dentro de la app, en `app/fuentes/`, así andan sin conexión: no se piden a Google). Títulos de pantalla de 32 px, de receta de 28 px, de tarjeta de 17 px. En el modo cocina, el paso va en Fraunces de 30 px.
 - **Texto:** Work Sans, pesos 400, 500 y 600. Cuerpo de 15 px; texto secundario de 13–14 px; etiquetas de sección en MAYÚSCULAS de 12 px con espaciado de 0.06em.
 
 ### Forma y espacio
@@ -425,7 +428,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 
 #### 6.1 Correcciones y riesgos
 - **Cola offline: estado esperado en la bandeja.** `bandeja.actualizar` recibe un `desde` opcional (el estado que veía la app). Si la fila ya no está en ese estado, responde `409` y la cola descarta la edición con un aviso, igual que `ingredientes_cambiaron`. Así, «Descartar» o «Probar de nuevo» mandados sin conexión no pisan una fila que la Mac ya dejó en `lista`. (`Acciones.js`, `ediciones.js`, `vistas/bandeja.js`, con su caso en `aplicarEdicion()` y su test.)
-- **Timers del modo cocina con la app en segundo plano.** Hoy no suenan si se sale de la app: el chip del timer avisa «Suena con A ojo abierta». Investigar si Chrome en Android permite abrir el temporizador del sistema con un link `intent:`; si no, queda solo el aviso.
+- **Timers del modo cocina con la app en segundo plano.** No suenan si se sale de la app: el chip del timer avisa «Suena con A ojo abierta». Investigar si Chrome en Android permite abrir el temporizador del sistema con un link `intent:`; si no, queda solo el aviso.
   - *Investigado (14/11):* Chrome solo abre con `intent:` actividades marcadas `BROWSABLE`, y no hay indicios de que la del Reloj que atiende `SET_TIMER` lo esté (no se probó en un celular). **Queda solo el aviso.**
 - **Fotos sin conexión.** Medir en el celular, con `navigator.storage.estimate()`, cuánto ocupa la caché de fotos (las de Drive se guardan como respuestas opacas, que pueden contar mucho más de lo que pesan). Dejar preparada en `urlImagen_()` (`Drive.js`) la alternativa `https://lh3.googleusercontent.com/d/<id>=w1200` por si `drive.google.com/thumbnail` deja de andar.
   - *Cómo quedó:* `FORMA_URL_FOTOS_` (`Drive.js`) elige `thumbnail` o `lh3`; solo cambia las fotos nuevas. La CSP de la app ya permite las dos.
@@ -439,7 +442,7 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 - **Detalles menores:**
   - Los colores de relleno de las fotos (`RELLENOS`, `dom.js`) pasan a tokens de `estilos.css`, en los dos modos.
   - El `confirm()` de «¿Salir sin guardar los cambios?» (`vistas/ingredientes.js`) se reemplaza por un diálogo con el estilo de la app.
-  - Una versión nueva no recarga la app mientras se escribe una nota (hoy solo se protege el modo cocina): espera, o avisa «Hay una versión nueva».
+  - Una versión nueva no recarga la app mientras se escribe una nota espera a que se cambie de pantalla (también con un pedido, el texto de una propia, ingredientes sin guardar, un link pegado o una hoja abierta).
   - `api fila` deja de bajar `todo` entero para leer una sola fila.
   - `scripts/servir.js` escucha solo en `127.0.0.1`.
 
