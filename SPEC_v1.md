@@ -428,9 +428,9 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 - **Timers del modo cocina con la app en segundo plano.** Hoy no suenan si se sale de la app: el chip del timer avisa «Suena con A ojo abierta». Investigar si Chrome en Android permite abrir el temporizador del sistema con un link `intent:`; si no, queda solo el aviso.
   - *Investigado (14/11):* Chrome solo abre con `intent:` actividades marcadas `BROWSABLE`, y no hay indicios de que la del Reloj que atiende `SET_TIMER` lo esté (no se probó en un celular). **Queda solo el aviso.**
 - **Fotos sin conexión.** Medir en el celular, con `navigator.storage.estimate()`, cuánto ocupa la caché de fotos (las de Drive se guardan como respuestas opacas, que pueden contar mucho más de lo que pesan). Dejar preparada en `urlImagen_()` (`Drive.js`) la alternativa `https://lh3.googleusercontent.com/d/<id>=w1200` por si `drive.google.com/thumbnail` deja de andar.
-  - *Hecho (14/11):* `FORMA_URL_FOTOS_` (`Drive.js`) elige `thumbnail` o `lh3`; solo cambia las fotos nuevas. La CSP de la app ya permite las dos. Falta la medición en el celular.
+  - *Cómo quedó:* `FORMA_URL_FOTOS_` (`Drive.js`) elige `thumbnail` o `lh3`; solo cambia las fotos nuevas. La CSP de la app ya permite las dos.
 - **Links `/share/` de Instagram.** `Url.js` toma `share` como nombre de usuario: `/share/p/X` se normalizaría a `/p/X/` con un id que no es el del post. Probarlo con un link real; si aparece, no canonizarlo y resolver la redirección en `fetch meta`. Con su test en `tests/url.test.js`.
-  - *Revisado (14/11):* entre los 100 links procesados no hay ninguno `/share/`, y el Android de Laura comparte `/reel/<id>/`. **Queda pendiente** hasta que aparezca uno real.
+  - *Revisado (14/11):* entre los 100 links procesados no hay ninguno `/share/`, y el Android de Laura comparte `/reel/<id>/`: se resuelve cuando aparezca uno real.
 - **Dos corridas de `/recetas` a la vez** (la Mac y la computadora de Laura): `bandeja.pendientes` no reserva nada, así que las dos podrían tomar la misma fila. Sumar una acción `bandeja.tomar` que, dentro del lock, pase a `procesando` las filas que devuelve, y que `/recetas` la use en lugar de `pendientes` + `actualizar procesando`.
 - **Capturas que quedan en Drive.** Mandarlas a la papelera cuando la fila pasa a `lista` (en `receta.upsert`) o con una limpieza de las de más de 30 días.
   - *Decidido (14/11):* al pasar a `lista`, en `receta.upsert`. Las de filas descartadas quedan (son pocas).
@@ -445,43 +445,42 @@ Sale de la revisión del proyecto del 14/11/2026, hecha con las fases 1 a 5 term
 
 #### 6.2 Infraestructura y proceso
 - **Tests en GitHub Actions:** un job `test` con `npm test` y los tests de Python (solo biblioteca estándar), y `needs: test` en el job que publica la app en Pages.
-  - *Hecho (14/11):* `.github/workflows/tests.yml`, que `pages.yml` llama antes de publicar.
+  - *Cómo quedó:* `.github/workflows/tests.yml`, que `pages.yml` llama antes de publicar.
 - **`npm run deploy` más seguro:** corre `npm test` antes del push y `procesamiento/aojo api ping` después del deploy, para detectar enseguida un permiso nuevo de Google que todavía no se aceptó.
-  - *Hecho (14/11):* el ping espera la `VERSION_API` de `Api.js`.
+  - *Cómo quedó:* el ping espera la `VERSION_API` de `Api.js`.
 - **Backup de la Sheet:** un trigger semanal de Apps Script que copia la planilla a «A ojo/backups» y conserva las últimas 8. Pide un permiso nuevo: correr `setup()` en el editor antes del deploy.
-  - *Hecho (14/11):* `Backup.js`. `setup()` instala el trigger (domingos a las 4) sin duplicarlo y, si no hay ninguna copia, hace la primera.
+  - *Cómo quedó:* `Backup.js`. `setup()` instala el trigger (domingos a las 4) sin duplicarlo y, si no hay ninguna copia, hace la primera. Desde la Fase 7 arma una planilla nueva con las hojas copiadas, sin el script (§8 de `SPEC_v2.md`).
 - **Permisos de `/recetas` en el repo:** pasar los de `.claude/settings.local.json` a un `.claude/settings.json` versionado, con rutas `~/.a-ojo/**` en lugar de rutas fijas, y sumar `.claude/settings.local.json` al `.gitignore`. Así `/recetas` corre igual en la computadora de Laura.
-  - *Hecho (14/11).*
 - **`/recetas` desde la computadora de Laura (Windows), con su propia cuenta de Claude Code.** Camino elegido: **WSL 2** (Ubuntu), donde los scripts de `procesamiento/` y `aojo` corren como en la Mac. Hace falta:
   - Que `setup.sh` acepte Linux: `apt` en lugar de Homebrew para ffmpeg, y el mismo venv con uv.
   - Cookies de la cuenta secundaria de Instagram desde **Firefox**: en Windows, Chrome cifra las cookies de forma que yt-dlp no las puede leer. Un perfil de Firefox «A ojo – procesamiento» y `fetch cookies` (o una exportación a `~/.a-ojo/cookies-instagram.txt`) reemplazan al perfil de Chrome. Actualizar `docs/perfil-instagram.md`.
-    - *Hecho (14/11):* el nombre visible del perfil de Firefox se resuelve con su `profiles.ini`, también el de Windows desde WSL (`/mnt/c/Users/*/AppData/Roaming/Mozilla/Firefox`), y yt-dlp recibe la ruta de la carpeta.
+    - *Cómo quedó:* el nombre visible del perfil de Firefox se resuelve con su `profiles.ini`, también el de Windows desde WSL (`/mnt/c/Users/*/AppData/Roaming/Mozilla/Firefox`), y yt-dlp recibe la ruta de la carpeta.
   - Su propio `.env` (misma URL de la API y mismo token, que se le pasan por privado; sin clasp ni `A_OJO_DEPLOYMENT_ID`, porque no despliega).
   - Una guía `docs/procesar-en-windows.md`: instalar WSL 2, Claude Code adentro de WSL, clonar el repo en el disco de WSL (no en `/mnt/c`, que es lento), correr `./setup.sh` y probar con `/recetas --dry-run`.
-  - *Hecho (14/11):* `setup.sh` acepta Linux con apt; la guía está en `docs/procesar-en-windows.md`, y `.gitattributes` fuerza LF por si se clona desde Windows. Falta la prueba real en la computadora de Laura.
+  - *Cómo quedó:* `setup.sh` acepta Linux con apt; la guía está en `docs/procesar-en-windows.md`, y `.gitattributes` fuerza LF por si se clona desde Windows.
   - Alternativa descartada por ahora: Windows nativo (Claude Code con Git Bash), que pediría un `setup.ps1` y adaptar las rutas del venv (`Scripts\python.exe`).
 
 #### 6.3 Funciones nuevas (de más a menos valor)
 1. **Compartir directo a A ojo.** `share_target` en el manifest: en Android, la app instalada aparece en el menú Compartir de Instagram y YouTube. Además, un campo «Pegar un link» en la Bandeja (para iPhone, iPad o una computadora sin la extensión). `capturar` ya deduplica, así que puede ir por la cola.
-   - *Hecho (14/11):* §5.3. Sin cambios en la API. Falta la prueba en Android: Chrome actualiza el manifest de la app instalada solo, pero puede tardar; si «A ojo» no aparece en Compartir, reinstalarla.
+   - *Cómo quedó:* §5.3. Sin cambios en la API. Chrome actualiza el manifest de la app instalada solo, pero puede tardar; si «A ojo» no aparece en Compartir, hay que reinstalarla.
 2. **«Algo está mal en esta receta».** Desde la ficha se pide reprocesarla con un texto («la harina son 300 g»). Queda en la bandeja y `/recetas` lo lee como instrucción.
-   - *Hecho (14/11):* columna `pedido` en `Bandeja`, `receta.corregir` (API 0.7.0), `api receta` y `--sin-foto` en `procesamiento/api.py`, §1.5 de `recetas.md`. Decidido: se parte de la receta guardada y, si el pedido contradice la fuente, gana el pedido con un tip que lo avisa. Falta la demo con la API desplegada.
+   - *Cómo quedó:* columna `pedido` en `Bandeja`, `receta.corregir` (API 0.7.0), `api receta` y `--sin-foto` en `procesamiento/api.py`, §1.5 de `recetas.md`. Decidido: se parte de la receta guardada y, si el pedido contradice la fuente, gana el pedido con un tip que lo avisa.
 3. **Quién escribió cada nota.** Un mapa de nombres para mostrar en el código (`camilo` → Camilo, `pareja` → Laura), que usan las notas y cualquier otro texto que nombre a alguien.
-   - *Hecho (14/11):* `NOMBRES` y `nombreDe()` en `formato.js`; los usan las notas de la ficha y las tarjetas de la Bandeja. Un test revisa que ningún texto de las vistas diga «pareja».
+   - *Cómo quedó:* `NOMBRES` y `nombreDe()` en `formato.js`; los usan las notas de la ficha y las tarjetas de la Bandeja. Un test revisa que ningún texto de las vistas diga «pareja».
 4. **Pasos con sus ingredientes explícitos.** `/recetas` guarda en cada paso los ingredientes que usa (columna nueva en `Pasos`); `ingredientesPorNombre()` (`cocina.js`) queda como respaldo para las recetas viejas.
-   - *Hecho (14/11):* columna `ingredientes` en `Pasos` (posiciones, «1,3»), validada en `receta.upsert` (API 0.8.0); `ingredientesDePaso()` en `cocina.js`. Las recetas viejas siguen con el respaldo (o se completan si pasan por un pedido de corrección); un `/recetas --pasos` para completarlas queda como idea.
+   - *Cómo quedó:* columna `ingredientes` en `Pasos` (posiciones, «1,3»), validada en `receta.upsert` (API 0.8.0); `ingredientesDePaso()` en `cocina.js`. Las recetas viejas siguen con el respaldo (o se completan si pasan por un pedido de corrección); un `/recetas --pasos` para completarlas queda como idea.
 5. **«Cómo se armó»** en la ficha: `notas_proceso`, plegado.
-   - *Hecho (14/11):* un `<details>` en la ficha con el origen (`textoOrigen()`, `formato.js`), la confianza y `notas_proceso`. `/recetas` las escribe desde ahora para ellos, sin jerga; las de antes quedan como están.
+   - *Cómo quedó:* un `<details>` en la ficha con el origen (`textoOrigen()`, `formato.js`), la confianza y `notas_proceso`. `/recetas` las escribe desde ahora para ellos, sin jerga; las de antes quedan como están.
 6. **Compartir una receta** por WhatsApp, como la lista de compras.
-   - *Hecho (14/11):* botón sobre la foto de la ficha; el texto lo arma `textoReceta()` (`ingredientes.js`), con las porciones de la ficha.
+   - *Cómo quedó:* botón sobre la foto de la ficha; el texto lo arma `textoReceta()` (`ingredientes.js`), con las porciones de la ficha.
 7. **Editar y borrar notas.**
-   - *Hecho (14/11):* `nota.editar` y `nota.borrar` (API 0.9.0), columnas `actualizado` y `borrada` en `Notas`. Decidido: los dos pueden editar o borrar cualquier nota; borrar pide confirmación.
+   - *Cómo quedó:* `nota.editar` y `nota.borrar` (API 0.9.0), columnas `actualizado` y `borrada` en `Notas`. Decidido: los dos pueden editar o borrar cualquier nota; borrar pide confirmación.
 8. **Re-agregar una receta a compras sin perder lo marcado:** reusar el id de cada ingrediente y que `compras.agregar` actualice la cantidad y las porciones de los que ya están.
-   - *Hecho (14/11):* `idsPara()` (`compras.js`) le da a cada ingrediente el id del ítem que ya tiene en la lista (por nombre, dentro de la receta) y `compras.agregar` actualiza esos ítems (API 0.10.0). El paso para elegir arranca con lo que ya está en la lista. Decidido: lo marcado se desmarca si ahora hace falta más.
+   - *Cómo quedó:* `idsPara()` (`compras.js`) le da a cada ingrediente el id del ítem que ya tiene en la lista (por nombre, dentro de la receta) y `compras.agregar` actualiza esos ítems (API 0.10.0). El paso para elegir arranca con lo que ya está en la lista. Decidido: lo marcado se desmarca si ahora hace falta más.
 9. **Pendientes de v2 (§1):** un «¿Qué cocino hoy?» simple (filtrar por «tengo: …» con la búsqueda que ya existe), la exportación a Obsidian y, si se revisa la decisión de procesar siempre a mano, correr `/recetas` programado en la Mac con Claude Code sin interfaz.
    - *Decidido (14/11):* se hacen «¿Qué cocino hoy?» y la exportación a Obsidian; `/recetas` programado, no por ahora (el procesamiento sigue a mano).
-   - *Hecho (14/11):* «¿Qué cocino hoy?», como modo «Con lo que tengo» de la Biblioteca.
-   - *Hecho (14/11):* exportación a Obsidian, `procesamiento/aojo obsidian` (`obsidian.py`): una nota por receta (no descartada) en `30_recursos/Recetas` de «mental palace» (`A_OJO_OBSIDIAN`), con propiedades, ingredientes, pasos, nuestras notas y «Cómo se armó». Se corre a mano; renombra por `a_ojo_id` y nunca pisa una nota ajena.
+   - *Cómo quedó:* «¿Qué cocino hoy?», como modo «Con lo que tengo» de la Biblioteca.
+   - *Cómo quedó:* exportación a Obsidian, `procesamiento/aojo obsidian` (`obsidian.py`): una nota por receta (no descartada) en `30_recursos/Recetas` de «mental palace» (`A_OJO_OBSIDIAN`), con propiedades, ingredientes, pasos, nuestras notas y «Cómo se armó». Se corre a mano; renombra por `a_ojo_id` y nunca pisa una nota ajena.
 
 #### 6.4 Forma de trabajo
 - Se implementa en Claude Code, un ítem por sesión y por commit, siguiendo `CLAUDE.md`.

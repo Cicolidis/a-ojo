@@ -1,6 +1,6 @@
 # A ojo — Plan
 
-Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia una fase, se cambia primero ahí. Cada fase termina con una demo y un commit. Una casilla se marca apenas se termina la tarea.
+Sale de la §9 de `SPEC_v1.md` (fases 1 a 6) y de la §8 de `SPEC_v2.md` (fases 7 en adelante), que siguen siendo la fuente de verdad: si cambia una fase, se cambia primero ahí. Las specs dicen qué se pide; lo que está hecho o falta va solo acá, en las casillas. Cada fase termina con una demo y un commit. Una casilla se marca apenas se termina la tarea.
 
 ## Fase 1: datos y captura
 
@@ -115,7 +115,7 @@ Sale de la §9 de `SPEC_v1.md`, que sigue siendo la fuente de verdad: si cambia 
 - [x] Backup sin script: hojas copiadas con `sheet.copyTo()` a una planilla nueva
 - [ ] Push de la API y `hacerBackup()` a mano en el editor: deja una planilla sin script en «A ojo/backups»
 - [x] Test de paridad entre `obsidian.py` y `formato.js` / `ingredientes.js`
-- [ ] Una sola lista de pendientes: sacar los estados de §9 de `SPEC_v1.md`
+- [x] Una sola lista de pendientes: sacar los estados de §9 de `SPEC_v1.md`
 
 ### Fase 8: escalado con conversión
 
