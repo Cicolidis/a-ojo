@@ -5,7 +5,7 @@
 import { h, icono, rellenar } from '../dom.js';
 import { porcionesTexto } from '../formato.js';
 import { unirConY } from '../ingredientes.js';
-import { LUGARES, REVISAR, armarLista, filaDeDespensa, lugarPorRegla, nombreLugar, paraDespensa, recetasEnLista, textoWhatsApp } from '../compras.js';
+import { LUGARES, REVISAR, armarLista, compradoParaDespensa, filaDeDespensa, lugarPorRegla, nombreLugar, recetasEnLista, textoWhatsApp } from '../compras.js';
 import { idAzar, nuevaEdicion } from '../ediciones.js';
 import { cargando, compartirTexto, navegacion, tocarAfueraCierra, vacio } from './controles.js';
 
@@ -59,17 +59,18 @@ export function montar(contenedor, { app, editar, avisar }) {
    */
   function marcar(fila, hecho, revisar) {
     editar(nuevaEdicion('compras.marcar', { ids: fila.ids, hecho }));
-    if (revisar && hecho) aLaDespensa(paraDespensa(fila.items, app.datos.despensa));
-    if (revisar && !hecho) {
+    if (revisar && hecho) aLaDespensa(compradoParaDespensa(fila.items, app.datos.despensa));
+    // Lo escrito a mano no pasa por la despensa: destildarlo tampoco la toca.
+    if (revisar && !hecho && fila.items.some(i => i.receta_id)) {
       const enCasa = filaDeDespensa(fila.items[0].nombre, app.datos.despensa);
       if (enCasa) editar(nuevaEdicion('despensa.quitar', { ids: [enCasa.id] }));
     }
     pintar('c:' + fila.clave, hecho ? fila.clave : null);
   }
 
-  /** «Limpiar marcados»: saca lo marcado de la lista y lo comprado pasa a la despensa, con «Deshacer». */
+  /** «Limpiar marcados»: saca lo marcado de la lista y lo comprado de las recetas pasa a la despensa, con «Deshacer». */
   function limpiar(marcados) {
-    const nombres = paraDespensa(marcados, app.datos.despensa);
+    const nombres = compradoParaDespensa(marcados, app.datos.despensa);
     editar(nuevaEdicion('compras.quitar', { ids: marcados.map(c => c.id) }));
     const ids = aLaDespensa(nombres);
     pintar();

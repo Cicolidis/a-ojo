@@ -1757,3 +1757,14 @@ test('repetir: una entrada con una fecha que no es de su semana (editada a mano)
   const { items } = p.repetir([{ id: 's_1', semana: '2026-11-02', fecha: '2026-11-12', comida: 'cena', receta_id: 'r_x', porciones: 2 }], '2026-11-16', porId);
   assert.deepEqual([items[0].fecha, items[0].comida], ['', '']);
 });
+
+test('compradoParaDespensa: solo lo que vino de una receta pasa a la despensa (lo escrito a mano, no)', async () => {
+  const { compradoParaDespensa } = await cargar('compras.js');
+  const items = [
+    { nombre: 'harina', receta_id: 'r_vasca', rol: 'principal' },
+    { nombre: 'servilletas', receta_id: '', rol: 'principal' },
+    { nombre: 'papel manteca', receta_id: 'r_vasca', rol: 'utensilio' },
+    { nombre: 'Huevos', receta_id: 'r_vasca', rol: 'principal' },
+  ];
+  assert.deepEqual(compradoParaDespensa(items, [{ nombre: 'huevo' }]), ['harina']);
+});

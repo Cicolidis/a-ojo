@@ -95,6 +95,14 @@ export function paraDespensa(items, despensa) {
   return nombres;
 }
 
+/**
+ * Lo comprado (o tildado en «Revisá si tenés») que pasa a la despensa: solo lo que vino de una receta.
+ * Lo escrito a mano en la lista («servilletas», «detergente») no pasa. Sin utensilios ni lo que ya está.
+ */
+export function compradoParaDespensa(items, despensa) {
+  return paraDespensa((items || []).filter(it => it.receta_id), despensa);
+}
+
 /** Los nombres escritos a mano, separados por coma, punto y coma, «y» o renglones: «harina, huevos y manteca». */
 export function nombresEscritos(texto) {
   return String(texto || '').split(/[,;\n]+|\s+y\s+/i).map(s => s.trim().replace(/\s+/g, ' ').slice(0, 80)).filter(Boolean);
